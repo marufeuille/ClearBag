@@ -1,0 +1,6 @@
+service_account.json
+sample.pdf
+token.pickle
+.env
+
+__pycache__
