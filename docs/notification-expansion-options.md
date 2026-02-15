@@ -18,50 +18,93 @@
 
 ## 技術選択肢の比較
 
-### 1. LINE Notify
+### 1. PWA (Progressive Web App) + Web Push
 
 #### 概要
-LINEの公式通知サービス。個人のLINEアカウントに通知を送信。
+PWA(Progressive Web App)とWeb Push APIを組み合わせた通知システム。ホーム画面に追加したWebアプリからプッシュ通知を送信。
 
 #### メリット
-- ✅ **導入コスト極小**: 日本ではほぼ全員がLINEアカウントを保有
-- ✅ **技術的ハードル低**: トークン発行のみで利用可能
-- ✅ **クロスプラットフォーム**: iOS/Android完全対応
-- ✅ **実装が単純**: HTTPリクエスト1回で通知完了
-- ✅ **無料**: 完全無料で利用可能
-- ✅ **既存実装との親和性**: Slack Notifierと同じ構造で実装可能
+- ✅ **アプリストア不要**: ブラウザからホーム画面に追加するだけ
+- ✅ **完全無料**: 開発者登録料なし、通知送信料なし
+- ✅ **クロスプラットフォーム**: iOS 16.4+/Android完全対応
+- ✅ **ネイティブ相当の体験**: ホーム画面アイコン、プッシュ通知、オフライン動作
+- ✅ **低実装コスト**: HTML/CSS/JavaScriptのみ、Service Worker追加
+- ✅ **柔軟なUI**: 通知一覧表示、既読管理、フィルタリングなど自由に実装可能
+- ✅ **段階的な拡張**: 最初はシンプルに、後から双方向通知やリッチUIを追加可能
 
 #### デメリット
-- ❌ **一方向通知のみ**: ユーザーからの返信・アクション不可
-- ❌ **グループ通知に制限**: 個別トークンが必要(ユーザーごとに設定)
-- ❌ **LINE依存**: LINEサービス停止時に影響を受ける
-- ⚠️ **UIカスタマイズ制限**: テキスト+画像のみ、リッチメニューなし
+- ⚠️ **ホーム画面追加が必要**: 初回のみユーザーが「ホーム画面に追加」操作が必要
+- ⚠️ **通知許可が必要**: ブラウザの通知許可ダイアログでユーザーが許可する必要あり
+- ⚠️ **iOS制限**: iOS 16.4未満では動作しない(2026年現在はほぼ問題なし)
+- ⚠️ **バックグラウンド制約**: iOSではネイティブアプリより制約が多い(Time Sensitiveなし)
 
 #### 実装の難易度
-**★☆☆☆☆ (極めて容易)**
+**★★★☆☆ (中程度)**
 
+**フロントエンド (PWA)**:
+```javascript
+// service-worker.js
+self.addEventListener('push', (event) => {
+  const data = event.data.json();
+  self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: '/icon.png',
+    badge: '/badge.png',
+    data: data
+  });
+});
+
+// app.js - 通知購読
+const registration = await navigator.serviceWorker.register('/sw.js');
+const subscription = await registration.pushManager.subscribe({
+  userVisibleOnly: true,
+  applicationServerKey: VAPID_PUBLIC_KEY
+});
+// subscription情報をサーバーに送信
+```
+
+**バックエンド (Python)**:
 ```python
-# 実装イメージ
-class LineNotifier(Notifier):
-    def __init__(self, access_token: str):
-        self._token = access_token
+from pywebpush import webpush
+
+class PWANotifier(Notifier):
+    def __init__(self, vapid_private_key: str, vapid_claims: dict, subscriptions: list[dict]):
+        self._vapid_key = vapid_private_key
+        self._vapid_claims = vapid_claims
+        self._subscriptions = subscriptions
 
     def notify_file_processed(self, filename, summary, events, tasks, file_link):
-        message = self._build_message(filename, summary, events, tasks, file_link)
-        requests.post(
-            'https://notify-api.line.me/api/notify',
-            headers={'Authorization': f'Bearer {self._token}'},
-            data={'message': message}
-        )
+        payload = {
+            "title": f"📄 {filename} 処理完了",
+            "body": summary,
+            "events": len(events),
+            "tasks": len(tasks),
+            "link": file_link
+        }
+        for subscription in self._subscriptions:
+            webpush(
+                subscription_info=subscription,
+                data=json.dumps(payload),
+                vapid_private_key=self._vapid_key,
+                vapid_claims=self._vapid_claims
+            )
 ```
 
 #### 運用コスト
-- トークン管理: ユーザーごとに1トークン必要
-- 保守: API仕様が安定しており、メンテナンス頻度低
+- **開発者登録料**: なし
+- **通知送信料**: 完全無料(FCMを使う場合も無料枠で十分)
+- **ホスティング**: Cloud Run/Vercel/Netlifyなどで無料枠内で運用可能
+- **保守**: Webアプリなので一度デプロイすれば自動更新、アプリ審査なし
+
+#### 初期セットアップ手順(ユーザー側)
+1. ブラウザ(Safari/Chrome)でPWAのURLにアクセス
+2. 「ホーム画面に追加」をタップ(iOSはシェアボタン→「ホーム画面に追加」)
+3. アプリを開いて「通知を許可」をタップ
+4. 完了!以降、通知が届く
 
 ---
 
-### 2. Firebase Cloud Messaging (FCM)
+### 2. Firebase Cloud Messaging (FCM) - ネイティブアプリ
 
 #### 概要
 Googleが提供するクロスプラットフォームのプッシュ通知サービス。
@@ -94,58 +137,7 @@ Googleが提供するクロスプラットフォームのプッシュ通知サ�
 
 ---
 
-### 3. Email (Gmail API / SendGrid)
-
-#### 概要
-メールでの通知。Gmail APIまたはSendGridなどのメール送信サービスを利用。
-
-#### メリット
-- ✅ **導入コスト極小**: 全ユーザーがメールアドレスを保有
-- ✅ **完全なクロスプラットフォーム**: すべての端末で受信可能
-- ✅ **技術的ハードル低**: SMTP/APIで簡単に送信可能
-- ✅ **既存実装との親和性**: Notifierポートに容易に実装可能
-- ✅ **リッチコンテンツ**: HTML形式で自由な表現が可能
-
-#### デメリット
-- ❌ **即時性の欠如**: プッシュ通知と比較して気づきにくい
-- ❌ **迷惑メール判定リスク**: 受信設定によっては届かない可能性
-- ⚠️ **通知優先度低**: メールアプリの通知設定に依存
-- ⚠️ **送信制限**: Gmail APIは1日500通の制限あり(SendGridは有料プランで拡張可)
-
-#### 実装の難易度
-**★★☆☆☆ (容易)**
-
-Gmail API使用の場合:
-```python
-class EmailNotifier(Notifier):
-    def __init__(self, credentials: Credentials, to_addresses: list[str]):
-        self._service = build('gmail', 'v1', credentials=credentials)
-        self._to_addresses = to_addresses
-
-    def notify_file_processed(self, filename, summary, events, tasks, file_link):
-        message = self._build_html_message(filename, summary, events, tasks, file_link)
-        for to_addr in self._to_addresses:
-            self._send_email(to_addr, subject, message)
-```
-
-SendGrid使用の場合:
-```python
-class SendGridNotifier(Notifier):
-    def __init__(self, api_key: str, to_addresses: list[str]):
-        self._sg = SendGridAPIClient(api_key)
-        self._to_addresses = to_addresses
-
-    def notify_file_processed(self, ...):
-        # SendGrid APIで送信
-```
-
-#### 運用コスト
-- **Gmail API**: 無料、OAuth認証の定期的な更新が必要
-- **SendGrid**: 月100通まで無料、それ以上は従量課金($14.95~/月)
-
----
-
-### 4. SMS (Twilio / AWS SNS)
+### 3. SMS (Twilio / AWS SNS)
 
 #### 概要
 電話番号へのSMS送信サービス。
@@ -190,7 +182,7 @@ class TwilioSMSNotifier(Notifier):
 
 ---
 
-### 5. LINE公式アカウント (Messaging API)
+### 4. LINE公式アカウント (Messaging API)
 
 #### 概要
 LINE公式アカウントを作成し、Messaging APIでメッセージを送信。
@@ -232,45 +224,41 @@ class LineMessagingNotifier(Notifier):
 
 ## 推奨ランキング
 
-### 🥇 1位: LINE Notify
+### 🥇 1位: PWA (Progressive Web App) + Web Push
 **総合評価: ★★★★★**
 
 #### 理由
-- **導入コスト**: ほぼゼロ(既存LINEアカウントのみ)
-- **実装コスト**: 最小(1-2時間で完成)
-- **運用コスト**: 無料、保守不要
-- **既存システムとの統合**: Slack Notifierと同じ構造で実装可能
+- **導入コスト**: 極小(ブラウザでアクセス→ホーム画面追加のみ)
+- **実装コスト**: 中程度(1-2日で完成、フロント+バックエンド)
+- **運用コスト**: 完全無料、アプリ審査なし、自動更新
+- **拡張性**: 通知一覧、既読管理、双方向対応など自由に拡張可能
+- **自己完結**: 外部サービス依存なし、すべて自分で管理
 
-#### ユーザー別設定方法
-1. 各ユーザーがLINE Notifyにアクセス: https://notify-bot.line.me/
-2. 「マイページ」→「トークンを発行する」
-3. トークン名を入力(例: 「学校通知」)、通知先トークルームを選択
-4. 発行されたトークンを管理者に共有
-5. 管理者が環境変数またはGoogle Sheetsに設定
+#### ユーザー側の初期設定手順
+1. SafariまたはChromeでPWAのURLにアクセス
+2. 「ホーム画面に追加」をタップ(iOS: シェアボタン→「ホーム画面に追加」)
+3. ホーム画面のアイコンからアプリを開く
+4. 「通知を許可」をタップ
+5. 完了!(以降、バックグラウンドでプッシュ通知が届く)
 
 #### 実装タスク(別途定義)
-- `LineNotifier`クラスの実装
-- 複数トークン対応(妻用・祖母用)
-- 設定ファイルへのトークン追加機能
+**フロントエンド**:
+- PWA基本構成(manifest.json, service-worker.js)
+- 通知許可ダイアログ、購読情報の送信
+- 通知受信時の表示処理
+- 通知一覧画面(任意)
+
+**バックエンド**:
+- `PWANotifier`クラスの実装(`v2/adapters/pwa_notifier.py`)
+- VAPID鍵生成・管理
+- 購読情報の保存(Google Sheets or Firestore)
+- pywebpushライブラリでのプッシュ送信
+
+**工数見積: 1-2日(フロント半日、バックエンド半日、テスト半日)**
 
 ---
 
-### 🥈 2位: Email (Gmail API)
-**総合評価: ★★★★☆**
-
-#### 理由
-- **導入コスト**: ゼロ(全員がメールアドレス保有)
-- **実装コスト**: 小(2-3時間)
-- **運用コスト**: 無料(Gmail APIの場合)
-- **懸念点**: 即時性がやや劣る、迷惑メール判定リスク
-
-#### 適用シーン
-- 緊急性の低い通知(1日1回のサマリーなど)
-- LINE Notifyと併用してバックアップ通知先とする
-
----
-
-### 🥉 3位: LINE公式アカウント
+### 🥈 2位: LINE公式アカウント (Messaging API)
 **総合評価: ★★★☆☆**
 
 #### 理由
@@ -278,50 +266,73 @@ class LineMessagingNotifier(Notifier):
 - **実装コスト**: 中(半日程度)
 - **運用コスト**: 無料枠内(月60通想定)
 - **将来性**: 双方向対応、リッチコンテンツ対応で拡張性が高い
+- **懸念点**: 月200通制限、以降は従量課金
 
 #### 適用シーン
+- PWA実装までの暫定対応として
 - 将来的にユーザーからの返信対応を考慮する場合
-- よりリッチなUI/UXを提供したい場合
+- LINEアプリ内で完結したい場合
 
 ---
 
 ### ❌ 推奨しない選択肢
 
-#### FCM (Firebase Cloud Messaging)
-- **理由**: 専用アプリ開発コストが高すぎる
+#### LINE Notify
+- **理由**: 2025年3月31日にサービス終了済み
+- **代替**: LINE公式アカウント(Messaging API)またはPWA
+
+#### FCM (ネイティブアプリ)
+- **理由**: 専用アプリ開発コストが高すぎる(Swift + Kotlin)
 - **対象ユーザー**: 2名のみで、ROIが見合わない
-- **判断基準**: ユーザー数が100名以上になった場合に再検討
+- **代替**: PWAで同等の体験を低コストで実現可能
 
 #### SMS (Twilio)
 - **理由**: ランニングコストが高い(月420円)
-- **代替案**: LINE Notifyで無料実現可能
-- **判断基準**: LINEが使えない高齢者向けなど、特殊ケースのみ
+- **代替**: PWAで無料実現可能
+- **判断基準**: LINEもPWAも使えない高齢者向けなど、特殊ケースのみ
 
 ---
 
 ## 実装ロードマップ(提案)
 
-### Phase 1: LINE Notify実装(優先度: 高)
-1. `LineNotifier`クラスの作成(`v2/adapters/line_notify.py`)
-2. トークン設定機能の追加(環境変数 or Google Sheets)
-3. 既存`SlackNotifier`と並行稼働(両方に通知)
-4. ユーザーテスト(妻・祖母がトークン発行、通知受信確認)
+### Phase 1: PWA基本実装(優先度: 高)
+1. **フロントエンド構築**
+   - PWA基本構成: `manifest.json`, `service-worker.js`
+   - 通知許可リクエスト画面
+   - プッシュ購読情報の送信処理
+   - シンプルなUI(通知許可ボタンのみ)
 
-**工数見積: 2-3時間**
+2. **バックエンド実装**
+   - `PWANotifier`クラスの作成(`v2/adapters/pwa_notifier.py`)
+   - VAPID鍵生成・環境変数設定
+   - 購読情報の保存(Google Sheets追加カラム or Firestore)
+   - pywebpushでのプッシュ通知送信
 
-### Phase 2: Email実装(優先度: 中)
-1. バックアップ通知先としてEmail追加
-2. Gmail API認証設定
-3. 通知送信先メールアドレス設定機能
+3. **デプロイ**
+   - Cloud Run / Vercel / Netlifyでホスティング
+   - HTTPS必須(Let's Encryptで無料SSL)
 
-**工数見積: 3-4時間**
+4. **ユーザーテスト**
+   - 妻・祖母にURLを共有→ホーム画面追加→通知許可
+   - テスト通知送信、受信確認
 
-### Phase 3: 通知先選択機能(優先度: 低)
-1. ユーザーごとに通知先を選択可能にする
-2. Google Sheetsのプロファイルに`notification_channels`カラム追加
-3. 複数チャンネルへの並行通知対応
+**工数見積: 1-2日**
 
-**工数見積: 2-3時間**
+### Phase 2: 通知履歴・既読管理(優先度: 中)
+1. 通知一覧画面の追加
+2. 既読/未読管理
+3. 通知のフィルタリング(イベント/タスク)
+4. 通知からGoogle Calendar/Todoistへのディープリンク
+
+**工数見積: 1日**
+
+### Phase 3: リッチ通知・オフライン対応(優先度: 低)
+1. リッチ通知(画像、アクションボタン)
+2. オフライン時の通知キュー
+3. バックグラウンド同期
+4. アプリ内でのファイルプレビュー
+
+**工数見積: 1-2日**
 
 ---
 
@@ -348,10 +359,9 @@ class Notifier(ABC):
 **すべての選択肢がこのインターフェースに適合可能**。実装例:
 
 - `SlackNotifier` (既存)
-- `LineNotifier` (LINE Notify)
-- `EmailNotifier` (Gmail API / SendGrid)
-- `SMSNotifier` (Twilio / AWS SNS)
+- `PWANotifier` (PWA + Web Push)
 - `LineMessagingNotifier` (LINE公式アカウント)
+- `SMSNotifier` (Twilio / AWS SNS)
 
 ### 複数通知先への対応パターン
 
@@ -377,10 +387,9 @@ notification_channels:
   - type: slack
     token: ${SLACK_BOT_TOKEN}
     channel_id: ${SLACK_CHANNEL_ID}
-  - type: line_notify
-    token: ${LINE_NOTIFY_TOKEN_WIFE}
-  - type: line_notify
-    token: ${LINE_NOTIFY_TOKEN_GRANDMA}
+  - type: pwa
+    vapid_private_key: ${VAPID_PRIVATE_KEY}
+    subscriptions_source: google_sheets  # or firestore
 ```
 
 ---
@@ -389,10 +398,25 @@ notification_channels:
 
 | 選択肢 | 導入 | 実装 | 運用 | 総合 | 推奨度 |
 |--------|------|------|------|------|--------|
-| LINE Notify | ★★★★★ | ★★★★★ | ★★★★★ | ★★★★★ | 🥇 最推奨 |
-| Email (Gmail) | ★★★★★ | ★★★★☆ | ★★★★★ | ★★★★☆ | 🥈 推奨 |
-| LINE公式 | ★★★★☆ | ★★★☆☆ | ★★★★☆ | ★★★☆☆ | 🥉 将来性 |
+| PWA + Web Push | ★★★★☆ | ★★★☆☆ | ★★★★★ | ★★★★★ | 🥇 最推奨 |
+| LINE公式 | ★★★★☆ | ★★★☆☆ | ★★★★☆ | ★★★☆☆ | 🥈 暫定対応 |
 | SMS | ★★★★★ | ★★★★☆ | ★☆☆☆☆ | ★★☆☆☆ | ❌ 非推奨 |
-| FCM | ★☆☆☆☆ | ★☆☆☆☆ | ★★☆☆☆ | ★☆☆☆☆ | ❌ 非推奨 |
+| FCMネイティブ | ★☆☆☆☆ | ★☆☆☆☆ | ★★☆☆☆ | ★☆☆☆☆ | ❌ 非推奨 |
 
-**最終推奨**: Phase 1でLINE Notifyを実装し、Phase 2でEmailをバックアップとして追加する構成が最適。
+**最終推奨**: PWAをメイン通知先として実装。導入までの暫定対応としてLINE公式アカウントを検討。
+
+---
+
+## 参考資料
+
+### PWA + Web Push
+- [How to Set Up Push Notifications for Your PWA (iOS and Android)](https://www.mobiloud.com/blog/pwa-push-notifications)
+- [Using Push Notifications in PWAs: The Complete Guide](https://www.magicbell.com/blog/using-push-notifications-in-pwas)
+- [Do Progressive Web Apps Work on iOS? The Complete Guide for 2026](https://www.mobiloud.com/blog/progressive-web-apps-ios)
+
+### LINE Notify終了関連
+- [LINE Notify終了の衝撃!LINE Works APIでBot移行を試みた顛末](https://zenn.dev/ncdc/articles/90c6302a1b949a)
+- [line notifyのサービス終了理由と代替通知方法を徹底比較!](https://assist-all.co.jp/column/line/20250611-5167/)
+
+### LINE公式アカウント料金
+- [【2026年最新】LINE公式アカウントの料金プランを解説](https://line-sm.com/blog/line-official-2023-price-update/)
