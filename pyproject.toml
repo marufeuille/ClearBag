@@ -14,3 +14,23 @@ dependencies = [
     "slack-sdk>=3.39.0",
     "todoist-api-python>=3.1.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "manual: 手動実行のみ（実際のAPI呼び出しを行う）",
+]
