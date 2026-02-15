@@ -1,0 +1,37 @@
+[project]
+name = "school-ai-app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "functions-framework>=3.10.0",
+    "google-api-python-client>=2.187.0",
+    "google-auth-httplib2>=0.2.1",
+    "google-auth-oauthlib>=1.2.3",
+    "google-cloud-aiplatform>=1.129.0",
+    "pandas>=2.3.3",
+    "python-dotenv>=1.2.1",
+    "slack-sdk>=3.39.0",
+    "todoist-api-python>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "manual: 手動実行のみ（実際のAPI呼び出しを行う）",
+]

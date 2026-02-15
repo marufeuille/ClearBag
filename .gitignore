@@ -1,0 +1,8 @@
+service_account.json
+token.pickle
+.env
+
+__pycache__
+
+# Test samples (local only)
+sample/
