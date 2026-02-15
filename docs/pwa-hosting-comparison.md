@@ -263,33 +263,62 @@ pwa-notification/
 
 PWAのフロントエンドはCloudflare Pages、バックエンド(プッシュ通知送信)は別途必要。
 
-### 推奨: Cloud Run(Google Cloud)
+### 推奨: Cloud Functions gen2(Google Cloud) - **既存実装を拡張**
+
+#### 現状
+- **既にCloud Functions gen2で稼働中**: `school-agent-v2`
+- **エントリーポイント**: `v2/entrypoints/cloud_function.py`
+- **デプロイスクリプト**: `deploy_v2.sh`
 
 #### 料金
 - **無料枠**: 月200万リクエストまで無料
-- **CPU時間**: 月18万vCPU秒まで無料
-- **メモリ**: 月36万GB秒まで無料
-- **ネットワーク**: 月1GB Egress無料(北米リージョン)
+- **CPU時間**: 月40万GB秒まで無料
+- **ネットワーク**: 月5GB Egress無料
 
 #### 想定コスト
 - **月60通の通知送信**: 完全無料枠内
-- **月間実行時間**: 推定60秒(1通1秒 × 60通) → 無料枠の0.03%
+- **月間実行時間**: 推定60秒(1通1秒 × 60通) → 無料枠の0.0015%
 
 #### メリット
-- ✅ 従量課金(使った分だけ)
-- ✅ スケーリング自動
-- ✅ Python完全対応
-- ✅ pywebpushライブラリ利用可能
+- ✅ **既存システムに統合**: 新規デプロイ不要、同じFunctionに機能追加するだけ
+- ✅ **自動スケーリング**: リクエスト数に応じて自動拡張
+- ✅ **Python完全対応**: pywebpushライブラリ利用可能
+- ✅ **秘密情報管理**: Secret Manager統合済み
+- ✅ **ログ統合**: Cloud Loggingで既存ログと一元管理
 
-#### デプロイ方法
-```bash
-# Dockerコンテナ化してデプロイ
-gcloud run deploy pwa-notifier \
-  --source . \
-  --platform managed \
-  --region asia-northeast1 \
-  --allow-unauthenticated
+#### 実装方針
+既存の`Notifier`ポートに`PWANotifier`を追加するだけ:
+
+```python
+# v2/adapters/pwa_notifier.py
+from pywebpush import webpush
+from v2.domain.ports import Notifier
+
+class PWANotifier(Notifier):
+    def __init__(self, vapid_private_key: str, vapid_claims: dict, subscriptions: list[dict]):
+        self._vapid_key = vapid_private_key
+        self._vapid_claims = vapid_claims
+        self._subscriptions = subscriptions
+
+    def notify_file_processed(self, filename, summary, events, tasks, file_link):
+        # Web Push送信処理
+        ...
 ```
+
+既存の`deploy_v2.sh`で自動デプロイされる。
+
+#### Cloud Runとの比較
+
+| 項目 | Cloud Functions gen2 | Cloud Run |
+|------|---------------------|-----------|
+| **既存統合** | ✅ 既に使用中 | ❌ 新規構築必要 |
+| **デプロイ** | ✅ `deploy_v2.sh`で自動 | ❌ Dockerfile作成必要 |
+| **コード変更** | ✅ アダプタ追加のみ | ❌ コンテナ化必要 |
+| **無料枠** | 200万req/月 | 200万req/月 |
+| **起動速度** | ★★★★☆ | ★★★★★ |
+| **適用ケース** | HTTP関数 | コンテナ全般 |
+
+**結論**: Cloud Functions gen2で十分。わざわざCloud Runに移行する理由なし。
 
 ---
 
@@ -297,13 +326,13 @@ gcloud run deploy pwa-notifier \
 
 ### 構成
 - **フロントエンド(PWA)**: Cloudflare Pages
-- **バックエンド(通知送信)**: Cloud Run
+- **バックエンド(通知送信)**: Cloud Functions gen2(既存)
 
 ### 月額コスト
 | 項目 | コスト |
 |------|--------|
 | Cloudflare Pages | **0円** |
-| Cloud Run | **0円**(無料枠内) |
+| Cloud Functions gen2 | **0円**(無料枠内) |
 | **合計** | **0円/月** |
 
 ### スケーリング時のコスト予測
@@ -327,18 +356,18 @@ gcloud run deploy pwa-notifier \
 
 ## まとめ
 
-**🎯 最終決定: Cloudflare Pages + Cloud Run**
+**🎯 最終決定: Cloudflare Pages + Cloud Functions gen2**
 
 ### 理由
 1. **完全無料**: ユーザー2名の規模では永久に0円
-2. **スケーラビリティ**: ユーザー100人まで無料枠内
-3. **高パフォーマンス**: 世界最速級のCDN
-4. **PWA完璧対応**: Service Worker、Push API問題なし
-5. **運用負荷ゼロ**: 自動スケーリング、自動SSL、自動デプロイ
+2. **既存システムに統合**: 新規サービス不要、`PWANotifier`アダプタ追加のみ
+3. **スケーラビリティ**: ユーザー100人まで無料枠内
+4. **高パフォーマンス**: Cloudflare世界最速級CDN + Google Cloud Functions
+5. **運用負荷ゼロ**: 自動スケーリング、自動SSL、`deploy_v2.sh`で自動デプロイ
 
 ### 実装ロードマップへの反映
 - Phase 1に「Cloudflare Pagesへのデプロイ」を追加
-- バックエンドは「Cloud Runへのコンテナデプロイ」を追加
+- バックエンドは「既存Cloud Functionsに`PWANotifier`追加」のみ
 
 ---
 
