@@ -37,14 +37,27 @@ v2/
 
 tests/
 ├── conftest.py        # 共通fixture（モックとサンプルデータ）
-└── unit/
-    ├── test_models.py
-    ├── test_action_dispatcher.py
-    └── test_orchestrator.py
+├── unit/              # ユニットテスト
+│   ├── test_models.py
+│   ├── test_action_dispatcher.py
+│   └── test_orchestrator.py
+├── integration/       # 統合テスト（実際のAPIを使用）
+│   └── test_adapters_manual.py
+├── e2e/              # End-to-Endテスト
+│   └── test_v2_full_pipeline.py
+└── manual/           # 手動実行用テスト・ユーティリティ
+    ├── adapters/     # アダプタ個別テスト
+    │   ├── test_all_adapters.py
+    │   ├── test_gemini.py
+    │   ├── test_calendar_today.py
+    │   └── test_calendar_with_profile.py
+    └── utils/        # ユーティリティスクリプト
+        ├── check_folders.py
+        ├── upload_sample_to_inbox.py
+        ├── debug_calendar.py
+        └── verify_cloud.py
 
 # ルートディレクトリ
-test_adapters.py     # アダプタ個別動作確認
-test_v2_e2e.py       # End-to-End統合テスト
 main_v2.py           # Cloud Functionsデプロイ用
 ```
 
@@ -101,18 +114,35 @@ python -m v2.entrypoints.cli
 LOG_LEVEL=DEBUG python -m v2.entrypoints.cli
 ```
 
-### 統合テスト（End-to-End）
+### End-to-Endテスト
 
 ```bash
-# Inboxにテスト用ファイルを配置してから実行
-python test_v2_e2e.py
+# 完全なパイプライン統合テスト
+uv run python -m pytest tests/e2e/test_v2_full_pipeline.py -v
+
+# または直接実行
+uv run python tests/e2e/test_v2_full_pipeline.py
 ```
 
 ### 個別アダプタテスト
 
 ```bash
-# 各アダプタの動作確認
-python test_adapters.py
+# 全アダプタの動作確認
+uv run python tests/manual/adapters/test_all_adapters.py
+
+# 個別テスト
+uv run python tests/manual/adapters/test_gemini.py
+uv run python tests/manual/adapters/test_calendar_today.py
+```
+
+### ユーティリティスクリプト
+
+```bash
+# Inbox/Archiveフォルダの確認
+uv run python tests/manual/utils/check_folders.py
+
+# sample.pdfをInboxにアップロード（※Service Account制限のため手動推奨）
+uv run python tests/manual/utils/upload_sample_to_inbox.py
 ```
 
 ## ユニットテスト
