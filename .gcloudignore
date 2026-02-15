@@ -15,3 +15,32 @@
 
 node_modules
 #!include:.gitignore
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+tests/
+
+# Environment
+.env
+.env.local
+service_account.json
+
+# Examples and docs
+examples/
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

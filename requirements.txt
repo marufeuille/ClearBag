@@ -31,7 +31,7 @@ googleapis-common-protos==1.72.0
 grpc-google-iam-v1==0.14.3
 grpcio==1.76.0
 grpcio-status==1.76.0
-gunicorn==23.0.0
+gunicorn==25.1.0
 h11==0.16.0
 httpcore==1.0.9
 httplib2==0.31.0
@@ -60,7 +60,7 @@ rsa==4.9.1
 shapely==2.1.2
 six==1.17.0
 slack-sdk==3.39.0
-starlette==0.50.0
+starlette==0.52.1
 tenacity==9.1.2
 todoist-api-python==3.1.0
 typing-extensions==4.15.0
@@ -68,8 +68,8 @@ typing-inspection==0.4.2
 tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.5.0
-uvicorn==0.38.0
+uvicorn==0.40.0
 uvicorn-worker==0.4.0
 watchdog==6.0.0
 websockets==15.0.1
-werkzeug==3.1.4
+werkzeug==3.1.5

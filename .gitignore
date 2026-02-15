@@ -1,6 +1,8 @@
 service_account.json
-sample.pdf
 token.pickle
 .env
 
 __pycache__
+
+# Test samples (local only)
+sample/
