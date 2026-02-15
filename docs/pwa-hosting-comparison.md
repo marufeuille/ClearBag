@@ -11,7 +11,94 @@
 
 ---
 
-## 🥇 最推奨: Cloudflare Pages
+## 🥇 最推奨: Firebase Hosting(Google Cloud統一案)
+
+### 料金
+**Sparkプラン(無料)**
+
+### 無料枠の詳細
+- ✅ **ストレージ**: 10GB
+- ✅ **データ転送**: 10GB/月
+- ✅ **カスタムドメイン**: 対応
+- ✅ **SSL証明書**: 自動発行・更新
+- ✅ **CDN**: Google Cloud CDN(世界中の拠点)
+- ✅ **PWA専用機能**: URL rewrite, カスタムヘッダー、ローカライゼーション
+- ✅ **Firebase統合**: Firestore, Auth, Cloud Functionsと完全統合
+
+### メリット
+- 🎯 **Google Cloud完全統合**: Cloud Functions gen2と同じGCPプロジェクト
+- 🔑 **認証情報の統一**: 同じサービスアカウント、Secret Manager
+- 📊 **ログの一元管理**: Cloud Loggingで全て統合
+- 🚀 **PWA専用設計**: Service Worker、Push API、manifest.json最適化
+- 🔒 **無料SSL/HTTPS**: 自動取得・更新
+- 🔄 **Git連携**: GitHub Actions + Firebase CLI で自動デプロイ
+- 🌐 **カスタムドメイン**: 独自ドメイン使用可能
+- 📱 **Firebase連携**: 将来的にFirestore(購読情報保存)やAuthを追加しやすい
+
+### デメリット
+- ⚠️ **転送量制限**: 10GB/月(超過時は従量課金)
+- 💰 **超過時のコスト**: $0.15/GB(10GB超過ごとに約$1.50)
+
+### 想定コスト(ユーザー2人の場合)
+- **月間転送量**: 推定1-2GB(PWAアプリ本体 + 通知配信)
+- **コスト**: **0円/月**(10GB無料枠内)
+
+### PWA対応
+- ✅ **Service Worker完全対応**
+- ✅ **manifest.json対応**
+- ✅ **HTTPS標準対応**(PWA必須)
+- ✅ **Push API対応**
+- ✅ **公式PWAドキュメント**: [Firebase PWA Guide](https://firebase.google.com/docs/hosting)
+
+### デプロイ方法
+```bash
+# Firebase CLI インストール
+npm install -g firebase-tools
+
+# Firebaseプロジェクト初期化(既存GCPプロジェクトと紐付け)
+firebase login
+firebase init hosting
+# → 既存のGCPプロジェクトIDを選択
+
+# デプロイ
+firebase deploy --only hosting
+
+# または、GitHub Actions で自動デプロイ
+# .github/workflows/deploy-pwa.yml に設定
+```
+
+### Google Cloud統一のメリット
+
+#### 1. 認証情報の統一
+```bash
+# 同じサービスアカウントを使用
+SERVICE_ACCOUNT_EMAIL=$(grep -o '"client_email": "[^"]*' service_account.json | cut -d'"' -f4)
+
+# Firebase HostingもCloud Functionsも同じ権限で管理
+```
+
+#### 2. ログの一元管理
+- Cloud Loggingで全てのログを統合表示
+- PWAアクセスログ + Cloud Functionsログを一箇所で確認
+
+#### 3. Secret Managerの統合
+```bash
+# 既存のSecret Manager設定をそのまま使用
+VAPID_PRIVATE_KEY_SECRET="school-agent-vapid-private-key"
+
+# Firebase HostingからもSecret Manager経由でVAPID鍵を参照可能
+```
+
+#### 4. IAM権限の統一
+- 同じGCPプロジェクト内で完結
+- 権限管理が一元化
+
+### 想定月額コスト
+**0円** (無料枠10GB内)
+
+---
+
+## 🥈 次点: Cloudflare Pages
 
 ### 料金
 **完全無料**
@@ -22,47 +109,23 @@
 - ✅ **サイト数**: 無制限!
 - ✅ **カスタムドメイン**: 100個まで
 - ✅ **CDN**: 全世界300+拠点に無料配信
-- ⚠️ **ビルド数**: 月500回まで(十分)
-- ⚠️ **同時ビルド**: 1つまで
-- ⚠️ **ファイルサイズ**: 最大25MB/ファイル、最大20,000ファイル
 
 ### メリット
 - 🎯 **帯域幅無制限が最大の強み**: ユーザー数が増えても追加コスト0円
 - 🚀 **超高速CDN**: Cloudflareの世界最速級CDN
 - 🔒 **無料SSL/HTTPS**: 自動取得・更新
-- 🌐 **カスタムドメイン対応**: 独自ドメイン使用可能
 - 🔄 **Git連携**: GitHub/GitLab連携で自動デプロイ
-- 🛡️ **DDoS保護**: 無料で標準装備
-- 📊 **Web Analytics**: 基本的なアクセス解析が無料
 
 ### デメリット
-- ⚠️ **サーバーレス関数制限**: Workers(エッジ関数)は1日100,000リクエストまで無料
-- ⚠️ **ビルド時間**: 複雑なビルドには不向き(PWAは影響なし)
-
-### PWA対応
-- ✅ Service Worker完全対応
-- ✅ manifest.json対応
-- ✅ HTTPS標準対応(PWA必須)
-- ✅ Push API対応
-
-### デプロイ方法
-```bash
-# Wranglerを使う場合
-npm install -g wrangler
-wrangler pages deploy ./dist
-
-# または、GitHub連携で自動デプロイ
-# 1. Cloudflare Dashboardでリポジトリ連携
-# 2. ビルドコマンド設定
-# 3. mainブランチへのpushで自動デプロイ
-```
+- ❌ **別サービス管理**: Google Cloudと別アカウント、別認証
+- ⚠️ **ログ分散**: Firebase HostingとCloudflare Pagesで別々のダッシュボード
 
 ### 想定月額コスト
 **0円** (無制限プラン)
 
 ---
 
-## 🥈 次点: Vercel
+## 🥉 3位: Vercel
 
 ### 料金
 **Hobby(無料)プラン**
@@ -109,48 +172,6 @@ vercel --prod
 
 ---
 
-## 🥉 3位: Firebase Hosting
-
-### 料金
-**Sparkプラン(無料)**
-
-### 無料枠の詳細
-- ✅ **ストレージ**: 10GB
-- ✅ **データ転送**: 10GB/月
-- ✅ **カスタムドメイン**: 対応
-- ✅ **SSL証明書**: 自動
-- ✅ **CDN**: Google Cloud CDN
-
-### メリット
-- 🔥 **Firebaseエコシステム**: Firestore, Auth, FCMと統合しやすい
-- 📊 **Analytics**: Google Analyticsと統合
-- 🔄 **バージョン管理**: 過去のデプロイ履歴を保持
-- 🌐 **カスタムドメイン**: 簡単設定
-
-### デメリット
-- ❌ **転送量制限**: 10GB/月(超過時は従量課金)
-- 💰 **超過時のコスト**: $0.15/GB(10GB超過ごとに約$1.50)
-- ⚠️ **Blazeプランへの移行必要**: 無料枠超過時
-
-### PWA対応
-- ✅ Service Worker完全対応
-- ✅ PWA公式ドキュメントあり
-- ✅ manifest.json対応
-
-### デプロイ方法
-```bash
-npm install -g firebase-tools
-firebase login
-firebase init hosting
-firebase deploy
-```
-
-### 想定月額コスト
-- **無料枠内**: 0円(転送量10GB未満)
-- **超過時**: 約$0.15/GB × 超過GB数
-
----
-
 ## ❌ 非推奨: GitHub Pages
 
 ### 料金
@@ -185,18 +206,19 @@ firebase deploy
 
 ## 詳細比較表
 
-| 項目 | Cloudflare Pages | Vercel | Firebase Hosting | GitHub Pages |
-|------|------------------|--------|------------------|--------------|
+| 項目 | Firebase Hosting | Cloudflare Pages | Vercel | GitHub Pages |
+|------|------------------|------------------|--------|--------------|
 | **月額基本料** | 0円 | 0円 | 0円 | 0円 |
-| **帯域幅** | ∞ 無制限 | 100GB | 10GB | 100GB |
-| **ストレージ** | 25MB/file | - | 10GB | 1GB |
-| **カスタムドメイン** | ✅ | ✅ | ✅ | ✅ |
+| **帯域幅** | 10GB | ∞ 無制限 | 100GB | 100GB |
+| **ストレージ** | 10GB | 25MB/file | - | 1GB |
+| **GCP統合** | ✅ 完全統合 | ❌ 別サービス | ❌ 別サービス | ❌ 別サービス |
+| **認証情報** | ✅ 統一 | ❌ 別アカウント | ❌ 別アカウント | ❌ 別アカウント |
+| **ログ管理** | ✅ Cloud Logging | ❌ 分散 | ❌ 分散 | ❌ 分散 |
 | **SSL/HTTPS** | ✅ 自動 | ✅ 自動 | ✅ 自動 | ✅ 自動 |
-| **CDN速度** | ★★★★★ | ★★★★★ | ★★★★☆ | ★★★☆☆ |
+| **CDN速度** | ★★★★☆ | ★★★★★ | ★★★★★ | ★★★☆☆ |
 | **PWA対応** | ★★★★★ | ★★★★★ | ★★★★★ | ★★☆☆☆ |
-| **デプロイ容易性** | ★★★★☆ | ★★★★★ | ★★★★☆ | ★★★☆☆ |
-| **商用利用** | ✅ 可能 | ⚠️ 規約制限 | ✅ 可能 | ⚠️ 規約制限 |
-| **超過時コスト** | 0円 | $20/月 | ~$0.15/GB | 制限あり |
+| **商用利用** | ✅ 可能 | ✅ 可能 | ⚠️ 規約制限 | ⚠️ 規約制限 |
+| **超過時コスト** | ~$0.15/GB | 0円 | $20/月 | 制限あり |
 
 ---
 
@@ -324,15 +346,19 @@ class PWANotifier(Notifier):
 
 ## 総合コスト見積もり
 
-### 構成
-- **フロントエンド(PWA)**: Cloudflare Pages
+### 構成(Google Cloud統一)
+- **フロントエンド(PWA)**: Firebase Hosting
 - **バックエンド(通知送信)**: Cloud Functions gen2(既存)
+- **購読情報保存**: Google Sheets(既存) or Firestore(将来)
+- **秘密鍵管理**: Secret Manager(既存)
 
 ### 月額コスト
 | 項目 | コスト |
 |------|--------|
-| Cloudflare Pages | **0円** |
-| Cloud Functions gen2 | **0円**(無料枠内) |
+| Firebase Hosting | **0円**(10GB無料枠内) |
+| Cloud Functions gen2 | **0円**(200万req無料枠内) |
+| Google Sheets API | **0円**(既存利用) |
+| Secret Manager | **0円**(既存利用) |
 | **合計** | **0円/月** |
 
 ### スケーリング時のコスト予測
@@ -356,17 +382,41 @@ class PWANotifier(Notifier):
 
 ## まとめ
 
-**🎯 最終決定: Cloudflare Pages + Cloud Functions gen2**
+**🎯 最終決定: Firebase Hosting + Cloud Functions gen2 (Google Cloud統一)**
 
 ### 理由
-1. **完全無料**: ユーザー2名の規模では永久に0円
-2. **既存システムに統合**: 新規サービス不要、`PWANotifier`アダプタ追加のみ
-3. **スケーラビリティ**: ユーザー100人まで無料枠内
-4. **高パフォーマンス**: Cloudflare世界最速級CDN + Google Cloud Functions
-5. **運用負荷ゼロ**: 自動スケーリング、自動SSL、`deploy_v2.sh`で自動デプロイ
+1. **Google Cloud完全統合**: 全てのサービスが同じGCPプロジェクト内
+2. **運用管理の一元化**:
+   - 認証情報: 同じサービスアカウント
+   - ログ: Cloud Loggingで一元管理
+   - 権限: IAMで統一管理
+   - Secret Manager: VAPID鍵も同じSecret Managerで管理
+3. **完全無料**: ユーザー2名の規模では永久に0円(10GB無料枠内)
+4. **既存システムに統合**: Cloud Functions gen2に`PWANotifier`追加のみ
+5. **PWA専用設計**: Firebase HostingはPWAに最適化済み
+6. **拡張性**: 将来的にFirestore(購読情報)やAuth追加が容易
+
+### Google Cloud統一の具体的メリット
+
+#### 運用面
+- ダッシュボード1つで全て管理(GCP Console)
+- ログ検索が統一(Cloud Logging)
+- アラート設定が統一(Cloud Monitoring)
+- コスト管理が統一(Cloud Billing)
+
+#### セキュリティ面
+- サービスアカウント1つで完結
+- Secret Manager統一(VAPID鍵、Slack Token等)
+- IAM権限の一元管理
+- 監査ログの統合
+
+#### 開発面
+- デプロイスクリプトの統一(`deploy_v2.sh`に追加)
+- 環境変数の統一管理
+- CI/CDパイプラインの統合
 
 ### 実装ロードマップへの反映
-- Phase 1に「Cloudflare Pagesへのデプロイ」を追加
+- Phase 1に「Firebase Hostingへのデプロイ」を追加
 - バックエンドは「既存Cloud Functionsに`PWANotifier`追加」のみ
 
 ---
