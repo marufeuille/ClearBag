@@ -1,23 +1,27 @@
-# School Agent
+# School Agent v2
 
 学校のプリントや書類の処理を自動化するAIエージェントです。Google Driveからファイルを読み込み、Google Geminiを使って内容・文脈・日付を解析し、自動的にGoogleカレンダーへの予定登録、Todoistへのタスク追加、Slackへの通知を行います。
+
+**v2ではHexagonal Architecture(ヘキサゴナルアーキテクチャ)を採用し、テスタビリティと拡張性を大幅に向上させました。**
 
 ## 機能
 
 - **自動スキャン**: 特定のGoogle Driveフォルダ (`Inbox`) を監視します。
-- **AI解析**: Gemini 1.5 Pro を使用して、文書の内容を理解します。
+- **AI解析**: Gemini 2.5 Pro を使用して、文書の内容を理解します。
 - **カレンダー連携**: 家族メンバーごとに指定されたGoogleカレンダーに予定を追加します。
-- **タスク管理**: アクションが必要な項目（例：「提出」「持ち物」）をTodoistに登録します。
+- **タスク管理**: アクションが必要な項目(例:「提出」「持ち物」)をTodoistに登録します。
 - **通知**: 処理結果の要約をSlackに送信します。
 - **アーカイブ**: ファイルを検索しやすい名前 (`YYYYMMDD_タイトル`) にリネームし、`Archive` フォルダに移動します。
 
 ## アーキテクチャ
 
-- **言語**: Python
-- **AI**: Google Vertex AI (Gemini 1.5 Pro)
+- **言語**: Python 3.13
+- **設計**: Hexagonal Architecture (Ports & Adapters)
+- **AI**: Google Vertex AI (Gemini 2.5 Pro)
 - **ストレージ**: Google Drive
 - **設定管理**: Google Sheets
 - **連携**: Google Calendar, Todoist, Slack
+- **テストカバレッジ**: 100% (31 unit tests)
 
 ## セットアップ
 
@@ -29,8 +33,8 @@
     - Google Calendar API
     - Vertex AI API
 - 適切な権限を持つサービスアカウント
-- Todoist アカウント & APIトークン
-- Slack ワークスペース & Botトークン
+- Todoist アカウント & APIトークン (オプション)
+- Slack ワークスペース & Botトークン (オプション)
 
 ### 2. インストール
 
@@ -44,46 +48,170 @@ uv sync
 
 ### 3. 設定
 
-1.  **Google Sheets**: `Profiles` と `Rules` タブを持つ設定用シートを作成します（詳細は `SPECIFICATION.md` 参照）。
+1.  **Google Sheets**: `Profiles` と `Rules` タブを持つ設定用シートを作成します(詳細は `SPECIFICATION.md` 参照)。
 2.  **環境変数**: ルートディレクトリに `.env` ファイルを作成します:
 
 ```env
+# 必須
 PROJECT_ID=your-google-cloud-project-id
 SPREADSHEET_ID=your-config-sheet-id
 INBOX_FOLDER_ID=your-inbox-drive-folder-id
 ARCHIVE_FOLDER_ID=your-archive-drive-folder-id
+
+# オプショナル(未設定の場合はスキップされます)
 TODOIST_API_TOKEN=your-todoist-token
 SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
 SLACK_CHANNEL_ID=your-slack-channel-id
+
+# デフォルト値あり
+VERTEX_AI_LOCATION=us-central1  # デフォルト: us-central1
+GEMINI_MODEL=gemini-2.5-pro     # デフォルト: gemini-2.5-pro
 ```
 
-3.  **認証情報**: `service_account.json` をルートディレクトリに配置します。
+3.  **認証情報**: `service_account.json` をルートディレクトリに配置、または環境変数で指定します:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+```
 
 ### 4. 使用方法
 
-エージェントスクリプトを実行します:
+#### CLI実行
 
 ```bash
-uv run src/main.py
+# 基本実行
+python -m v2.entrypoints.cli
+
+# ログレベル変更
+LOG_LEVEL=DEBUG python -m v2.entrypoints.cli
+```
+
+#### Cloud Functionsデプロイ
+
+```bash
+# デプロイスクリプトの実行
+./deploy_v2.sh
+
+# または手動でデプロイ
+gcloud functions deploy school-agent-v2 \
+  --gen2 \
+  --runtime=python313 \
+  --region=asia-northeast1 \
+  --source=. \
+  --entry-point=school_agent_http \
+  --trigger-http \
+  --allow-unauthenticated \
+  --timeout=540s \
+  --memory=1024Mi \
+  --set-env-vars PROJECT_ID=xxx,SPREADSHEET_ID=xxx,...
 ```
 
 ## ディレクトリ構成
 
 ```
 .
-├── src/
-│   ├── main.py           # エントリーポイント
-│   ├── config.py         # 設定読み込み
-│   ├── drive_utils.py    # Google Drive 操作
-│   ├── gemini_client.py  # Vertex AI クライアント
-│   ├── calendar_client.py# Google Calendar クライアント
-│   ├── todoist_client.py # Todoist クライアント
-│   └── slack_client.py   # Slack クライアント
-├── .env                  # 環境変数 (git管理外)
-├── requirements.txt      # Python依存ライブラリ
-├── service_account.json  # Google認証情報 (git管理外)
-└── SPECIFICATION.md      # システム仕様書
+├── v2/                   # v2実装(Hexagonal Architecture)
+│   ├── domain/          # ドメインモデル・ポート定義
+│   │   ├── models.py    # 8つのdataclass(Profile, Rule, EventData等)
+│   │   ├── errors.py    # ドメイン固有の例外
+│   │   └── ports.py     # 6つのABC(ConfigSource, FileStorage等)
+│   ├── services/        # ビジネスロジック
+│   │   ├── orchestrator.py       # メインワークフロー
+│   │   └── action_dispatcher.py  # 解析結果→アクション振り分け
+│   ├── adapters/        # 外部サービス実装
+│   │   ├── credentials.py        # Google認証
+│   │   ├── google_sheets.py      # ConfigSource実装
+│   │   ├── google_drive.py       # FileStorage実装
+│   │   ├── google_calendar.py    # CalendarService実装
+│   │   ├── gemini.py             # DocumentAnalyzer実装(Gemini 2.5 Pro)
+│   │   ├── todoist.py            # TaskService実装
+│   │   └── slack.py              # Notifier実装
+│   ├── entrypoints/     # エントリーポイント
+│   │   ├── factory.py            # DI組み立て(Null Object Pattern含む)
+│   │   ├── cli.py                # CLI実行
+│   │   └── cloud_function.py     # Cloud Functions実行
+│   └── config.py        # 環境変数からの設定読み込み
+├── tests/
+│   ├── conftest.py      # 共通fixture(モックとサンプルデータ)
+│   ├── unit/            # ユニットテスト(31テスト、100%カバレッジ)
+│   ├── integration/     # 統合テスト
+│   ├── e2e/            # End-to-Endテスト
+│   └── manual/         # 手動実行用テスト・ユーティリティ
+├── main_v2.py          # Cloud Functionsデプロイ用エントリーポイント
+├── deploy_v2.sh        # デプロイスクリプト
+├── .env                # 環境変数 (git管理外)
+├── requirements.txt    # Python依存ライブラリ
+├── service_account.json# Google認証情報 (git管理外)
+├── ARCHITECTURE_V2.md  # 詳細設計ドキュメント
+└── SPECIFICATION.md    # システム仕様書
 ```
+
+## テスト
+
+```bash
+# 全ユニットテスト実行
+pytest tests/unit -v
+
+# カバレッジ付き
+pytest tests/unit --cov=v2 --cov-report=html
+
+# E2Eテスト
+pytest tests/e2e/test_v2_full_pipeline.py -v
+
+# 個別アダプタテスト
+python tests/manual/adapters/test_all_adapters.py
+```
+
+**現在のテストカバレッジ: 100% (31 unit tests)**
+
+## 設計原則
+
+### Hexagonal Architecture
+
+- **Domain層**: ビジネスロジックのみ。外部依存なし。
+- **Ports**: ABCで定義。型安全性を確保。
+- **Adapters**: 外部サービス実装。ポートに準拠。
+- **Entrypoints**: 依存性を組み立ててドメインを起動。
+
+### 重要な設計判断
+
+1. **ABC > Protocol**: 実装漏れをインスタンス化時に即座に検出
+2. **frozen dataclass > Pydantic**: 標準ライブラリのみ。不変性保証
+3. **Constructor Injection**: テスト時にモック差し替えが容易
+4. **Null Object Pattern**: オプショナルサービス(Todoist/Slack)の優雅な処理
+5. **logging > print**: テストで`caplog` fixture検証可能
+
+### 拡張性
+
+- 新しい通知先追加: `Notifier` ABCを実装するだけ
+- 新しいストレージ: `FileStorage` ABCを実装するだけ
+- 新しいLLM: `DocumentAnalyzer` ABCを実装するだけ
+
+## トラブルシューティング
+
+### Todoist/Slack通知が送信されない
+
+トークンが設定されていない場合、Null Objectパターンで処理がスキップされます。
+ログに以下のメッセージが出力されます:
+
+```
+WARNING: TODOIST_API_TOKEN not set, tasks will not be created
+WARNING: Slack tokens not set, notifications will not be sent
+```
+
+必要に応じて `.env` にトークンを追加してください。
+
+### Gemini解析エラー
+
+- `PROJECT_ID` が正しいか確認
+- Service Accountに Vertex AI User ロールが付与されているか確認
+- リージョン(`VERTEX_AI_LOCATION`)が正しいか確認
+
+## 詳細ドキュメント
+
+- [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) - v2設計詳細
+- [v2/README.md](v2/README.md) - v2実装ドキュメント
+- [SPECIFICATION.md](SPECIFICATION.md) - システム仕様書
 
 ## ライセンス
 
