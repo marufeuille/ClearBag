@@ -230,12 +230,19 @@ gcloud scheduler jobs create http school-agent-daily \
 
 1. **環境変数** `SERVICE_ACCOUNT_EMAIL` が設定されている場合はそれを使用
 2. **ローカルファイル** `service_account.json` が存在する場合はそこから抽出
-3. **gcloud コマンド** プロジェクトのService Accountを自動取得
+3. **gcloud コマンド** プロジェクトのService Accountを自動取得:
+   - Compute Engine default service account (`PROJECT_ID-compute@developer.gserviceaccount.com`)
+   - App Engine default service account (`PROJECT_ID@appspot.gserviceaccount.com`)
+   - その他の最初のService Account
 
-推奨: `.env` に `SERVICE_ACCOUNT_EMAIL` を設定
+**推奨設定方法:**
 
 ```bash
+# .env ファイルに追加（最も確実）
 SERVICE_ACCOUNT_EMAIL=your-sa@your-project.iam.gserviceaccount.com
+
+# または gcloud のデフォルトプロジェクトを設定
+gcloud config set project YOUR_PROJECT_ID
 ```
 
 ### 既存デプロイから allUsers 権限を削除

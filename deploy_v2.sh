@@ -55,17 +55,53 @@ elif [ -f "service_account.json" ]; then
   echo "Extracting SERVICE_ACCOUNT_EMAIL from service_account.json"
   SERVICE_ACCOUNT_EMAIL=$(grep -o '"client_email": "[^"]*' service_account.json | cut -d'"' -f4)
 else
-  echo "Using default service account from gcloud"
+  echo "Attempting to get service account from gcloud..."
+
+  # Get project ID from gcloud config if not set
+  GCLOUD_PROJECT="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null)}"
+
+  if [ -z "$GCLOUD_PROJECT" ]; then
+    echo "Error: Could not determine PROJECT_ID"
+    echo "Please set PROJECT_ID in .env or run: gcloud config set project PROJECT_ID"
+    exit 1
+  fi
+
+  # Try to find the Compute Engine default service account first (most common)
   SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list \
-    --project="$PROJECT_ID" \
-    --filter="email:*@$PROJECT_ID.iam.gserviceaccount.com" \
+    --project="$GCLOUD_PROJECT" \
+    --filter="email:$GCLOUD_PROJECT-compute@developer.gserviceaccount.com" \
     --format="value(email)" \
-    --limit=1)
+    --limit=1 2>/dev/null)
+
+  # If not found, try App Engine default service account
+  if [ -z "$SERVICE_ACCOUNT_EMAIL" ]; then
+    SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list \
+      --project="$GCLOUD_PROJECT" \
+      --filter="email:$GCLOUD_PROJECT@appspot.gserviceaccount.com" \
+      --format="value(email)" \
+      --limit=1 2>/dev/null)
+  fi
+
+  # If still not found, use any service account from the project
+  if [ -z "$SERVICE_ACCOUNT_EMAIL" ]; then
+    SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list \
+      --project="$GCLOUD_PROJECT" \
+      --format="value(email)" \
+      --limit=1 2>/dev/null)
+  fi
+
+  if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
+    echo "Found service account from gcloud: $SERVICE_ACCOUNT_EMAIL"
+  fi
 fi
 
 if [ -z "$SERVICE_ACCOUNT_EMAIL" ]; then
   echo "Error: Could not determine SERVICE_ACCOUNT_EMAIL"
-  echo "Please set SERVICE_ACCOUNT_EMAIL environment variable or ensure service_account.json exists"
+  echo ""
+  echo "Please use one of the following methods:"
+  echo "  1. Set SERVICE_ACCOUNT_EMAIL in .env file"
+  echo "  2. Place service_account.json in the project root"
+  echo "  3. Ensure gcloud is configured with: gcloud config set project PROJECT_ID"
   exit 1
 fi
 
