@@ -226,16 +226,29 @@ gcloud scheduler jobs create http school-agent-daily \
 
 ### Service Account の設定
 
-デプロイスクリプトは以下の順でService Accountを検出します:
+**重要**: `SERVICE_ACCOUNT_EMAIL`の設定は**オプション**です。
 
-1. **環境変数** `SERVICE_ACCOUNT_EMAIL` が設定されている場合はそれを使用
-2. **ローカルファイル** `service_account.json` が存在する場合はそこから抽出
-3. **gcloud コマンド** プロジェクトのService Accountを自動取得
+デプロイスクリプトの動作:
 
-推奨: `.env` に `SERVICE_ACCOUNT_EMAIL` を設定
+1. **環境変数** `SERVICE_ACCOUNT_EMAIL` が設定されている場合:
+   - 指定されたService Accountを使用してFunctionをデプロイ
+   - CloudSchedulerも同じアカウントでOIDC認証
+
+2. **service_account.json** が存在する場合:
+   - ファイルからService Accountメールを抽出して使用
+
+3. **どちらも未設定の場合** (CI/CD環境で推奨):
+   - Cloud Functionsは自動的に**Compute Engine default service account**を使用
+   - CloudSchedulerはデプロイ後にFunctionから使用中のアカウントを取得
+
+**推奨設定:**
 
 ```bash
-SERVICE_ACCOUNT_EMAIL=your-sa@your-project.iam.gserviceaccount.com
+# ローカル開発: service_account.json を配置
+cp /path/to/service-account-key.json service_account.json
+
+# CI/CD環境: 設定不要（デフォルトのCompute Engine SAを使用）
+# Workload Identity Federation経由で認証するだけでOK
 ```
 
 ### 既存デプロイから allUsers 権限を削除
