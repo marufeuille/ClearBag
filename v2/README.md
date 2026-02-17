@@ -180,22 +180,24 @@ gcloud functions deploy school-agent-v2 \
   --entry-point=school_agent_http \
   --trigger-http \
   --no-allow-unauthenticated \
-  --service-account=SERVICE_ACCOUNT_EMAIL \
   --timeout=540s \
   --memory=512Mi \
   --set-env-vars PROJECT_ID=xxx,SPREADSHEET_ID=xxx,INBOX_FOLDER_ID=xxx,ARCHIVE_FOLDER_ID=xxx
+
+# Note: --service-account は指定不要。GCPが自動的にデフォルトSAを割り当てます
 ```
 
 ### Cloud Schedulerで定期実行
 
 ```bash
 # 毎日9時に実行（OIDC認証でService Account経由でアクセス）
+# deploy_v2.sh が自動的にFunctionのService Accountを使用して設定します
 gcloud scheduler jobs create http school-agent-daily \
   --schedule="0 9 * * *" \
   --uri="https://us-central1-xxx.cloudfunctions.net/school-agent-v2" \
   --http-method=POST \
   --time-zone="Asia/Tokyo" \
-  --oidc-service-account-email=SERVICE_ACCOUNT_EMAIL
+  --oidc-service-account-email=PROJECT_ID-compute@developer.gserviceaccount.com
 ```
 
 ## 設計原則
@@ -226,29 +228,26 @@ gcloud scheduler jobs create http school-agent-daily \
 
 ### Service Account の設定
 
-**重要**: `SERVICE_ACCOUNT_EMAIL`の設定は**オプション**です。
+**重要**: デプロイスクリプトはService Accountを自動的に処理します。手動設定は不要です。
 
 デプロイスクリプトの動作:
 
-1. **環境変数** `SERVICE_ACCOUNT_EMAIL` が設定されている場合:
-   - 指定されたService Accountを使用してFunctionをデプロイ
-   - CloudSchedulerも同じアカウントでOIDC認証
+1. **Cloud Functionsのデプロイ**:
+   - `--service-account`フラグを指定せずにデプロイ
+   - GCPが自動的に**Compute Engine default service account**を割り当て
 
-2. **service_account.json** が存在する場合:
-   - ファイルからService Accountメールを抽出して使用
+2. **Cloud Schedulerの設定**:
+   - デプロイ後、Functionが使用しているService Accountを取得
+   - そのアカウントをOIDC認証に使用
 
-3. **どちらも未設定の場合** (CI/CD環境で推奨):
-   - Cloud Functionsは自動的に**Compute Engine default service account**を使用
-   - CloudSchedulerはデプロイ後にFunctionから使用中のアカウントを取得
-
-**推奨設定:**
+**認証方法:**
 
 ```bash
-# ローカル開発: service_account.json を配置
-cp /path/to/service-account-key.json service_account.json
+# ローカル開発: gcloud認証
+gcloud auth application-default login
 
-# CI/CD環境: 設定不要（デフォルトのCompute Engine SAを使用）
-# Workload Identity Federation経由で認証するだけでOK
+# CI/CD環境: Workload Identity Federation
+# GitHub ActionsやCloud Buildで自動的に認証される
 ```
 
 ### 既存デプロイから allUsers 権限を削除

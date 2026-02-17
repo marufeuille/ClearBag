@@ -47,19 +47,6 @@ done
 echo "Generating requirements.txt..."
 uv export -o requirements.txt --no-hashes
 
-# Extract Service Account Email (optional - for Cloud Scheduler OIDC auth)
-# If not set, Cloud Functions will use the default Compute Engine service account
-if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
-  echo "Using SERVICE_ACCOUNT_EMAIL from environment variable: $SERVICE_ACCOUNT_EMAIL"
-elif [ -f "service_account.json" ]; then
-  echo "Extracting SERVICE_ACCOUNT_EMAIL from service_account.json"
-  SERVICE_ACCOUNT_EMAIL=$(grep -o '"client_email": "[^"]*' service_account.json | cut -d'"' -f4)
-  echo "Using Service Account: $SERVICE_ACCOUNT_EMAIL"
-else
-  echo "SERVICE_ACCOUNT_EMAIL not set - Cloud Functions will use default Compute Engine service account"
-  echo "Cloud Scheduler will use the same account for OIDC authentication"
-fi
-
 # Construct Environment Variables String (Non-secrets)
 ENV_VARS="PROJECT_ID=$PROJECT_ID"
 ENV_VARS+=",SPREADSHEET_ID=$SPREADSHEET_ID"
@@ -180,11 +167,6 @@ if [ "$DEPLOY_FUNCTION" = true ]; then
     --no-allow-unauthenticated \
     --set-env-vars $ENV_VARS"
 
-  # Add service account only if explicitly set
-  if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
-    DEPLOY_CMD+=" --service-account=$SERVICE_ACCOUNT_EMAIL"
-  fi
-
   # Add secrets only if any are defined
   if [ -n "$SECRETS_MAPPING" ]; then
     DEPLOY_CMD+=" --set-secrets $SECRETS_MAPPING"
@@ -214,16 +196,19 @@ fi
 
 echo "Function URL: $FUNCTION_URL"
 
-# Determine service account for Cloud Scheduler OIDC auth
-# Use explicitly set SERVICE_ACCOUNT_EMAIL, or get the one used by the deployed function
+# Get service account from deployed function for Cloud Scheduler OIDC auth
+echo "Getting service account from deployed function..."
+SERVICE_ACCOUNT_EMAIL=$(gcloud functions describe "$FUNCTION_NAME" \
+  --project="$PROJECT_ID" \
+  --region="$REGION" \
+  --format="value(serviceConfig.serviceAccountEmail)" 2>/dev/null)
+
 if [ -z "$SERVICE_ACCOUNT_EMAIL" ]; then
-  echo "Getting service account from deployed function..."
-  SERVICE_ACCOUNT_EMAIL=$(gcloud functions describe "$FUNCTION_NAME" \
-    --project="$PROJECT_ID" \
-    --region="$REGION" \
-    --format="value(serviceConfig.serviceAccountEmail)" 2>/dev/null)
-  echo "Function is using: $SERVICE_ACCOUNT_EMAIL"
+  echo "Error: Could not retrieve service account from deployed function"
+  exit 1
 fi
+
+echo "Function is using service account: $SERVICE_ACCOUNT_EMAIL"
 
 # Check if job exists
 if gcloud scheduler jobs describe "$SCHEDULER_JOB_NAME" --project="$PROJECT_ID" --location="$REGION" > /dev/null 2>&1; then
