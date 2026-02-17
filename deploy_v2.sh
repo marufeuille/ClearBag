@@ -173,7 +173,7 @@ if [ "$DEPLOY_FUNCTION" = true ]; then
     --service-account=$SERVICE_ACCOUNT_EMAIL \
     --memory=1024MiB \
     --trigger-http \
-    --allow-unauthenticated \
+    --no-allow-unauthenticated \
     --set-env-vars $ENV_VARS"
 
   # Add secrets only if any are defined

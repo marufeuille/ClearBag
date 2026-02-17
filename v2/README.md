@@ -162,6 +162,13 @@ pytest tests/unit/test_orchestrator.py -v
 
 ## Cloud Functionsデプロイ
 
+### セキュリティ設定
+
+Cloud Functionsは**認証必須**で、CloudScheduler経由のアクセスのみを許可します:
+- `--no-allow-unauthenticated`: allUsers権限を付与しない
+- CloudSchedulerは`--oidc-service-account-email`でService Accountの認証トークンを使用
+- 直接のHTTPアクセスは**403 Forbidden**で拒否されます
+
 ### デプロイコマンド
 
 ```bash
@@ -172,7 +179,8 @@ gcloud functions deploy school-agent-v2 \
   --source=. \
   --entry-point=school_agent_http \
   --trigger-http \
-  --allow-unauthenticated \
+  --no-allow-unauthenticated \
+  --service-account=SERVICE_ACCOUNT_EMAIL \
   --timeout=540s \
   --memory=512Mi \
   --set-env-vars PROJECT_ID=xxx,SPREADSHEET_ID=xxx,INBOX_FOLDER_ID=xxx,ARCHIVE_FOLDER_ID=xxx
@@ -181,12 +189,13 @@ gcloud functions deploy school-agent-v2 \
 ### Cloud Schedulerで定期実行
 
 ```bash
-# 毎日9時に実行
+# 毎日9時に実行（OIDC認証でService Account経由でアクセス）
 gcloud scheduler jobs create http school-agent-daily \
   --schedule="0 9 * * *" \
   --uri="https://us-central1-xxx.cloudfunctions.net/school-agent-v2" \
   --http-method=POST \
-  --time-zone="Asia/Tokyo"
+  --time-zone="Asia/Tokyo" \
+  --oidc-service-account-email=SERVICE_ACCOUNT_EMAIL
 ```
 
 ## 設計原則
@@ -214,6 +223,34 @@ gcloud scheduler jobs create http school-agent-daily \
 - 新しい通知先追加: `Notifier` ABCを実装するだけ
 - 新しいストレージ: `FileStorage` ABCを実装するだけ
 - 新しいLLM: `DocumentAnalyzer` ABCを実装するだけ
+
+### 既存デプロイから allUsers 権限を削除
+
+既にデプロイ済みのFunctionから`allUsers`権限を削除する方法:
+
+```bash
+# 1. 現在のIAMポリシーを確認
+gcloud functions get-iam-policy school-agent-v2 \
+  --region=asia-northeast1 \
+  --project=YOUR_PROJECT_ID
+
+# 2. allUsers権限を削除
+gcloud functions remove-iam-policy-binding school-agent-v2 \
+  --region=asia-northeast1 \
+  --project=YOUR_PROJECT_ID \
+  --member="allUsers" \
+  --role="roles/cloudfunctions.invoker"
+
+# 3. 削除されたことを確認（allUsersが表示されないこと）
+gcloud functions get-iam-policy school-agent-v2 \
+  --region=asia-northeast1 \
+  --project=YOUR_PROJECT_ID
+```
+
+または、`deploy_v2.sh`を再実行すると自動的に修正されます:
+```bash
+./deploy_v2.sh
+```
 
 ## トラブルシューティング
 
