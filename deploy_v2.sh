@@ -48,12 +48,28 @@ echo "Generating requirements.txt..."
 uv export -o requirements.txt --no-hashes
 
 # Extract Service Account Email
-SERVICE_ACCOUNT_EMAIL=$(grep -o '"client_email": "[^"]*' service_account.json | cut -d'"' -f4)
+# Try multiple methods in order of preference
+if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
+  echo "Using SERVICE_ACCOUNT_EMAIL from environment variable"
+elif [ -f "service_account.json" ]; then
+  echo "Extracting SERVICE_ACCOUNT_EMAIL from service_account.json"
+  SERVICE_ACCOUNT_EMAIL=$(grep -o '"client_email": "[^"]*' service_account.json | cut -d'"' -f4)
+else
+  echo "Using default service account from gcloud"
+  SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list \
+    --project="$PROJECT_ID" \
+    --filter="email:*@$PROJECT_ID.iam.gserviceaccount.com" \
+    --format="value(email)" \
+    --limit=1)
+fi
 
 if [ -z "$SERVICE_ACCOUNT_EMAIL" ]; then
-  echo "Error: Could not extract client_email from service_account.json"
+  echo "Error: Could not determine SERVICE_ACCOUNT_EMAIL"
+  echo "Please set SERVICE_ACCOUNT_EMAIL environment variable or ensure service_account.json exists"
   exit 1
 fi
+
+echo "Using Service Account: $SERVICE_ACCOUNT_EMAIL"
 
 # Construct Environment Variables String (Non-secrets)
 ENV_VARS="PROJECT_ID=$PROJECT_ID"

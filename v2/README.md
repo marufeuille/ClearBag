@@ -224,6 +224,20 @@ gcloud scheduler jobs create http school-agent-daily \
 - 新しいストレージ: `FileStorage` ABCを実装するだけ
 - 新しいLLM: `DocumentAnalyzer` ABCを実装するだけ
 
+### Service Account の設定
+
+デプロイスクリプトは以下の順でService Accountを検出します:
+
+1. **環境変数** `SERVICE_ACCOUNT_EMAIL` が設定されている場合はそれを使用
+2. **ローカルファイル** `service_account.json` が存在する場合はそこから抽出
+3. **gcloud コマンド** プロジェクトのService Accountを自動取得
+
+推奨: `.env` に `SERVICE_ACCOUNT_EMAIL` を設定
+
+```bash
+SERVICE_ACCOUNT_EMAIL=your-sa@your-project.iam.gserviceaccount.com
+```
+
 ### 既存デプロイから allUsers 権限を削除
 
 既にデプロイ済みのFunctionから`allUsers`権限を削除する方法:
