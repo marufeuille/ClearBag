@@ -47,65 +47,18 @@ done
 echo "Generating requirements.txt..."
 uv export -o requirements.txt --no-hashes
 
-# Extract Service Account Email
-# Try multiple methods in order of preference
+# Extract Service Account Email (optional - for Cloud Scheduler OIDC auth)
+# If not set, Cloud Functions will use the default Compute Engine service account
 if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
-  echo "Using SERVICE_ACCOUNT_EMAIL from environment variable"
+  echo "Using SERVICE_ACCOUNT_EMAIL from environment variable: $SERVICE_ACCOUNT_EMAIL"
 elif [ -f "service_account.json" ]; then
   echo "Extracting SERVICE_ACCOUNT_EMAIL from service_account.json"
   SERVICE_ACCOUNT_EMAIL=$(grep -o '"client_email": "[^"]*' service_account.json | cut -d'"' -f4)
+  echo "Using Service Account: $SERVICE_ACCOUNT_EMAIL"
 else
-  echo "Attempting to get service account from gcloud..."
-
-  # Get project ID from gcloud config if not set
-  GCLOUD_PROJECT="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null)}"
-
-  if [ -z "$GCLOUD_PROJECT" ]; then
-    echo "Error: Could not determine PROJECT_ID"
-    echo "Please set PROJECT_ID in .env or run: gcloud config set project PROJECT_ID"
-    exit 1
-  fi
-
-  # Try to find the Compute Engine default service account first (most common)
-  SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list \
-    --project="$GCLOUD_PROJECT" \
-    --filter="email:$GCLOUD_PROJECT-compute@developer.gserviceaccount.com" \
-    --format="value(email)" \
-    --limit=1 2>/dev/null)
-
-  # If not found, try App Engine default service account
-  if [ -z "$SERVICE_ACCOUNT_EMAIL" ]; then
-    SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list \
-      --project="$GCLOUD_PROJECT" \
-      --filter="email:$GCLOUD_PROJECT@appspot.gserviceaccount.com" \
-      --format="value(email)" \
-      --limit=1 2>/dev/null)
-  fi
-
-  # If still not found, use any service account from the project
-  if [ -z "$SERVICE_ACCOUNT_EMAIL" ]; then
-    SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list \
-      --project="$GCLOUD_PROJECT" \
-      --format="value(email)" \
-      --limit=1 2>/dev/null)
-  fi
-
-  if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
-    echo "Found service account from gcloud: $SERVICE_ACCOUNT_EMAIL"
-  fi
+  echo "SERVICE_ACCOUNT_EMAIL not set - Cloud Functions will use default Compute Engine service account"
+  echo "Cloud Scheduler will use the same account for OIDC authentication"
 fi
-
-if [ -z "$SERVICE_ACCOUNT_EMAIL" ]; then
-  echo "Error: Could not determine SERVICE_ACCOUNT_EMAIL"
-  echo ""
-  echo "Please use one of the following methods:"
-  echo "  1. Set SERVICE_ACCOUNT_EMAIL in .env file"
-  echo "  2. Place service_account.json in the project root"
-  echo "  3. Ensure gcloud is configured with: gcloud config set project PROJECT_ID"
-  exit 1
-fi
-
-echo "Using Service Account: $SERVICE_ACCOUNT_EMAIL"
 
 # Construct Environment Variables String (Non-secrets)
 ENV_VARS="PROJECT_ID=$PROJECT_ID"
@@ -222,11 +175,15 @@ if [ "$DEPLOY_FUNCTION" = true ]; then
     --runtime=$RUNTIME \
     --source=$SOURCE_DIR \
     --entry-point=$ENTRY_POINT \
-    --service-account=$SERVICE_ACCOUNT_EMAIL \
     --memory=1024MiB \
     --trigger-http \
     --no-allow-unauthenticated \
     --set-env-vars $ENV_VARS"
+
+  # Add service account only if explicitly set
+  if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
+    DEPLOY_CMD+=" --service-account=$SERVICE_ACCOUNT_EMAIL"
+  fi
 
   # Add secrets only if any are defined
   if [ -n "$SECRETS_MAPPING" ]; then
@@ -256,6 +213,17 @@ if [ -z "$FUNCTION_URL" ]; then
 fi
 
 echo "Function URL: $FUNCTION_URL"
+
+# Determine service account for Cloud Scheduler OIDC auth
+# Use explicitly set SERVICE_ACCOUNT_EMAIL, or get the one used by the deployed function
+if [ -z "$SERVICE_ACCOUNT_EMAIL" ]; then
+  echo "Getting service account from deployed function..."
+  SERVICE_ACCOUNT_EMAIL=$(gcloud functions describe "$FUNCTION_NAME" \
+    --project="$PROJECT_ID" \
+    --region="$REGION" \
+    --format="value(serviceConfig.serviceAccountEmail)" 2>/dev/null)
+  echo "Function is using: $SERVICE_ACCOUNT_EMAIL"
+fi
 
 # Check if job exists
 if gcloud scheduler jobs describe "$SCHEDULER_JOB_NAME" --project="$PROJECT_ID" --location="$REGION" > /dev/null 2>&1; then
