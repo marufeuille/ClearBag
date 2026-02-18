@@ -54,6 +54,17 @@ ENV_VARS+=",INBOX_FOLDER_ID=$INBOX_FOLDER_ID"
 ENV_VARS+=",ARCHIVE_FOLDER_ID=$ARCHIVE_FOLDER_ID"
 
 # ==========================================
+# Determine Service Account for Secret Manager
+# ==========================================
+
+# Cloud Functions will use Compute Engine default SA when not specified
+# Format: PROJECT_NUMBER-compute@developer.gserviceaccount.com
+echo "Getting project number for service account..."
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+EXPECTED_SERVICE_ACCOUNT="$PROJECT_NUMBER-compute@developer.gserviceaccount.com"
+echo "Expected service account: $EXPECTED_SERVICE_ACCOUNT"
+
+# ==========================================
 # Secret Manager Setup (share v1 secrets)
 # ==========================================
 
@@ -94,9 +105,9 @@ SLACK_CHANNEL_ID_SECRET="school-agent-slack-channel-id"
 TODOIST_API_TOKEN_SECRET="school-agent-todoist-api-token"
 
 # Create and Grant Secrets (optional変数も処理)
-create_and_grant_secret "$SLACK_BOT_TOKEN_SECRET" "$SLACK_BOT_TOKEN" "$SERVICE_ACCOUNT_EMAIL"
-create_and_grant_secret "$SLACK_CHANNEL_ID_SECRET" "$SLACK_CHANNEL_ID" "$SERVICE_ACCOUNT_EMAIL"
-create_and_grant_secret "$TODOIST_API_TOKEN_SECRET" "$TODOIST_API_TOKEN" "$SERVICE_ACCOUNT_EMAIL"
+create_and_grant_secret "$SLACK_BOT_TOKEN_SECRET" "$SLACK_BOT_TOKEN" "$EXPECTED_SERVICE_ACCOUNT"
+create_and_grant_secret "$SLACK_CHANNEL_ID_SECRET" "$SLACK_CHANNEL_ID" "$EXPECTED_SERVICE_ACCOUNT"
+create_and_grant_secret "$TODOIST_API_TOKEN_SECRET" "$TODOIST_API_TOKEN" "$EXPECTED_SERVICE_ACCOUNT"
 
 # Construct Secrets String for Deployment
 SECRETS_MAPPING=""
