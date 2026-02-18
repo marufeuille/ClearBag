@@ -65,6 +65,7 @@ ENV_VARS="PROJECT_ID=$PROJECT_ID"
 ENV_VARS+=",SPREADSHEET_ID=$SPREADSHEET_ID"
 ENV_VARS+=",INBOX_FOLDER_ID=$INBOX_FOLDER_ID"
 ENV_VARS+=",ARCHIVE_FOLDER_ID=$ARCHIVE_FOLDER_ID"
+ENV_VARS+=",LOG_LEVEL=${LOG_LEVEL:-INFO}"  # Default to INFO if not set
 
 # ==========================================
 # Secret Manager Setup (share v1 secrets)

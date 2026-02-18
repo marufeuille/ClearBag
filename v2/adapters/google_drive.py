@@ -56,13 +56,32 @@ class GoogleDriveStorage(FileStorage):
             Exception: Drive API呼び出しに失敗した場合
         """
         try:
+            query = f"'{self._inbox_id}' in parents and trashed = false"
+            logger.info("🔍 [Drive API] Listing files with query: %s", query)
+            logger.info("🔍 [Drive API] Inbox folder ID: %s", self._inbox_id)
+
             results = self._service.files().list(
-                q=f"'{self._inbox_id}' in parents and trashed = false",
-                fields="nextPageToken, files(id, name, mimeType, webViewLink)",
+                q=query,
+                fields="nextPageToken, files(id, name, mimeType, webViewLink, createdTime, modifiedTime)",
                 pageSize=100
             ).execute()
 
             items = results.get('files', [])
+            logger.info("📥 [Drive API] Raw response: %d files returned from API", len(items))
+
+            if items:
+                logger.info("📋 [Drive API] File details:")
+                for item in items:
+                    logger.info("  - ID: %s, Name: %s, MimeType: %s, Created: %s, Modified: %s",
+                               item['id'], item['name'], item['mimeType'],
+                               item.get('createdTime', 'N/A'), item.get('modifiedTime', 'N/A'))
+            else:
+                logger.warning("⚠️ [Drive API] No files found in Inbox. Possible reasons:")
+                logger.warning("  1. Inbox folder is actually empty")
+                logger.warning("  2. Service account lacks permission to the folder")
+                logger.warning("  3. Files were added after the last sync/cache refresh")
+                logger.warning("  4. Folder ID is incorrect: %s", self._inbox_id)
+
             file_infos = [
                 FileInfo(
                     id=item['id'],
@@ -73,11 +92,11 @@ class GoogleDriveStorage(FileStorage):
                 for item in items
             ]
 
-            logger.info("Found %d files in Inbox folder", len(file_infos))
+            logger.info("✅ [Drive API] Successfully created %d FileInfo objects", len(file_infos))
             return file_infos
 
         except Exception as e:
-            logger.exception("Failed to list files in Inbox folder")
+            logger.exception("❌ [Drive API] Failed to list files in Inbox folder")
             raise
 
     def download(self, file_id: str) -> bytes:
@@ -94,6 +113,7 @@ class GoogleDriveStorage(FileStorage):
             Exception: ダウンロードに失敗した場合
         """
         try:
+            logger.info("⬇️ [Drive API] Starting download for file ID: %s", file_id)
             request = self._service.files().get_media(fileId=file_id)
             fh = io.BytesIO()
             downloader = MediaIoBaseDownload(fh, request)
@@ -107,11 +127,11 @@ class GoogleDriveStorage(FileStorage):
                     )
 
             content = fh.getvalue()
-            logger.info("Downloaded file: %s (%d bytes)", file_id, len(content))
+            logger.info("✅ [Drive API] Downloaded file: %s (%d bytes)", file_id, len(content))
             return content
 
         except Exception as e:
-            logger.exception("Failed to download file: %s", file_id)
+            logger.exception("❌ [Drive API] Failed to download file: %s", file_id)
             raise
 
     def archive(self, file_id: str, new_name: str) -> None:
@@ -126,11 +146,15 @@ class GoogleDriveStorage(FileStorage):
             Exception: ファイル移動に失敗した場合
         """
         try:
+            logger.info("📦 [Drive API] Starting archive process for file: %s", file_id)
+            logger.info("📦 [Drive API] Target name: %s", new_name)
+
             # 1. 現在の親フォルダを取得
             file = self._service.files().get(
                 fileId=file_id, fields='parents'
             ).execute()
             previous_parents = ",".join(file.get('parents', []))
+            logger.info("📦 [Drive API] Current parents: %s", previous_parents)
 
             # 2. Archiveフォルダに移動 + リネーム
             self._service.files().update(
@@ -142,12 +166,12 @@ class GoogleDriveStorage(FileStorage):
             ).execute()
 
             logger.info(
-                "Archived file: %s -> %s (moved to %s)",
+                "✅ [Drive API] Archived file: %s -> %s (moved to %s)",
                 file_id,
                 new_name,
                 self._archive_id
             )
 
         except Exception as e:
-            logger.exception("Failed to archive file: %s", file_id)
+            logger.exception("❌ [Drive API] Failed to archive file: %s", file_id)
             raise
