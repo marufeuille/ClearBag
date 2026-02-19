@@ -7,8 +7,8 @@ SlackとLINEの2つの実装を作ります。継承は一切使いません。
 
 from typing import Protocol, runtime_checkable
 
-
 # ========== Protocol定義 ==========
+
 
 @runtime_checkable
 class Notifier(Protocol):
@@ -20,6 +20,7 @@ class Notifier(Protocol):
 
 
 # ========== 実装1: Slack（Protocolを知らない） ==========
+
 
 class SlackNotifier:
     """Slack通知実装 - Notifierを継承していない！"""
@@ -35,6 +36,7 @@ class SlackNotifier:
 
 # ========== 実装2: LINE（Protocolを知らない） ==========
 
+
 class LineNotifier:
     """LINE通知実装 - これもNotifierを継承していない！"""
 
@@ -48,6 +50,7 @@ class LineNotifier:
 
 
 # ========== ビジネスロジック（Protocolに依存） ==========
+
 
 class AlertSystem:
     """アラートシステム - Notifier Protocolにのみ依存"""

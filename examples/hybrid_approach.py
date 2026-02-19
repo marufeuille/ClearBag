@@ -7,8 +7,8 @@ School Agent v2 の再設計案
 from abc import ABC, abstractmethod
 from typing import Protocol
 
-
 # ========== 案1: Protocol + ABC の組み合わせ ==========
+
 
 # Protocolで「型」を定義（外部向け）
 class FileStorage(Protocol):

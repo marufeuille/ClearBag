@@ -6,10 +6,12 @@ sample.pdf を解析して、構造化データを抽出する。
 """
 
 import os
+
 from dotenv import load_dotenv
+
 from v2.adapters.credentials import get_google_credentials
-from v2.adapters.google_sheets import GoogleSheetsConfigSource
 from v2.adapters.gemini import GeminiDocumentAnalyzer
+from v2.adapters.google_sheets import GoogleSheetsConfigSource
 
 load_dotenv()
 
@@ -37,11 +39,7 @@ print(f"✅ Profiles: {len(profiles)}件, Rules: {len(rules)}件")
 
 # Gemini初期化
 print("\n2. Gemini初期化...")
-analyzer = GeminiDocumentAnalyzer(
-    credentials=creds,
-    project_id=project_id,
-    location="us-central1"
-)
+analyzer = GeminiDocumentAnalyzer(credentials=creds, project_id=project_id, location="us-central1")
 print("✅ Gemini初期化完了")
 
 # サンプルPDF読み込み
@@ -71,7 +69,7 @@ try:
     print("解析結果")
     print("=" * 60)
 
-    print(f"\n📄 要約:")
+    print("\n📄 要約:")
     print(f"   {analysis.summary}")
 
     print(f"\n📂 カテゴリ: {analysis.category.value}")
@@ -100,5 +98,6 @@ try:
 except Exception as e:
     print(f"\n❌ エラー: {e}")
     import traceback
+
     traceback.print_exc()
     exit(1)

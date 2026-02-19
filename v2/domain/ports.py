@@ -11,13 +11,15 @@ School Agent v2では全て新規実装のアダプタなので、ABCの方が�
 """
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
+
 from v2.domain.models import (
-    Profile,
-    Rule,
-    FileInfo,
     DocumentAnalysis,
     EventData,
+    FileInfo,
+    Profile,
+    Rule,
     TaskData,
 )
 
@@ -74,9 +76,7 @@ class CalendarService(ABC):
     """カレンダーサービス（Google Calendar等）"""
 
     @abstractmethod
-    def create_event(
-        self, calendar_id: str, event: EventData, file_link: str = ""
-    ) -> str:
+    def create_event(self, calendar_id: str, event: EventData, file_link: str = "") -> str:
         """イベントを作成。event_id or URLを返す"""
         pass
 

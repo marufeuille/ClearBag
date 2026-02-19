@@ -1,8 +1,10 @@
 """ActionDispatcher のテスト"""
 
-import pytest
 from unittest.mock import MagicMock, call
-from v2.domain.models import Category, EventData, TaskData, DocumentAnalysis, FileInfo, Profile
+
+import pytest
+
+from v2.domain.models import Category, DocumentAnalysis, EventData, FileInfo, Profile, TaskData
 from v2.services.action_dispatcher import ActionDispatcher, DispatchResult
 
 
@@ -43,9 +45,7 @@ class TestActionDispatcher:
     ):
         """related_profile_ids からカレンダーIDが正しく解決される"""
         # Arrange
-        event = EventData(
-            summary="イベント", start="2026-04-25", end="2026-04-25"
-        )
+        event = EventData(summary="イベント", start="2026-04-25", end="2026-04-25")
         analysis = DocumentAnalysis(
             summary="テスト",
             category=Category.EVENT,
@@ -55,7 +55,7 @@ class TestActionDispatcher:
         dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
 
         # Act
-        result = dispatcher.dispatch(sample_file_info, analysis, sample_profiles)
+        dispatcher.dispatch(sample_file_info, analysis, sample_profiles)
 
         # Assert
         mock_calendar.create_event.assert_called_once_with(
@@ -69,9 +69,7 @@ class TestActionDispatcher:
     ):
         """Profileが見つからない場合は primary にフォールバック"""
         # Arrange
-        event = EventData(
-            summary="イベント", start="2026-04-25", end="2026-04-25"
-        )
+        event = EventData(summary="イベント", start="2026-04-25", end="2026-04-25")
         analysis = DocumentAnalysis(
             summary="テスト",
             category=Category.EVENT,
@@ -121,9 +119,7 @@ class TestActionDispatcher:
     ):
         """通知が送信される"""
         # Arrange
-        event = EventData(
-            summary="イベント", start="2026-04-25", end="2026-04-25"
-        )
+        event = EventData(summary="イベント", start="2026-04-25", end="2026-04-25")
         task = TaskData(title="タスク", due_date="2026-04-20")
         analysis = DocumentAnalysis(
             summary="テスト文書",
@@ -206,9 +202,7 @@ class TestResolveCalendarId:
     def test_resolve_skip_profile_with_empty_calendar_id(self):
         """calendar_idが空のProfileはスキップされる"""
         profiles = {
-            "CHILD1": Profile(
-                id="CHILD1", name="太郎", grade="小3", keywords="", calendar_id=""
-            ),
+            "CHILD1": Profile(id="CHILD1", name="太郎", grade="小3", keywords="", calendar_id=""),
             "CHILD2": Profile(
                 id="CHILD2",
                 name="花子",

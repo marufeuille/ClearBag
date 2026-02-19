@@ -6,9 +6,11 @@ sample.pdfをGoogle DriveのInboxフォルダにアップロードする
 """
 
 import os
+
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+
 from v2.adapters.credentials import get_google_credentials
 
 load_dotenv()
@@ -32,21 +34,18 @@ creds = get_google_credentials()
 service = build("drive", "v3", credentials=creds)
 
 # アップロード
-file_metadata = {
-    "name": "sample.pdf",
-    "parents": [INBOX_FOLDER_ID]
-}
+file_metadata = {"name": "sample.pdf", "parents": [INBOX_FOLDER_ID]}
 
 media = MediaFileUpload(PDF_PATH, mimetype="application/pdf", resumable=True)
 
 print(f"\nUploading {PDF_PATH} to Inbox folder...")
-file = service.files().create(
-    body=file_metadata,
-    media_body=media,
-    fields="id, name, webViewLink"
-).execute()
+file = (
+    service.files()
+    .create(body=file_metadata, media_body=media, fields="id, name, webViewLink")
+    .execute()
+)
 
-print(f"✅ Uploaded successfully!")
+print("✅ Uploaded successfully!")
 print(f"   File ID: {file['id']}")
 print(f"   Name: {file['name']}")
 print(f"   Link: {file['webViewLink']}")

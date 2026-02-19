@@ -9,35 +9,36 @@ Cloud Functions環境ではApplication Default Credentials (ADC)を使用。
 import os
 import pickle
 from functools import lru_cache
+
+import google.auth
 from google.auth.transport.requests import Request
+from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-from google.oauth2 import service_account
-import google.auth
 
 # Google API のスコープ
 SCOPES = [
-    'https://www.googleapis.com/auth/spreadsheets.readonly',
-    'https://www.googleapis.com/auth/drive',
-    'https://www.googleapis.com/auth/calendar',
-    'https://www.googleapis.com/auth/chat.messages',
-    'https://www.googleapis.com/auth/chat.spaces.readonly',
-    'https://www.googleapis.com/auth/tasks',
-    'https://www.googleapis.com/auth/cloud-platform'
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/chat.messages",
+    "https://www.googleapis.com/auth/chat.spaces.readonly",
+    "https://www.googleapis.com/auth/tasks",
+    "https://www.googleapis.com/auth/cloud-platform",
 ]
 
 
 def _is_cloud_function_environment() -> bool:
     """Cloud Functions環境かどうかを判定"""
     # Cloud Functionsでは K_SERVICE 環境変数が設定される
-    return os.getenv('K_SERVICE') is not None or os.getenv('FUNCTION_TARGET') is not None
+    return os.getenv("K_SERVICE") is not None or os.getenv("FUNCTION_TARGET") is not None
 
 
 @lru_cache(maxsize=1)
 def get_google_credentials(
-    token_pickle_path: str = 'token.pickle',
-    credentials_json_path: str = 'credentials.json',
-    service_account_path: str = 'service_account.json',
+    token_pickle_path: str = "token.pickle",
+    credentials_json_path: str = "credentials.json",
+    service_account_path: str = "service_account.json",
 ) -> Credentials:
     """
     Google API認証情報を取得（シングルトン）。
@@ -70,7 +71,7 @@ def get_google_credentials(
 
     # 1. 既存のOAuth認証情報を読み込み
     if os.path.exists(token_pickle_path):
-        with open(token_pickle_path, 'rb') as token:
+        with open(token_pickle_path, "rb") as token:
             creds = pickle.load(token)
 
     # 2. 認証情報の有効性チェック
@@ -82,9 +83,7 @@ def get_google_credentials(
             # 新規認証
             if os.path.exists(credentials_json_path):
                 # OAuth認証フロー
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    credentials_json_path, SCOPES
-                )
+                flow = InstalledAppFlow.from_client_secrets_file(credentials_json_path, SCOPES)
                 creds = flow.run_local_server(port=0)
             elif os.path.exists(service_account_path):
                 # サービスアカウント認証
@@ -99,7 +98,7 @@ def get_google_credentials(
 
         # 3. OAuth認証情報をキャッシュ（サービスアカウントの場合は不要）
         if not isinstance(creds, service_account.Credentials):
-            with open(token_pickle_path, 'wb') as token:
+            with open(token_pickle_path, "wb") as token:
                 pickle.dump(creds, token)
 
     return creds

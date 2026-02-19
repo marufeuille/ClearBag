@@ -21,6 +21,7 @@ Adapter動作確認スクリプト
 import argparse
 import os
 import sys
+
 from dotenv import load_dotenv
 
 # .env読み込み
@@ -34,7 +35,7 @@ def test_slack():
     print("=" * 60)
 
     from v2.adapters.slack import SlackNotifier
-    from v2.domain.models import TaskData, EventData
+    from v2.domain.models import EventData, TaskData
 
     bot_token = os.getenv("SLACK_BOT_TOKEN")
     channel_id = os.getenv("SLACK_CHANNEL_ID")
@@ -80,6 +81,7 @@ def test_slack():
     except Exception as e:
         print(f"❌ エラー: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -110,12 +112,9 @@ def test_todoist():
             note="これはPhase 3のAdapter動作確認テストです。削除してOKです。",
         )
 
-        task_id = adapter.create_task(
-            task,
-            file_link="https://example.com/test.pdf"
-        )
+        task_id = adapter.create_task(task, file_link="https://example.com/test.pdf")
 
-        print(f"✅ Todoistタスクが作成されました")
+        print("✅ Todoistタスクが作成されました")
         print(f"   タスクID: {task_id}")
         print("   → Todoistアプリで確認してください")
         return True
@@ -123,6 +122,7 @@ def test_todoist():
     except Exception as e:
         print(f"❌ エラー: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -146,6 +146,7 @@ def test_credentials():
     except Exception as e:
         print(f"❌ エラー: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -185,6 +186,7 @@ def test_google_sheets():
     except Exception as e:
         print(f"❌ エラー: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -224,6 +226,7 @@ def test_google_drive():
     except Exception as e:
         print(f"❌ エラー: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -252,12 +255,10 @@ def test_google_calendar():
         )
 
         event_url = calendar.create_event(
-            calendar_id="primary",
-            event=event,
-            file_link="https://example.com/test.pdf"
+            calendar_id="primary", event=event, file_link="https://example.com/test.pdf"
         )
 
-        print(f"✅ Calendarイベントが作成されました")
+        print("✅ Calendarイベントが作成されました")
         print(f"   URL: {event_url}")
         print("   → Google Calendarで確認してください")
 
@@ -266,6 +267,7 @@ def test_google_calendar():
     except Exception as e:
         print(f"❌ エラー: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -283,7 +285,9 @@ def main():
     results = []
 
     # 個別指定がない場合は全テスト
-    run_all = not (args.slack or args.todoist or args.creds or args.sheets or args.drive or args.calendar)
+    run_all = not (
+        args.slack or args.todoist or args.creds or args.sheets or args.drive or args.calendar
+    )
 
     if args.creds or run_all:
         results.append(("Credentials", test_credentials()))

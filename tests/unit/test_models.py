@@ -1,15 +1,16 @@
 """ドメインモデルのテスト"""
 
 import pytest
+
 from v2.domain.models import (
     Category,
-    Profile,
-    Rule,
-    EventData,
-    TaskData,
     DocumentAnalysis,
+    EventData,
     FileInfo,
     ProcessingResult,
+    Profile,
+    Rule,
+    TaskData,
 )
 
 
@@ -42,9 +43,7 @@ class TestProfile:
 
     def test_profile_is_frozen(self):
         """Profileは不変（frozen）である"""
-        profile = Profile(
-            id="CHILD1", name="太郎", grade="小3", keywords="", calendar_id=""
-        )
+        profile = Profile(id="CHILD1", name="太郎", grade="小3", keywords="", calendar_id="")
         with pytest.raises(AttributeError):
             profile.name = "花子"  # type: ignore
 
@@ -69,9 +68,7 @@ class TestEventData:
 
     def test_create_event_with_defaults(self):
         """デフォルト値でEventDataが生成される"""
-        event = EventData(
-            summary="遠足", start="2026-04-25", end="2026-04-25"
-        )
+        event = EventData(summary="遠足", start="2026-04-25", end="2026-04-25")
         assert event.summary == "遠足"
         assert event.location == ""
         assert event.description == ""
@@ -118,9 +115,7 @@ class TestDocumentAnalysis:
 
     def test_create_analysis_minimal(self):
         """最小限のフィールドでDocumentAnalysisが生成される"""
-        analysis = DocumentAnalysis(
-            summary="テスト文書", category=Category.INFO
-        )
+        analysis = DocumentAnalysis(summary="テスト文書", category=Category.INFO)
         assert analysis.summary == "テスト文書"
         assert analysis.category == Category.INFO
         assert analysis.related_profile_ids == []
@@ -165,12 +160,8 @@ class TestProcessingResult:
 
     def test_create_result_success(self):
         """成功時のProcessingResultが生成される"""
-        file_info = FileInfo(
-            id="f1", name="test.pdf", mime_type="application/pdf"
-        )
-        analysis = DocumentAnalysis(
-            summary="テスト", category=Category.EVENT
-        )
+        file_info = FileInfo(id="f1", name="test.pdf", mime_type="application/pdf")
+        analysis = DocumentAnalysis(summary="テスト", category=Category.EVENT)
 
         result = ProcessingResult(
             file_info=file_info,
@@ -186,13 +177,9 @@ class TestProcessingResult:
 
     def test_create_result_error(self):
         """エラー時のProcessingResultが生成される"""
-        file_info = FileInfo(
-            id="f1", name="test.pdf", mime_type="application/pdf"
-        )
+        file_info = FileInfo(id="f1", name="test.pdf", mime_type="application/pdf")
 
-        result = ProcessingResult(
-            file_info=file_info, error="Download failed"
-        )
+        result = ProcessingResult(file_info=file_info, error="Download failed")
         assert result.error == "Download failed"
         assert result.archived is False
         assert result.analysis is None

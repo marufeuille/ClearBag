@@ -7,8 +7,8 @@ Protocol と ABC の型チェック比較
 from abc import ABC, abstractmethod
 from typing import Protocol, runtime_checkable
 
-
 # ========== 1. ABC方式 ==========
+
 
 class NotifierABC(ABC):
     """ABC版 - 継承が必須"""
@@ -36,6 +36,7 @@ class IncompleteABCNotifier(NotifierABC):
 
 # ========== 2. Protocol方式 ==========
 
+
 @runtime_checkable
 class NotifierProtocol(Protocol):
     """Protocol版 - 継承不要"""
@@ -60,6 +61,7 @@ class IncompleteProtocolNotifier:
 
 
 # ========== 実行比較 ==========
+
 
 def use_notifier_abc(notifier: NotifierABC) -> None:
     """ABC版を使う関数"""

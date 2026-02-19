@@ -16,6 +16,5 @@
         --set-env-vars PROJECT_ID=xxx,SPREADSHEET_ID=xxx,...
 """
 
-from v2.entrypoints.cloud_function import school_agent_http
 
 # Cloud Functionsはこのモジュールから school_agent_http をインポートする

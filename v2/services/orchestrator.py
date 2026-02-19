@@ -5,13 +5,15 @@ Ports（Protocol）にのみ依存し、外部APIの実装詳細からは独立�
 """
 
 from __future__ import annotations
+
 import logging
+
+from v2.domain.models import FileInfo, ProcessingResult
 from v2.domain.ports import (
     ConfigSource,
-    FileStorage,
     DocumentAnalyzer,
+    FileStorage,
 )
-from v2.domain.models import FileInfo, ProcessingResult
 from v2.services.action_dispatcher import ActionDispatcher
 
 logger = logging.getLogger(__name__)
@@ -84,14 +86,10 @@ class Orchestrator:
             result = self._process_single(file_info, profiles, rules)
             results.append(result)
 
-        logger.info(
-            "=== Processing complete: %d files processed ===", len(results)
-        )
+        logger.info("=== Processing complete: %d files processed ===", len(results))
         return results
 
-    def _process_single(
-        self, file_info: FileInfo, profiles, rules
-    ) -> ProcessingResult:
+    def _process_single(self, file_info: FileInfo, profiles, rules) -> ProcessingResult:
         """
         1ファイルの処理。エラーが発生しても他のファイル処理は続行。
 
@@ -112,15 +110,11 @@ class Orchestrator:
 
             # Geminiで解析
             logger.info("Analyzing with Gemini...")
-            analysis = self._analyzer.analyze(
-                content, file_info.mime_type, profiles, rules
-            )
+            analysis = self._analyzer.analyze(content, file_info.mime_type, profiles, rules)
             logger.info("Analysis complete: %s", analysis.summary)
 
             # アクション実行
-            dispatch_result = self._dispatcher.dispatch(
-                file_info, analysis, profiles
-            )
+            dispatch_result = self._dispatcher.dispatch(file_info, analysis, profiles)
 
             # アーカイブ
             archive_name = analysis.archive_filename or f"PROCESSED_{file_info.name}"

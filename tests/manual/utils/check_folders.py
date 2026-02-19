@@ -4,8 +4,10 @@ Inbox/Archiveフォルダの内容を確認する
 """
 
 import os
+
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
+
 from v2.adapters.credentials import get_google_credentials
 
 load_dotenv()
@@ -22,11 +24,15 @@ print("=" * 60)
 
 # Inbox確認
 print("\n📥 INBOX:")
-results = service.files().list(
-    q=f"'{INBOX_FOLDER_ID}' in parents and trashed=false",
-    fields="files(id, name, mimeType, webViewLink)"
-).execute()
-inbox_files = results.get('files', [])
+results = (
+    service.files()
+    .list(
+        q=f"'{INBOX_FOLDER_ID}' in parents and trashed=false",
+        fields="files(id, name, mimeType, webViewLink)",
+    )
+    .execute()
+)
+inbox_files = results.get("files", [])
 if inbox_files:
     for f in inbox_files:
         print(f"  - {f['name']} ({f['mimeType']})")
@@ -36,12 +42,16 @@ else:
 
 # Archive確認
 print("\n📦 ARCHIVE:")
-results = service.files().list(
-    q=f"'{ARCHIVE_FOLDER_ID}' in parents and trashed=false",
-    fields="files(id, name, mimeType, webViewLink)",
-    pageSize=10
-).execute()
-archive_files = results.get('files', [])
+results = (
+    service.files()
+    .list(
+        q=f"'{ARCHIVE_FOLDER_ID}' in parents and trashed=false",
+        fields="files(id, name, mimeType, webViewLink)",
+        pageSize=10,
+    )
+    .execute()
+)
+archive_files = results.get("files", [])
 if archive_files:
     for f in archive_files[:5]:  # 最初の5件のみ表示
         print(f"  - {f['name']} ({f['mimeType']})")

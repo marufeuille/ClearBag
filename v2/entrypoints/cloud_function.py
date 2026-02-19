@@ -25,10 +25,13 @@
 """
 
 import logging
+
 import functions_framework
+
 from v2.entrypoints.factory import create_orchestrator
 
 logger = logging.getLogger(__name__)
+
 
 @functions_framework.http
 def school_agent_http(request):
@@ -52,7 +55,9 @@ def school_agent_http(request):
         success_count = len([r for r in results if not r.error])
         error_count = len([r for r in results if r.error])
 
-        response_message = f"Processed {len(results)} file(s): {success_count} success, {error_count} errors"
+        response_message = (
+            f"Processed {len(results)} file(s): {success_count} success, {error_count} errors"
+        )
         logger.info(response_message)
 
         # エラーがあっても200を返す（部分的成功を許容）

@@ -6,11 +6,13 @@ FileStorage ABCの実装。
 
 import io
 import logging
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-from v2.domain.ports import FileStorage
+
 from v2.domain.models import FileInfo
+from v2.domain.ports import FileStorage
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +24,7 @@ class GoogleDriveStorage(FileStorage):
     Inbox/Archiveフォルダを管理し、ファイルの一覧取得・ダウンロード・移動を行う。
     """
 
-    def __init__(
-        self,
-        credentials: Credentials,
-        inbox_folder_id: str,
-        archive_folder_id: str
-    ):
+    def __init__(self, credentials: Credentials, inbox_folder_id: str, archive_folder_id: str):
         """
         Args:
             credentials: Google API認証情報
@@ -41,7 +38,7 @@ class GoogleDriveStorage(FileStorage):
         if not archive_folder_id:
             raise ValueError("archive_folder_id is required")
 
-        self._service = build('drive', 'v3', credentials=credentials)
+        self._service = build("drive", "v3", credentials=credentials)
         self._inbox_id = inbox_folder_id
         self._archive_id = archive_folder_id
 
@@ -56,19 +53,23 @@ class GoogleDriveStorage(FileStorage):
             Exception: Drive API呼び出しに失敗した場合
         """
         try:
-            results = self._service.files().list(
-                q=f"'{self._inbox_id}' in parents and trashed = false",
-                fields="nextPageToken, files(id, name, mimeType, webViewLink)",
-                pageSize=100
-            ).execute()
+            results = (
+                self._service.files()
+                .list(
+                    q=f"'{self._inbox_id}' in parents and trashed = false",
+                    fields="nextPageToken, files(id, name, mimeType, webViewLink)",
+                    pageSize=100,
+                )
+                .execute()
+            )
 
-            items = results.get('files', [])
+            items = results.get("files", [])
             file_infos = [
                 FileInfo(
-                    id=item['id'],
-                    name=item['name'],
-                    mime_type=item['mimeType'],
-                    web_view_link=item.get('webViewLink', '')
+                    id=item["id"],
+                    name=item["name"],
+                    mime_type=item["mimeType"],
+                    web_view_link=item.get("webViewLink", ""),
                 )
                 for item in items
             ]
@@ -76,7 +77,7 @@ class GoogleDriveStorage(FileStorage):
             logger.info("Found %d files in Inbox folder", len(file_infos))
             return file_infos
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to list files in Inbox folder")
             raise
 
@@ -102,15 +103,13 @@ class GoogleDriveStorage(FileStorage):
             while not done:
                 status, done = downloader.next_chunk()
                 if status:
-                    logger.debug(
-                        "Download progress: %d%%", int(status.progress() * 100)
-                    )
+                    logger.debug("Download progress: %d%%", int(status.progress() * 100))
 
             content = fh.getvalue()
             logger.info("Downloaded file: %s (%d bytes)", file_id, len(content))
             return content
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to download file: %s", file_id)
             raise
 
@@ -127,27 +126,22 @@ class GoogleDriveStorage(FileStorage):
         """
         try:
             # 1. 現在の親フォルダを取得
-            file = self._service.files().get(
-                fileId=file_id, fields='parents'
-            ).execute()
-            previous_parents = ",".join(file.get('parents', []))
+            file = self._service.files().get(fileId=file_id, fields="parents").execute()
+            previous_parents = ",".join(file.get("parents", []))
 
             # 2. Archiveフォルダに移動 + リネーム
             self._service.files().update(
                 fileId=file_id,
                 addParents=self._archive_id,
                 removeParents=previous_parents,
-                body={'name': new_name},
-                fields='id, parents'
+                body={"name": new_name},
+                fields="id, parents",
             ).execute()
 
             logger.info(
-                "Archived file: %s -> %s (moved to %s)",
-                file_id,
-                new_name,
-                self._archive_id
+                "Archived file: %s -> %s (moved to %s)", file_id, new_name, self._archive_id
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to archive file: %s", file_id)
             raise

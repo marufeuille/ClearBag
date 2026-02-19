@@ -6,12 +6,14 @@ DocumentAnalyzer ABCの実装。
 
 import json
 import logging
-from google.oauth2.credentials import Credentials
+
 import vertexai
-from vertexai.generative_models import GenerativeModel, Part
 import vertexai.preview.generative_models as generative_models
+from google.oauth2.credentials import Credentials
+from vertexai.generative_models import GenerativeModel, Part
+
+from v2.domain.models import Category, DocumentAnalysis, EventData, Profile, Rule, TaskData
 from v2.domain.ports import DocumentAnalyzer
-from v2.domain.models import Profile, Rule, DocumentAnalysis, EventData, TaskData, Category
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +45,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
             raise ValueError("project_id is required")
 
         # Vertex AI初期化
-        vertexai.init(
-            project=project_id,
-            location=location,
-            credentials=credentials
-        )
+        vertexai.init(project=project_id, location=location, credentials=credentials)
 
         self._model = GenerativeModel(model_name)
         self._project_id = project_id
@@ -57,7 +55,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
             "Gemini initialized: project=%s, location=%s, model=%s",
             project_id,
             location,
-            model_name
+            model_name,
         )
 
     def analyze(
@@ -84,7 +82,6 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
         """
         try:
             # プロンプト構築
-            system_prompt = self._build_system_prompt()
             user_prompt = self._build_user_prompt(profiles, rules)
 
             # Gemini API呼び出し
@@ -98,14 +95,10 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
             }
 
             safety_settings = {
-                generative_models.HarmCategory.HARM_CATEGORY_HATE_SPEECH:
-                    generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                generative_models.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT:
-                    generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                generative_models.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT:
-                    generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                generative_models.HarmCategory.HARM_CATEGORY_HARASSMENT:
-                    generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+                generative_models.HarmCategory.HARM_CATEGORY_HATE_SPEECH: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+                generative_models.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+                generative_models.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+                generative_models.HarmCategory.HARM_CATEGORY_HARASSMENT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             }
 
             responses = self._model.generate_content(
@@ -123,12 +116,12 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
                 "Document analysis complete: category=%s, events=%d, tasks=%d",
                 analysis.category,
                 len(analysis.events),
-                len(analysis.tasks)
+                len(analysis.tasks),
             )
 
             return analysis
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to analyze document")
             raise
 
@@ -142,9 +135,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
 出力は必ずJSON形式で行ってください。Markdownのコードブロックは不要です。
 """
 
-    def _build_user_prompt(
-        self, profiles: dict[str, Profile], rules: list[Rule]
-    ) -> str:
+    def _build_user_prompt(self, profiles: dict[str, Profile], rules: list[Rule]) -> str:
         """ユーザープロンプトを構築"""
         # ProfilesをJSONに変換（dataclass → dict）
         profiles_dict = {

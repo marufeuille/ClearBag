@@ -1,10 +1,12 @@
 """Orchestrator のテスト"""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from v2.domain.models import Category, DocumentAnalysis, FileInfo, ProcessingResult
-from v2.services.orchestrator import Orchestrator
 from v2.services.action_dispatcher import DispatchResult
+from v2.services.orchestrator import Orchestrator
 
 
 class TestOrchestrator:
@@ -25,12 +27,8 @@ class TestOrchestrator:
         # Arrange
         from v2.services.action_dispatcher import ActionDispatcher
 
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
-        orchestrator = Orchestrator(
-            mock_config, mock_storage, mock_analyzer, dispatcher
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
+        orchestrator = Orchestrator(mock_config, mock_storage, mock_analyzer, dispatcher)
 
         # Act
         results = orchestrator.run()
@@ -68,12 +66,8 @@ class TestOrchestrator:
         from v2.services.action_dispatcher import ActionDispatcher
 
         mock_storage.list_inbox_files.return_value = []
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
-        orchestrator = Orchestrator(
-            mock_config, mock_storage, mock_analyzer, dispatcher
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
+        orchestrator = Orchestrator(mock_config, mock_storage, mock_analyzer, dispatcher)
 
         # Act
         results = orchestrator.run()
@@ -97,12 +91,8 @@ class TestOrchestrator:
         from v2.services.action_dispatcher import ActionDispatcher
 
         mock_config.load_profiles.side_effect = Exception("Config error")
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
-        orchestrator = Orchestrator(
-            mock_config, mock_storage, mock_analyzer, dispatcher
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
+        orchestrator = Orchestrator(mock_config, mock_storage, mock_analyzer, dispatcher)
 
         # Act
         results = orchestrator.run()
@@ -126,12 +116,8 @@ class TestOrchestrator:
         from v2.services.action_dispatcher import ActionDispatcher
 
         mock_storage.download.side_effect = Exception("Download failed")
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
-        orchestrator = Orchestrator(
-            mock_config, mock_storage, mock_analyzer, dispatcher
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
+        orchestrator = Orchestrator(mock_config, mock_storage, mock_analyzer, dispatcher)
 
         # Act
         results = orchestrator.run()
@@ -159,12 +145,8 @@ class TestOrchestrator:
         from v2.services.action_dispatcher import ActionDispatcher
 
         mock_analyzer.analyze.side_effect = Exception("Analysis failed")
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
-        orchestrator = Orchestrator(
-            mock_config, mock_storage, mock_analyzer, dispatcher
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
+        orchestrator = Orchestrator(mock_config, mock_storage, mock_analyzer, dispatcher)
 
         # Act
         results = orchestrator.run()
@@ -189,12 +171,8 @@ class TestOrchestrator:
         # Arrange
         from v2.services.action_dispatcher import ActionDispatcher
 
-        file1 = FileInfo(
-            id="f1", name="file1.pdf", mime_type="application/pdf"
-        )
-        file2 = FileInfo(
-            id="f2", name="file2.pdf", mime_type="application/pdf"
-        )
+        file1 = FileInfo(id="f1", name="file1.pdf", mime_type="application/pdf")
+        file2 = FileInfo(id="f2", name="file2.pdf", mime_type="application/pdf")
         mock_storage.list_inbox_files.return_value = [file1, file2]
 
         analysis1 = DocumentAnalysis(
@@ -209,12 +187,8 @@ class TestOrchestrator:
         )
         mock_analyzer.analyze.side_effect = [analysis1, analysis2]
 
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
-        orchestrator = Orchestrator(
-            mock_config, mock_storage, mock_analyzer, dispatcher
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
+        orchestrator = Orchestrator(mock_config, mock_storage, mock_analyzer, dispatcher)
 
         # Act
         results = orchestrator.run()
@@ -242,12 +216,8 @@ class TestOrchestrator:
         # Arrange
         from v2.services.action_dispatcher import ActionDispatcher
 
-        file1 = FileInfo(
-            id="f1", name="file1.pdf", mime_type="application/pdf"
-        )
-        file2 = FileInfo(
-            id="f2", name="file2.pdf", mime_type="application/pdf"
-        )
+        file1 = FileInfo(id="f1", name="file1.pdf", mime_type="application/pdf")
+        file2 = FileInfo(id="f2", name="file2.pdf", mime_type="application/pdf")
         mock_storage.list_inbox_files.return_value = [file1, file2]
 
         # file1はダウンロードエラー、file2は成功
@@ -261,12 +231,8 @@ class TestOrchestrator:
             archive_filename="file2.pdf",
         )
 
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
-        orchestrator = Orchestrator(
-            mock_config, mock_storage, mock_analyzer, dispatcher
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
+        orchestrator = Orchestrator(mock_config, mock_storage, mock_analyzer, dispatcher)
 
         # Act
         results = orchestrator.run()
@@ -296,18 +262,12 @@ class TestOrchestrator:
         )
         mock_analyzer.analyze.return_value = analysis_no_filename
 
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
-        orchestrator = Orchestrator(
-            mock_config, mock_storage, mock_analyzer, dispatcher
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
+        orchestrator = Orchestrator(mock_config, mock_storage, mock_analyzer, dispatcher)
 
         # Act
-        results = orchestrator.run()
+        orchestrator.run()
 
         # Assert
         expected_name = f"PROCESSED_{sample_file_info.name}"
-        mock_storage.archive.assert_called_once_with(
-            sample_file_info.id, expected_name
-        )
+        mock_storage.archive.assert_called_once_with(sample_file_info.id, expected_name)

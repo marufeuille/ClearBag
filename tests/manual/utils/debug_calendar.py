@@ -6,8 +6,9 @@ Calendarの動作デバッグスクリプト
 """
 
 from dotenv import load_dotenv
-from v2.adapters.credentials import get_google_credentials
 from googleapiclient.discovery import build
+
+from v2.adapters.credentials import get_google_credentials
 
 load_dotenv()
 
@@ -19,42 +20,46 @@ def list_calendars():
     print("=" * 60)
 
     creds = get_google_credentials()
-    service = build('calendar', 'v3', credentials=creds)
+    service = build("calendar", "v3", credentials=creds)
 
     calendars = service.calendarList().list().execute()
 
-    for calendar in calendars.get('items', []):
+    for calendar in calendars.get("items", []):
         print(f"\nカレンダー: {calendar['summary']}")
         print(f"  ID: {calendar['id']}")
         print(f"  Primary: {calendar.get('primary', False)}")
         print(f"  Access Role: {calendar['accessRole']}")
 
 
-def list_recent_events(calendar_id='primary', max_results=10):
+def list_recent_events(calendar_id="primary", max_results=10):
     """最近のイベントを表示"""
     print("\n" + "=" * 60)
     print(f"最近のイベント (calendar_id={calendar_id})")
     print("=" * 60)
 
     creds = get_google_credentials()
-    service = build('calendar', 'v3', credentials=creds)
+    service = build("calendar", "v3", credentials=creds)
 
     try:
-        events = service.events().list(
-            calendarId=calendar_id,
-            maxResults=max_results,
-            orderBy='startTime',
-            singleEvents=True,
-            timeMin='2026-02-01T00:00:00Z',  # 2026年2月以降
-            timeMax='2027-01-01T00:00:00Z'   # 2027年まで
-        ).execute()
+        events = (
+            service.events()
+            .list(
+                calendarId=calendar_id,
+                maxResults=max_results,
+                orderBy="startTime",
+                singleEvents=True,
+                timeMin="2026-02-01T00:00:00Z",  # 2026年2月以降
+                timeMax="2027-01-01T00:00:00Z",  # 2027年まで
+            )
+            .execute()
+        )
 
-        items = events.get('items', [])
+        items = events.get("items", [])
         if not items:
             print("イベントが見つかりませんでした")
         else:
             for event in items:
-                start = event.get('start', {}).get('date') or event.get('start', {}).get('dateTime')
+                start = event.get("start", {}).get("date") or event.get("start", {}).get("dateTime")
                 print(f"\n- {event.get('summary', 'No Title')}")
                 print(f"  開始: {start}")
                 print(f"  URL: {event.get('htmlLink')}")
@@ -62,6 +67,7 @@ def list_recent_events(calendar_id='primary', max_results=10):
     except Exception as e:
         print(f"エラー: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -72,33 +78,39 @@ def search_test_events():
     print("=" * 60)
 
     creds = get_google_credentials()
-    service = build('calendar', 'v3', credentials=creds)
+    service = build("calendar", "v3", credentials=creds)
 
     # 全カレンダーを調べる
     calendars = service.calendarList().list().execute()
 
-    for calendar in calendars.get('items', []):
-        calendar_id = calendar['id']
+    for calendar in calendars.get("items", []):
+        calendar_id = calendar["id"]
         print(f"\n📅 {calendar['summary']} ({calendar_id})")
 
         try:
-            events = service.events().list(
-                calendarId=calendar_id,
-                q='School Agent v2',  # テストイベントを検索
-                maxResults=5,
-                singleEvents=True,
-                orderBy='startTime'
-            ).execute()
+            events = (
+                service.events()
+                .list(
+                    calendarId=calendar_id,
+                    q="School Agent v2",  # テストイベントを検索
+                    maxResults=5,
+                    singleEvents=True,
+                    orderBy="startTime",
+                )
+                .execute()
+            )
 
-            items = events.get('items', [])
+            items = events.get("items", [])
             if items:
                 for event in items:
-                    start = event.get('start', {}).get('date') or event.get('start', {}).get('dateTime')
+                    start = event.get("start", {}).get("date") or event.get("start", {}).get(
+                        "dateTime"
+                    )
                     print(f"  ✅ 見つかった: {event.get('summary')}")
                     print(f"     開始: {start}")
                     print(f"     URL: {event.get('htmlLink')}")
             else:
-                print(f"  テストイベントなし")
+                print("  テストイベントなし")
 
         except Exception as e:
             print(f"  ⚠️  アクセスできません: {e}")
@@ -107,6 +119,6 @@ def search_test_events():
 if __name__ == "__main__":
     list_calendars()
     print("\n\n")
-    list_recent_events('primary')
+    list_recent_events("primary")
     print("\n\n")
     search_test_events()

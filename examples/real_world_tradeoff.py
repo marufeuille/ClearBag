@@ -8,12 +8,12 @@ from abc import ABC, abstractmethod
 from typing import Protocol
 from unittest.mock import MagicMock
 
-
 # ========== シナリオ1: 既存ライブラリの利用 ==========
 
 print("=" * 60)
 print("シナリオ1: 既存ライブラリのラップ")
 print("=" * 60)
+
 
 # 例: requests.Session は我々が制御できない外部クラス
 class ExistingHttpClient:

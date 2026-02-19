@@ -5,10 +5,11 @@ TaskService ABCの実装。
 """
 
 import logging
-from typing import Optional
+
 from todoist_api_python.api import TodoistAPI
-from v2.domain.ports import TaskService
+
 from v2.domain.models import TaskData
+from v2.domain.ports import TaskService
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class TodoistAdapter(TaskService):
     - エラーハンドリング改善
     """
 
-    def __init__(self, api_token: str, project_id: Optional[str] = None):
+    def __init__(self, api_token: str, project_id: str | None = None):
         """
         Args:
             api_token: Todoist API Token
@@ -68,13 +69,9 @@ class TodoistAdapter(TaskService):
                 project_id=self._project_id,
             )
 
-            logger.info(
-                "Created Todoist task: %s (ID: %s)",
-                created_task.content,
-                created_task.id
-            )
+            logger.info("Created Todoist task: %s (ID: %s)", created_task.content, created_task.id)
             return created_task.id
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to create Todoist task: %s", task.title)
             raise  # 呼び出し元でエラーハンドリング

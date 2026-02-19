@@ -5,10 +5,9 @@ ABC版とProtocol版でテストの書き方がどう変わるかの比較
 from abc import ABC, abstractmethod
 from typing import Protocol
 from unittest.mock import MagicMock
-import pytest
-
 
 # ========== Protocol版 ==========
+
 
 class NotifierProtocol(Protocol):
     def send(self, msg: str) -> None: ...
@@ -24,6 +23,7 @@ def test_with_protocol():
 
 
 # ========== ABC版 ==========
+
 
 class NotifierABC(ABC):
     @abstractmethod
@@ -41,6 +41,7 @@ def test_with_abc():
 
 
 # ========== 実装の違い ==========
+
 
 # Protocol: 継承不要
 class SlackNotifierProtocol:  # 継承なし

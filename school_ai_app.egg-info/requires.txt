@@ -1,0 +1,15 @@
+functions-framework>=3.10.0
+google-api-python-client>=2.187.0
+google-auth-httplib2>=0.2.1
+google-auth-oauthlib>=1.2.3
+google-cloud-aiplatform>=1.129.0
+pandas>=2.3.3
+python-dotenv>=1.2.1
+slack-sdk>=3.39.0
+todoist-api-python>=3.1.0
+
+[dev]
+pytest>=8.0.0
+pytest-cov>=4.1.0
+ruff>=0.8.0
+mypy>=1.13.0
