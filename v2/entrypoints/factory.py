@@ -13,6 +13,8 @@ from v2.adapters.google_sheets import GoogleSheetsConfigSource
 from v2.adapters.slack import SlackNotifier
 from v2.adapters.todoist import TodoistAdapter
 from v2.config import AppConfig
+from v2.domain.models import EventData, TaskData
+from v2.domain.ports import Notifier, TaskService
 from v2.services.action_dispatcher import ActionDispatcher
 from v2.services.orchestrator import Orchestrator
 
@@ -45,24 +47,24 @@ def create_orchestrator(config: AppConfig | None = None) -> Orchestrator:
     logger.info("Creating adapters...")
 
     config_source = GoogleSheetsConfigSource(
-        credentials=creds,
+        credentials=creds,  # type: ignore[arg-type]
         spreadsheet_id=config.spreadsheet_id,
     )
 
     file_storage = GoogleDriveStorage(
-        credentials=creds,
+        credentials=creds,  # type: ignore[arg-type]
         inbox_folder_id=config.inbox_folder_id,
         archive_folder_id=config.archive_folder_id,
     )
 
     analyzer = GeminiDocumentAnalyzer(
-        credentials=creds,
+        credentials=creds,  # type: ignore[arg-type]
         project_id=config.project_id,
         location=config.vertex_ai_location,
         model_name=config.gemini_model,
     )
 
-    calendar_service = GoogleCalendarService(credentials=creds)
+    calendar_service = GoogleCalendarService(credentials=creds)  # type: ignore[arg-type]
 
     # Todoist/Slackはオプショナル（トークンがない場合はスキップ可能）
     task_service = None
@@ -104,16 +106,23 @@ def create_orchestrator(config: AppConfig | None = None) -> Orchestrator:
 # Null Object Pattern（Todoist/Slackが無効な場合の代替）
 
 
-class _NullTaskService:
+class _NullTaskService(TaskService):
     """TaskServiceのNull Object（何もしない）"""
 
-    def create_task(self, task, file_link=""):
+    def create_task(self, task: TaskData, file_link: str = "") -> str:
         logger.debug("NullTaskService: task skipped (Todoist not configured)")
         return "null"
 
 
-class _NullNotifier:
+class _NullNotifier(Notifier):
     """NotifierのNull Object（何もしない）"""
 
-    def notify_file_processed(self, filename, summary, events, tasks, file_link=""):
+    def notify_file_processed(
+        self,
+        filename: str,
+        summary: str,
+        events: list[EventData],
+        tasks: list[TaskData],
+        file_link: str = "",
+    ) -> None:
         logger.debug("NullNotifier: notification skipped (Slack not configured)")

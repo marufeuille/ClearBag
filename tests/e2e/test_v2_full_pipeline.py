@@ -54,7 +54,7 @@ else:
         print(f"[{i}] {result.file_info.name}")
         print(f"    File Link: {result.file_info.web_view_link}")
 
-        if result.error:
+        if result.error or not result.analysis:
             print(f"    ❌ Error: {result.error}")
             continue
 
@@ -78,7 +78,7 @@ else:
 
         print(f"\n    📢 Notification Sent: {'Yes' if result.notification_sent else 'No'}")
         print(f"    📦 Archived: {'Yes' if result.archived else 'No'}")
-        if result.archived:
+        if result.archived and result.analysis:
             print(f"    📦 Archive Name: {result.analysis.archive_filename}")
 
         print()

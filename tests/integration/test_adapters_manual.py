@@ -28,9 +28,12 @@ class TestSlackAdapter:
         """Slackに実際に通知を送信"""
         from v2.adapters.slack import SlackNotifier
 
-        notifier = SlackNotifier(
-            bot_token=os.getenv("SLACK_BOT_TOKEN"), channel_id=os.getenv("SLACK_CHANNEL_ID")
-        )
+        bot_token = os.getenv("SLACK_BOT_TOKEN")
+        channel_id = os.getenv("SLACK_CHANNEL_ID")
+        assert bot_token is not None, "SLACK_BOT_TOKEN is required"
+        assert channel_id is not None, "SLACK_CHANNEL_ID is required"
+
+        notifier = SlackNotifier(bot_token=bot_token, channel_id=channel_id)
 
         # テストデータ
         events = [
@@ -70,7 +73,10 @@ class TestTodoistAdapter:
         """Todoistに実際にタスクを作成"""
         from v2.adapters.todoist import TodoistAdapter
 
-        adapter = TodoistAdapter(api_token=os.getenv("TODOIST_API_TOKEN"))
+        api_token = os.getenv("TODOIST_API_TOKEN")
+        assert api_token is not None, "TODOIST_API_TOKEN is required"
+
+        adapter = TodoistAdapter(api_token=api_token)
 
         # テストタスク
         task = TaskData(

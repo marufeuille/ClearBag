@@ -55,7 +55,7 @@ def main():
             print(f"\n[{i}] {result.file_info.name}")
             print(f"    Status: {'✅ Success' if not result.error else '❌ Error'}")
 
-            if result.error:
+            if result.error or not result.analysis:
                 print(f"    Error: {result.error}")
                 continue
 

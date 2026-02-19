@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from v2.domain.models import FileInfo, ProcessingResult
+from v2.domain.models import FileInfo, ProcessingResult, Profile, Rule
 from v2.domain.ports import (
     ConfigSource,
     DocumentAnalyzer,
@@ -89,7 +89,9 @@ class Orchestrator:
         logger.info("=== Processing complete: %d files processed ===", len(results))
         return results
 
-    def _process_single(self, file_info: FileInfo, profiles, rules) -> ProcessingResult:
+    def _process_single(
+        self, file_info: FileInfo, profiles: dict[str, Profile], rules: list[Rule]
+    ) -> ProcessingResult:
         """
         1ファイルの処理。エラーが発生しても他のファイル処理は続行。
 

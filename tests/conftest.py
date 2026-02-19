@@ -154,7 +154,7 @@ def mock_config(
 
 
 @pytest.fixture
-def mock_storage(sample_file_info) -> MagicMock:
+def mock_storage(sample_file_info: FileInfo) -> MagicMock:
     """FileStorage のモック"""
     mock = MagicMock(spec=FileStorage)
     mock.list_inbox_files.return_value = [sample_file_info]
@@ -163,7 +163,7 @@ def mock_storage(sample_file_info) -> MagicMock:
 
 
 @pytest.fixture
-def mock_analyzer(sample_analysis) -> MagicMock:
+def mock_analyzer(sample_analysis: DocumentAnalysis) -> MagicMock:
     """DocumentAnalyzer のモック"""
     mock = MagicMock(spec=DocumentAnalyzer)
     mock.analyze.return_value = sample_analysis

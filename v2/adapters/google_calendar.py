@@ -73,7 +73,7 @@ class GoogleCalendarService(CalendarService):
                 self._service.events().insert(calendarId=calendar_id, body=event_body).execute()
             )
 
-            event_url = created_event.get("htmlLink", "")
+            event_url: str = created_event.get("htmlLink", "")
             logger.info("Created calendar event: %s (%s)", event.summary, event_url)
             return event_url
 

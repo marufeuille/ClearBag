@@ -9,8 +9,10 @@ Cloud Functions環境ではApplication Default Credentials (ADC)を使用。
 import os
 import pickle
 from functools import lru_cache
+from typing import Union
 
 import google.auth
+import google.auth.credentials
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
@@ -39,7 +41,7 @@ def get_google_credentials(
     token_pickle_path: str = "token.pickle",
     credentials_json_path: str = "credentials.json",
     service_account_path: str = "service_account.json",
-) -> Credentials:
+) -> Union[Credentials, google.auth.credentials.Credentials]:
     """
     Google API認証情報を取得（シングルトン）。
 
@@ -63,11 +65,11 @@ def get_google_credentials(
     """
     # Cloud Functions環境ではApplication Default Credentialsを使用
     if _is_cloud_function_environment():
-        creds, project = google.auth.default(scopes=SCOPES)
-        return creds
+        adc_creds, project = google.auth.default(scopes=SCOPES)
+        return adc_creds
 
     # ローカル環境: 既存のロジック
-    creds = None
+    creds: Union[Credentials, None] = None
 
     # 1. 既存のOAuth認証情報を読み込み
     if os.path.exists(token_pickle_path):
@@ -76,7 +78,12 @@ def get_google_credentials(
 
     # 2. 認証情報の有効性チェック
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+        if (
+            creds
+            and creds.expired
+            and isinstance(creds, Credentials)
+            and creds.refresh_token
+        ):
             # リフレッシュトークンで更新
             creds.refresh(Request())
         else:

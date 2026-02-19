@@ -101,7 +101,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
                 generative_models.HarmCategory.HARM_CATEGORY_HARASSMENT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             }
 
-            responses = self._model.generate_content(
+            responses = self._model.generate_content(  # type: ignore[call-overload]
                 [document_part, user_prompt],
                 generation_config=generation_config,
                 safety_settings=safety_settings,
@@ -207,7 +207,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
 3. ファイル名は `YYYYMMDD_タイトル` の形式にしてください。
 """
 
-    def _parse_response(self, response_text: str) -> dict:
+    def _parse_response(self, response_text: str) -> dict[str, object]:
         """
         Geminiのレスポンスをパース。
 
