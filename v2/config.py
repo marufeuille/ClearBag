@@ -12,7 +12,6 @@ class AppConfig:
     spreadsheet_id: str
     inbox_folder_id: str
     archive_folder_id: str
-    todoist_token: str
     slack_bot_token: str
     slack_channel_id: str
     vertex_ai_location: str = "us-central1"
@@ -39,7 +38,6 @@ class AppConfig:
         if not archive_folder_id:
             raise ValueError("ARCHIVE_FOLDER_ID is not set in environment")
 
-        todoist_token = os.getenv("TODOIST_API_TOKEN", "")
         slack_bot_token = os.getenv("SLACK_BOT_TOKEN", "")
         slack_channel_id = os.getenv("SLACK_CHANNEL_ID", "")
 
@@ -48,7 +46,6 @@ class AppConfig:
             spreadsheet_id=spreadsheet_id,
             inbox_folder_id=inbox_folder_id,
             archive_folder_id=archive_folder_id,
-            todoist_token=todoist_token,
             slack_bot_token=slack_bot_token,
             slack_channel_id=slack_channel_id,
             vertex_ai_location=os.getenv("VERTEX_AI_LOCATION", "us-central1"),

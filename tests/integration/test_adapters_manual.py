@@ -64,40 +64,6 @@ class TestSlackAdapter:
 
 
 @pytest.mark.manual
-@pytest.mark.skipif(
-    not os.getenv("TODOIST_API_TOKEN"),
-    reason="TODOIST_API_TOKEN not set"
-)
-class TestTodoistAdapter:
-    """Todoist Adapter の動作確認"""
-
-    def test_create_task(self):
-        """Todoistに実際にタスクを作成"""
-        from v2.adapters.todoist import TodoistAdapter
-
-        adapter = TodoistAdapter(
-            api_token=os.getenv("TODOIST_API_TOKEN")
-        )
-
-        # テストタスク
-        task = TaskData(
-            title="[テスト] School Agent v2 動作確認",
-            due_date="2026-02-20",
-            assignee="PARENT",
-            note="これはPhase 3の動作確認テストです。",
-        )
-
-        # 実行
-        task_id = adapter.create_task(
-            task,
-            file_link="https://example.com/test.pdf"
-        )
-
-        print(f"✅ Todoistタスクが作成されました: {task_id}")
-        print("   Todoistアプリで確認してください。")
-
-
-@pytest.mark.manual
 class TestCredentials:
     """認証情報の取得テスト"""
 

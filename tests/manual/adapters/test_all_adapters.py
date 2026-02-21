@@ -5,7 +5,6 @@ Adapter動作確認スクリプト
 実際のAPIを呼び出すため、.envに以下の設定が必要:
 - SLACK_BOT_TOKEN
 - SLACK_CHANNEL_ID
-- TODOIST_API_TOKEN
 
 使い方:
     # 全テスト
@@ -13,9 +12,6 @@ Adapter動作確認スクリプト
 
     # Slackのみ
     uv run python test_adapters.py --slack
-
-    # Todoistのみ
-    uv run python test_adapters.py --todoist
 """
 
 import argparse
@@ -75,49 +71,6 @@ def test_slack():
         print("✅ Slack通知が送信されました")
         print(f"   チャンネル: {channel_id}")
         print("   → Slackアプリで確認してください")
-        return True
-
-    except Exception as e:
-        print(f"❌ エラー: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
-def test_todoist():
-    """Todoist Adapter のテスト"""
-    print("\n" + "=" * 60)
-    print("Todoist Adapter テスト")
-    print("=" * 60)
-
-    from v2.adapters.todoist import TodoistAdapter
-    from v2.domain.models import TaskData
-
-    api_token = os.getenv("TODOIST_API_TOKEN")
-
-    if not api_token:
-        print("❌ TODOIST_API_TOKEN が設定されていません")
-        return False
-
-    try:
-        adapter = TodoistAdapter(api_token=api_token)
-
-        # テストタスク
-        task = TaskData(
-            title="[テスト] School Agent v2 Phase 3 動作確認",
-            due_date="2026-02-20",
-            assignee="PARENT",
-            note="これはPhase 3のAdapter動作確認テストです。削除してOKです。",
-        )
-
-        task_id = adapter.create_task(
-            task,
-            file_link="https://example.com/test.pdf"
-        )
-
-        print(f"✅ Todoistタスクが作成されました")
-        print(f"   タスクID: {task_id}")
-        print("   → Todoistアプリで確認してください")
         return True
 
     except Exception as e:
@@ -273,7 +226,6 @@ def test_google_calendar():
 def main():
     parser = argparse.ArgumentParser(description="Adapter動作確認")
     parser.add_argument("--slack", action="store_true", help="Slackのみテスト")
-    parser.add_argument("--todoist", action="store_true", help="Todoistのみテスト")
     parser.add_argument("--creds", action="store_true", help="認証のみテスト")
     parser.add_argument("--sheets", action="store_true", help="Google Sheetsのみテスト")
     parser.add_argument("--drive", action="store_true", help="Google Driveのみテスト")
@@ -283,7 +235,7 @@ def main():
     results = []
 
     # 個別指定がない場合は全テスト
-    run_all = not (args.slack or args.todoist or args.creds or args.sheets or args.drive or args.calendar)
+    run_all = not (args.slack or args.creds or args.sheets or args.drive or args.calendar)
 
     if args.creds or run_all:
         results.append(("Credentials", test_credentials()))
@@ -299,9 +251,6 @@ def main():
 
     if args.slack or run_all:
         results.append(("Slack", test_slack()))
-
-    if args.todoist or run_all:
-        results.append(("Todoist", test_todoist()))
 
     # 結果サマリー
     print("\n" + "=" * 60)
