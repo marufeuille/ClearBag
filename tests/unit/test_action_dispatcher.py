@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import MagicMock, call
 from v2.domain.models import Category, EventData, TaskData, DocumentAnalysis, FileInfo, Profile
 from v2.services.action_dispatcher import ActionDispatcher, DispatchResult
+from v2.entrypoints.factory import _NullTaskService, _NullNotifier
 
 
 class TestActionDispatcher:
@@ -219,3 +220,67 @@ class TestResolveCalendarId:
         }
         result = ActionDispatcher._resolve_calendar_id(["CHILD1", "CHILD2"], profiles)
         assert result == "cal2"  # CHILD1はcalendar_idが空なのでスキップ
+
+
+class TestNullTaskService:
+    """_NullTaskService の単体テスト"""
+
+    def test_create_task_returns_null_string(self):
+        """_NullTaskService.create_task() は "null" を返す"""
+        # Arrange
+        null_service = _NullTaskService()
+        task = TaskData(title="テスト", due_date="2026-02-25", assignee="PARENT")
+
+        # Act
+        result = null_service.create_task(task, file_link="http://example.com")
+
+        # Assert
+        assert result == "null"
+        assert isinstance(result, str)
+
+    def test_create_task_no_exception(self):
+        """_NullTaskService.create_task() は例外を発生させない"""
+        # Arrange
+        null_service = _NullTaskService()
+        task = TaskData(title="テスト", due_date="2026-03-01", assignee="CHILD")
+
+        # Act & Assert
+        # 例外が発生しないことを確認
+        result = null_service.create_task(task)
+        assert result is not None
+
+
+class TestNullNotifier:
+    """_NullNotifier の単体テスト"""
+
+    def test_notify_file_processed_completes_normally(self):
+        """_NullNotifier.notify_file_processed() は例外なく完了する"""
+        # Arrange
+        null_notifier = _NullNotifier()
+        events = [
+            EventData(
+                summary="イベント", start="2026-02-25", end="2026-02-25", confidence="HIGH"
+            )
+        ]
+        tasks = [TaskData(title="タスク", due_date="2026-02-25", assignee="PARENT")]
+
+        # Act & Assert
+        # 例外が発生しないことを確認
+        null_notifier.notify_file_processed(
+            filename="test.pdf",
+            summary="テスト",
+            events=events,
+            tasks=tasks,
+            file_link="http://example.com",
+        )
+
+    def test_notify_file_processed_with_empty_collections(self):
+        """_NullNotifier.notify_file_processed() は空のコレクションでも正常に処理される"""
+        # Arrange
+        null_notifier = _NullNotifier()
+
+        # Act & Assert
+        # 空のイベント・タスクリストでも例外が発生しないことを確認
+        null_notifier.notify_file_processed(
+            filename="empty.pdf", summary="空のドキュメント", events=[], tasks=[]
+        )

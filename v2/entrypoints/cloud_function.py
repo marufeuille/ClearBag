@@ -19,7 +19,6 @@
     - SPREADSHEET_ID
     - INBOX_FOLDER_ID
     - ARCHIVE_FOLDER_ID
-    - TODOIST_API_TOKEN (optional)
     - SLACK_BOT_TOKEN (optional)
     - SLACK_CHANNEL_ID (optional)
 """

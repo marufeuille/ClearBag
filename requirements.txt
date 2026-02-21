@@ -62,7 +62,6 @@ six==1.17.0
 slack-sdk==3.39.0
 starlette==0.52.1
 tenacity==9.1.2
-todoist-api-python==3.1.0
 typing-extensions==4.15.0
 typing-inspection==0.4.2
 tzdata==2025.2
