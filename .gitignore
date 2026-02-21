@@ -13,3 +13,4 @@ sample/
 
 # Terraform provider cache
 terraform/.terraform/
+terraform/environments/**/.terraform/

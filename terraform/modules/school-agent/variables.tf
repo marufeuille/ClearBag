@@ -9,8 +9,13 @@ variable "region" {
   default     = "asia-northeast1"
 }
 
+variable "prefix" {
+  description = "Resource name prefix to distinguish environments (e.g. \"dev-\" for dev, \"\" for prod)"
+  type        = string
+}
+
 variable "function_name" {
-  description = "Cloud Functions name"
+  description = "Cloud Functions name (prefix will be prepended)"
   type        = string
   default     = "school-agent-v2"
 }
@@ -37,11 +42,10 @@ variable "service_account_email" {
   description = "Service Account email for Cloud Functions"
   type        = string
   default     = ""
-  nullable    = true
 }
 
 variable "artifact_registry_repo" {
-  description = "Artifact Registry repository name"
+  description = "Artifact Registry repository name (shared across environments)"
   type        = string
   default     = "school-agent"
 }
@@ -58,6 +62,11 @@ variable "scheduler_timezone" {
   default     = "Asia/Tokyo"
 }
 
+variable "scheduler_paused" {
+  description = "Whether to pause the Cloud Scheduler job (true for dev to avoid accidental runs)"
+  type        = bool
+}
+
 variable "env_vars" {
   description = "Environment variables for Cloud Functions"
   type = object({
@@ -66,10 +75,4 @@ variable "env_vars" {
     INBOX_FOLDER_ID   = string
     ARCHIVE_FOLDER_ID = string
   })
-  default = {
-    PROJECT_ID        = ""
-    SPREADSHEET_ID    = ""
-    INBOX_FOLDER_ID   = ""
-    ARCHIVE_FOLDER_ID = ""
-  }
 }

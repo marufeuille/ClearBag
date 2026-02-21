@@ -1,10 +1,11 @@
 resource "google_cloud_scheduler_job" "scheduler" {
-  name        = "${var.function_name}-scheduler"
+  name        = "${var.prefix}${var.function_name}-scheduler"
   description = "School Agent v2 scheduler - runs at 9:00 and 17:00 JST"
   schedule    = var.scheduler_schedule
   time_zone   = var.scheduler_timezone
   region      = var.region
   project     = var.project_id
+  paused      = var.scheduler_paused
 
   http_target {
     http_method = "POST"

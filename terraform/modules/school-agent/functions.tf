@@ -1,18 +1,19 @@
 locals {
   effective_service_account = var.service_account_email != "" ? var.service_account_email : "${var.project_id}@appspot.gserviceaccount.com"
-  function_uri              = "asia-northeast1-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/${var.function_name}:latest"
+  prefixed_function_name    = "${var.prefix}${var.function_name}"
+  function_uri              = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/${var.function_name}:latest"
 }
 
 resource "google_cloudfunctions2_function" "function" {
   provider    = google-beta
-  name        = var.function_name
+  name        = local.prefixed_function_name
   location    = var.region
   description = "School Agent v2 - Cloud Functions Gen2"
 
   build_config {
     runtime           = var.runtime
     entry_point       = var.entry_point
-    docker_repository = "asia-northeast1-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}"
+    docker_repository = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}"
   }
 
   service_config {
@@ -58,7 +59,7 @@ resource "google_cloudfunctions2_function" "function" {
 }
 
 output "function_uri" {
-  description = "The URI of the deployed Cloud Function"
+  description = "The container image URI in Artifact Registry (not the Cloud Function HTTP endpoint)"
   value       = local.function_uri
 }
 
