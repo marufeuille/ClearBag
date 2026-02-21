@@ -6,3 +6,10 @@ __pycache__
 
 # Test samples (local only)
 sample/
+
+# takt tool internals
+.takt/.runtime/
+.takt/runs/
+
+# Terraform provider cache
+terraform/.terraform/
