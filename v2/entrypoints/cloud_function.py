@@ -25,10 +25,13 @@
 """
 
 import logging
+
 import functions_framework
+
 from v2.entrypoints.factory import create_orchestrator
 
 logger = logging.getLogger(__name__)
+
 
 @functions_framework.http
 def school_agent_http(request):

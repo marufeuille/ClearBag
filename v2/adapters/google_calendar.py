@@ -5,10 +5,12 @@ CalendarService ABCの実装。
 """
 
 import logging
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from v2.domain.ports import CalendarService
+
 from v2.domain.models import EventData
+from v2.domain.ports import CalendarService
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +31,7 @@ class GoogleCalendarService(CalendarService):
         if not credentials:
             raise ValueError("credentials is required")
 
-        self._service = build('calendar', 'v3', credentials=credentials)
+        self._service = build("calendar", "v3", credentials=credentials)
         self._timezone = timezone
 
     def create_event(
@@ -61,28 +63,25 @@ class GoogleCalendarService(CalendarService):
 
             # イベントボディ構築
             event_body = {
-                'summary': event.summary or 'No Title',
-                'location': event.location,
-                'description': description,
-                'start': start_body,
-                'end': end_body,
+                "summary": event.summary or "No Title",
+                "location": event.location,
+                "description": description,
+                "start": start_body,
+                "end": end_body,
             }
 
             # Calendar API呼び出し
-            created_event = self._service.events().insert(
-                calendarId=calendar_id,
-                body=event_body
-            ).execute()
-
-            event_url = created_event.get('htmlLink', '')
-            logger.info(
-                "Created calendar event: %s (%s)",
-                event.summary,
-                event_url
+            created_event = (
+                self._service.events()
+                .insert(calendarId=calendar_id, body=event_body)
+                .execute()
             )
+
+            event_url = created_event.get("htmlLink", "")
+            logger.info("Created calendar event: %s (%s)", event.summary, event_url)
             return event_url
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to create calendar event: %s", event.summary)
             raise
 
@@ -98,10 +97,7 @@ class GoogleCalendarService(CalendarService):
         """
         if len(datetime_str) == 10:
             # 終日イベント（YYYY-MM-DD）
-            return {'date': datetime_str}
+            return {"date": datetime_str}
         else:
             # 時刻指定イベント（ISO8601）
-            return {
-                'dateTime': datetime_str,
-                'timeZone': self._timezone
-            }
+            return {"dateTime": datetime_str, "timeZone": self._timezone}

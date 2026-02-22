@@ -4,14 +4,15 @@
 """
 
 import logging
-from v2.config import AppConfig
+
 from v2.adapters.credentials import get_google_credentials
-from v2.adapters.google_sheets import GoogleSheetsConfigSource
-from v2.adapters.google_drive import GoogleDriveStorage
 from v2.adapters.gemini import GeminiDocumentAnalyzer
 from v2.adapters.google_calendar import GoogleCalendarService
-from v2.adapters.todoist import TodoistAdapter
+from v2.adapters.google_drive import GoogleDriveStorage
+from v2.adapters.google_sheets import GoogleSheetsConfigSource
 from v2.adapters.slack import SlackNotifier
+from v2.adapters.todoist import TodoistAdapter
+from v2.config import AppConfig
 from v2.services.action_dispatcher import ActionDispatcher
 from v2.services.orchestrator import Orchestrator
 
@@ -102,8 +103,10 @@ def create_orchestrator(config: AppConfig | None = None) -> Orchestrator:
 
 # Null Object Pattern（Todoist/Slackが無効な場合の代替）
 
+
 class _NullTaskService:
     """TaskServiceのNull Object（何もしない）"""
+
     def create_task(self, task, file_link=""):
         logger.debug("NullTaskService: task skipped (Todoist not configured)")
         return "null"
@@ -111,5 +114,6 @@ class _NullTaskService:
 
 class _NullNotifier:
     """NotifierのNull Object（何もしない）"""
+
     def notify_file_processed(self, filename, summary, events, tasks, file_link=""):
         logger.debug("NullNotifier: notification skipped (Slack not configured)")

@@ -5,10 +5,12 @@ ConfigSource ABCの実装。
 """
 
 import logging
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from v2.domain.ports import ConfigSource
+
 from v2.domain.models import Profile, Rule
+from v2.domain.ports import ConfigSource
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ class GoogleSheetsConfigSource(ConfigSource):
         if not spreadsheet_id:
             raise ValueError("spreadsheet_id is required")
 
-        self._service = build('sheets', 'v4', credentials=credentials)
+        self._service = build("sheets", "v4", credentials=credentials)
         self._spreadsheet_id = spreadsheet_id
 
     def load_profiles(self) -> dict[str, Profile]:
@@ -47,12 +49,14 @@ class GoogleSheetsConfigSource(ConfigSource):
             Exception: シート読み込みに失敗した場合
         """
         try:
-            result = self._service.spreadsheets().values().get(
-                spreadsheetId=self._spreadsheet_id,
-                range='Profiles!A2:E'
-            ).execute()
+            result = (
+                self._service.spreadsheets()
+                .values()
+                .get(spreadsheetId=self._spreadsheet_id, range="Profiles!A2:E")
+                .execute()
+            )
 
-            rows = result.get('values', [])
+            rows = result.get("values", [])
             profiles = {}
 
             for row in rows:
@@ -60,16 +64,16 @@ class GoogleSheetsConfigSource(ConfigSource):
                     profile_id = row[0]
                     profiles[profile_id] = Profile(
                         id=profile_id,
-                        name=row[1] if len(row) > 1 else '',
-                        grade=row[2] if len(row) > 2 else '',
-                        keywords=row[3] if len(row) > 3 else '',
-                        calendar_id=row[4] if len(row) > 4 else '',
+                        name=row[1] if len(row) > 1 else "",
+                        grade=row[2] if len(row) > 2 else "",
+                        keywords=row[3] if len(row) > 3 else "",
+                        calendar_id=row[4] if len(row) > 4 else "",
                     )
 
             logger.info("Loaded %d profiles from Google Sheets", len(profiles))
             return profiles
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load profiles from Google Sheets")
             raise
 
@@ -84,26 +88,30 @@ class GoogleSheetsConfigSource(ConfigSource):
             Exception: シート読み込みに失敗した場合
         """
         try:
-            result = self._service.spreadsheets().values().get(
-                spreadsheetId=self._spreadsheet_id,
-                range='Rules!A2:D'
-            ).execute()
+            result = (
+                self._service.spreadsheets()
+                .values()
+                .get(spreadsheetId=self._spreadsheet_id, range="Rules!A2:D")
+                .execute()
+            )
 
-            rows = result.get('values', [])
+            rows = result.get("values", [])
             rules = []
 
             for row in rows:
                 if len(row) > 0:
-                    rules.append(Rule(
-                        rule_id=row[0],
-                        target_profile=row[1] if len(row) > 1 else '',
-                        rule_type=row[2] if len(row) > 2 else '',
-                        content=row[3] if len(row) > 3 else '',
-                    ))
+                    rules.append(
+                        Rule(
+                            rule_id=row[0],
+                            target_profile=row[1] if len(row) > 1 else "",
+                            rule_type=row[2] if len(row) > 2 else "",
+                            content=row[3] if len(row) > 3 else "",
+                        )
+                    )
 
             logger.info("Loaded %d rules from Google Sheets", len(rules))
             return rules
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load rules from Google Sheets")
             raise

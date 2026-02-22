@@ -10,12 +10,15 @@
 
 import logging
 import sys
+
 from v2.entrypoints.factory import create_orchestrator
+
 
 # ログ設定
 def setup_logging():
     """ログ設定を初期化"""
     import os
+
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 
     logging.basicConfig(
@@ -23,6 +26,7 @@ def setup_logging():
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+
 
 def main():
     """メインエントリーポイント"""
@@ -59,7 +63,9 @@ def main():
             print(f"    Category: {result.analysis.category.value}")
             print(f"    Events Created: {result.events_created}")
             print(f"    Tasks Created: {result.tasks_created}")
-            print(f"    Notification Sent: {'Yes' if result.notification_sent else 'No'}")
+            print(
+                f"    Notification Sent: {'Yes' if result.notification_sent else 'No'}"
+            )
             print(f"    Archived: {'Yes' if result.archived else 'No'}")
 
         # エラーがあったファイルがあれば終了コード1
@@ -81,6 +87,7 @@ def main():
         logger.exception("Fatal error")
         print(f"\n❌ Fatal Error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
