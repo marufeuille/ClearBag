@@ -117,10 +117,29 @@ module "cloud_scheduler" {
 # ---------------------------------------------------------------------------
 # Workload Identity Federation (WIF) — GitHub Actions 用 GCP 認証基盤
 # ---------------------------------------------------------------------------
+
+# WIF に必要な GCP API
+resource "google_project_service" "sts" {
+  project            = var.project_id
+  service            = "sts.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "iamcredentials" {
+  project            = var.project_id
+  service            = "iamcredentials.googleapis.com"
+  disable_on_destroy = false
+}
+
 module "workload_identity" {
   source      = "../../modules/workload_identity"
   project_id  = var.project_id
   github_repo = "marufeuille/ClearBag"
+
+  depends_on = [
+    google_project_service.sts,
+    google_project_service.iamcredentials,
+  ]
 }
 
 locals {
