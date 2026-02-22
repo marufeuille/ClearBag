@@ -14,3 +14,6 @@ sample/
 # Terraform provider cache
 terraform/.terraform/
 terraform/environments/**/.terraform/
+terraform/**/terraform.tfstate
+terraform/**/terraform.tfstate.backup
+terraform/**/terraform.tfvars
