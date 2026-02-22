@@ -74,14 +74,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug WIF_PROVIDER format (temporary)
-        env:
-          WIF_PROVIDER: ${{ secrets.WIF_PROVIDER }}
-        run: |
-          echo "Length: ${#WIF_PROVIDER}"
-          echo "First 9 chars: [${WIF_PROVIDER:0:9}]"
-          echo "Last 5 chars:  [${WIF_PROVIDER: -5}]"
-
       - name: Authenticate to GCP via Workload Identity Federation
         uses: google-github-actions/auth@v2
         with:
