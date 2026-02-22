@@ -26,6 +26,12 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
+    # google-github-actions/auth@v2 が GitHub OIDC トークンの aud に送る値に合わせる
+    # デフォルト（未設定）は //iam.googleapis.com/... 形式を期待するが、
+    # auth アクションは projects/PROJECT_NUMBER/... 形式で送るため不一致になる
+    allowed_audiences = [
+      "projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.github.workload_identity_pool_id}/providers/github-oidc"
+    ]
   }
 }
 
