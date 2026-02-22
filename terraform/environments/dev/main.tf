@@ -159,6 +159,7 @@ locals {
     "roles/secretmanager.admin",             # Secret Manager リソースの参照・管理
     "roles/serviceusage.serviceUsageAdmin",  # API 有効化 (google_project_service)
     "roles/iam.serviceAccountAdmin",         # SA の作成・管理
+    "roles/iam.workloadIdentityPoolAdmin",   # WIF Pool/Provider の管理
   ]
 }
 

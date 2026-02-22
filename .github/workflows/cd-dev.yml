@@ -103,15 +103,18 @@ jobs:
       - name: Build Docker image
         run: |
           IMAGE_TAG="${GITHUB_SHA::7}"
-          IMAGE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
-          docker build --platform linux/amd64 -t "${IMAGE_URL}" .
-          docker tag "${IMAGE_URL}" "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:latest"
-          echo "IMAGE_URL=${IMAGE_URL}" >> $GITHUB_ENV
+          SHA_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          LATEST_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:latest"
+          docker build --platform linux/amd64 -t "${SHA_URL}" .
+          docker tag "${SHA_URL}" "${LATEST_URL}"
+          # Terraform には latest タグの URL を渡す
+          echo "IMAGE_URL=${LATEST_URL}" >> $GITHUB_ENV
+          echo "SHA_URL=${SHA_URL}" >> $GITHUB_ENV
 
       - name: Push Docker image
         run: |
+          docker push "${SHA_URL}"
           docker push "${IMAGE_URL}"
-          docker push "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:latest"
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
