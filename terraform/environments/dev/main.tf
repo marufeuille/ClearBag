@@ -30,6 +30,16 @@ resource "google_project_iam_member" "vertex_ai_user" {
   member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+resource "google_service_account_iam_member" "scheduler_token_creator" {
+  service_account_id = google_service_account.cloud_run.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
+}
+
 module "artifact_registry" {
   source = "../../modules/artifact_registry"
 
