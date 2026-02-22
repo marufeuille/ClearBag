@@ -30,12 +30,6 @@ variable "target_url" {
 }
 
 variable "service_account_email" {
-  description = "OIDC トークン生成に使用するサービスアカウント"
+  description = "OAuth トークン生成に使用するサービスアカウント"
   type        = string
-}
-
-variable "oidc_audience" {
-  description = "OIDC トークンの audience（Cloud Run Jobs の場合は https://run.googleapis.com/）"
-  type        = string
-  default     = ""
 }

@@ -9,9 +9,9 @@ resource "google_cloud_scheduler_job" "this" {
     http_method = "POST"
     uri         = var.target_url
 
-    oidc_token {
+    oauth_token {
       service_account_email = var.service_account_email
-      audience              = var.oidc_audience != "" ? var.oidc_audience : var.target_url
+      scope                 = "https://www.googleapis.com/auth/cloud-platform"
     }
   }
 }

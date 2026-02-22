@@ -112,6 +112,5 @@ module "cloud_scheduler" {
   schedule              = "0 9,17 * * *"
   time_zone             = "Asia/Tokyo"
   target_url            = module.cloud_run_job.job_api_uri
-  oidc_audience         = "https://run.googleapis.com/"
   service_account_email = google_service_account.cloud_run.email
 }
