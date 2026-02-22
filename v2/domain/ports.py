@@ -11,13 +11,15 @@ School Agent v2では全て新規実装のアダプタなので、ABCの方が�
 """
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
+
 from v2.domain.models import (
-    Profile,
-    Rule,
-    FileInfo,
     DocumentAnalysis,
     EventData,
+    FileInfo,
+    Profile,
+    Rule,
     TaskData,
 )
 

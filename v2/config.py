@@ -2,12 +2,14 @@
 
 import os
 from dataclasses import dataclass
+
 from dotenv import load_dotenv
 
 
 @dataclass(frozen=True)
 class AppConfig:
     """アプリケーション設定"""
+
     project_id: str
     spreadsheet_id: str
     inbox_folder_id: str

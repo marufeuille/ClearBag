@@ -1,10 +1,12 @@
 """ActionDispatcher - 解析結果からアクション実行への振り分け"""
 
 from __future__ import annotations
-from dataclasses import dataclass
+
 import logging
+from dataclasses import dataclass
+
 from v2.domain.models import DocumentAnalysis, FileInfo, Profile
-from v2.domain.ports import CalendarService, TaskService, Notifier
+from v2.domain.ports import CalendarService, Notifier, TaskService
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DispatchResult:
     """アクション実行結果"""
+
     events_created: int = 0
     tasks_created: int = 0
     notification_sent: bool = False
@@ -57,9 +60,7 @@ class ActionDispatcher:
         result = DispatchResult()
 
         # Calendar events (LOW confidence は除外)
-        eligible_events = [
-            e for e in analysis.events if e.confidence != "LOW"
-        ]
+        eligible_events = [e for e in analysis.events if e.confidence != "LOW"]
         logger.info(
             "Processing %d events (%d filtered by confidence)",
             len(eligible_events),
@@ -73,9 +74,7 @@ class ActionDispatcher:
             logger.debug(
                 "Creating event '%s' on calendar %s", event.summary, calendar_id
             )
-            self._calendar.create_event(
-                calendar_id, event, file_info.web_view_link
-            )
+            self._calendar.create_event(calendar_id, event, file_info.web_view_link)
             result.events_created += 1
 
         # Tasks

@@ -5,10 +5,12 @@ Notifier ABCの実装。
 """
 
 import logging
+
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from v2.domain.ports import Notifier
+
 from v2.domain.models import EventData, TaskData
+from v2.domain.ports import Notifier
 
 logger = logging.getLogger(__name__)
 
@@ -59,18 +61,15 @@ class SlackNotifier(Notifier):
 
         try:
             response = self._client.chat_postMessage(
-                channel=self._channel_id,
-                text=message
+                channel=self._channel_id, text=message
             )
             logger.info(
                 "Slack message sent: ts=%s, channel=%s",
-                response['ts'],
-                self._channel_id
+                response["ts"],
+                self._channel_id,
             )
         except SlackApiError as e:
-            logger.error(
-                "Failed to send Slack message: %s", e.response['error']
-            )
+            logger.error("Failed to send Slack message: %s", e.response["error"])
             raise  # 呼び出し元でエラーハンドリング
 
     def _build_message(

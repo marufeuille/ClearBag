@@ -37,3 +37,21 @@ addopts = [
 markers = [
     "manual: 手動実行のみ（実際のAPI呼び出しを行う）",
 ]
+
+[tool.ruff]
+target-version = "py313"
+src = ["v2", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort (import ordering)
+    "UP",   # pyupgrade (Python 3.13向けモダン化)
+    "B",    # flake8-bugbear (よくあるバグパターン)
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501", # 行長はformatterが管理するため、linterでは除外
+]
