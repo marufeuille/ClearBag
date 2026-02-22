@@ -9,7 +9,7 @@ IMAGE_NAME="school-agent-v2"
 
 # 引数: ENV（dev/prod）, IMAGE_TAG（任意）
 ENV="${1:-dev}"
-IMAGE_TAG="${2:-$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')}"
+IMAGE_TAG="${2:-$(echo 'latest')}"
 
 # 環境ごとのリポジトリID
 case "$ENV" in
@@ -44,7 +44,7 @@ uv export -o requirements.txt --no-hashes
 # Build
 # ==========================================
 echo "Building Docker image..."
-docker build -t "${IMAGE_URL}" .
+docker build --platform linux/amd64 -t "${IMAGE_URL}" .
 
 # ==========================================
 # Push
@@ -54,6 +54,11 @@ gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
 echo "Pushing image..."
 docker push "${IMAGE_URL}"
+
+# latest tag も付与して push
+LATEST_URL="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_ID}/${IMAGE_NAME}:latest"
+docker tag "${IMAGE_URL}" "${LATEST_URL}"
+docker push "${LATEST_URL}"
 
 echo ""
 echo "Successfully pushed: ${IMAGE_URL}"
