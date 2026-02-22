@@ -1,0 +1,124 @@
+name: CD (dev)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write  # WIF OIDC トークン発行に必要
+
+env:
+  PROJECT_ID: marufeuille-linebot
+  REGION: asia-northeast1
+  REPOSITORY_ID: school-agent-dev
+  IMAGE_NAME: school-agent-v2
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Ruff lint
+        run: uv run ruff check v2/
+
+      - name: Ruff format check
+        run: uv run ruff format --check v2/
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests
+        run: >
+          uv run pytest
+          tests/unit/
+          tests/integration/
+          -m "not manual"
+          --cov=v2
+          --cov-report=term-missing
+
+  deploy:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false  # デプロイ途中でキャンセルしない
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Export requirements.txt
+        run: uv export -o requirements.txt --no-hashes
+
+      - name: Build Docker image
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::7}"
+          IMAGE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          docker build --platform linux/amd64 -t "${IMAGE_URL}" .
+          docker tag "${IMAGE_URL}" "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:latest"
+          echo "IMAGE_URL=${IMAGE_URL}" >> $GITHUB_ENV
+
+      - name: Push Docker image
+        run: |
+          docker push "${IMAGE_URL}"
+          docker push "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:latest"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.5"
+
+      - name: Terraform Init
+        working-directory: terraform/environments/dev
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: terraform/environments/dev
+        run: |
+          terraform apply -auto-approve \
+            -var="image_url=${IMAGE_URL}" \
+            -var="project_id=${{ env.PROJECT_ID }}" \
+            -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
+            -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
+            -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}"

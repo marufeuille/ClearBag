@@ -6,11 +6,10 @@ terraform {
       version = "~> 6.0"
     }
   }
-  # 将来的にGCSバックエンドへ移行する（別タスク）
-  # backend "gcs" {
-  #   bucket = "YOUR_TFSTATE_BUCKET"
-  #   prefix = "terraform/environments/dev"
-  # }
+  backend "gcs" {
+    bucket = "marufeuille-linebot-terraform-backend"
+    prefix = "terraform/environments/dev"
+  }
 }
 
 provider "google" {
@@ -113,4 +112,30 @@ module "cloud_scheduler" {
   time_zone             = "Asia/Tokyo"
   target_url            = module.cloud_run_job.job_api_uri
   service_account_email = google_service_account.cloud_run.email
+}
+
+# ---------------------------------------------------------------------------
+# Workload Identity Federation (WIF) — GitHub Actions 用 GCP 認証基盤
+# ---------------------------------------------------------------------------
+module "workload_identity" {
+  source      = "../../modules/workload_identity"
+  project_id  = var.project_id
+  github_repo = "marufeuille/ClearBag"
+}
+
+locals {
+  github_actions_roles = [
+    "roles/artifactregistry.writer", # Docker イメージ push
+    "roles/run.developer",           # Cloud Run Job 更新
+    "roles/iam.serviceAccountUser",  # Cloud Run SA として実行
+    "roles/storage.admin",           # Terraform state (GCS) 読み書き
+    "roles/cloudscheduler.admin",    # Cloud Scheduler 管理
+  ]
+}
+
+resource "google_project_iam_member" "github_actions" {
+  for_each = toset(local.github_actions_roles)
+  project  = var.project_id
+  role     = each.value
+  member   = "serviceAccount:${module.workload_identity.service_account_email}"
 }

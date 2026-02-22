@@ -17,3 +17,13 @@ output "service_account_email" {
   description = "dev 環境の Cloud Run 実行 SA メールアドレス"
   value       = google_service_account.cloud_run.email
 }
+
+output "workload_identity_provider" {
+  description = "GitHub Actions WIF Provider のフルパス（GitHub Environment Secret: WIF_PROVIDER に設定）"
+  value       = module.workload_identity.workload_identity_provider
+}
+
+output "github_actions_service_account_email" {
+  description = "GitHub Actions デプロイ用 SA メールアドレス（GitHub Environment Secret: WIF_SERVICE_ACCOUNT に設定）"
+  value       = module.workload_identity.service_account_email
+}
