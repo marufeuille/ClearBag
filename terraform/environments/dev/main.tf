@@ -131,6 +131,12 @@ resource "google_project_service" "iamcredentials" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "cloudresourcemanager" {
+  project            = var.project_id
+  service            = "cloudresourcemanager.googleapis.com"
+  disable_on_destroy = false
+}
+
 module "workload_identity" {
   source      = "../../modules/workload_identity"
   project_id  = var.project_id
@@ -144,11 +150,15 @@ module "workload_identity" {
 
 locals {
   github_actions_roles = [
-    "roles/artifactregistry.writer", # Docker イメージ push
-    "roles/run.developer",           # Cloud Run Job 更新
-    "roles/iam.serviceAccountUser",  # Cloud Run SA として実行
-    "roles/storage.admin",           # Terraform state (GCS) 読み書き
-    "roles/cloudscheduler.admin",    # Cloud Scheduler 管理
+    "roles/artifactregistry.writer",         # Docker イメージ push
+    "roles/run.developer",                   # Cloud Run Job 更新
+    "roles/iam.serviceAccountUser",          # Cloud Run SA として実行
+    "roles/storage.admin",                   # Terraform state (GCS) 読み書き
+    "roles/cloudscheduler.admin",            # Cloud Scheduler 管理
+    "roles/resourcemanager.projectIamAdmin", # terraform が IAM ポリシーを変更するため
+    "roles/secretmanager.admin",             # Secret Manager リソースの参照・管理
+    "roles/serviceusage.serviceUsageAdmin",  # API 有効化 (google_project_service)
+    "roles/iam.serviceAccountAdmin",         # SA の作成・管理
   ]
 }
 
