@@ -3,7 +3,8 @@
 既存 src/config.py:get_credentials() を移植。
 シングルトンパターンで認証情報をキャッシュし、各Adapterで再利用する。
 
-Cloud Functions環境ではApplication Default Credentials (ADC)を使用。
+Cloud環境（Cloud Functions / Cloud Run Services / Cloud Run Jobs）では
+Application Default Credentials (ADC)を使用。
 """
 
 import os
@@ -28,11 +29,12 @@ SCOPES = [
 ]
 
 
-def _is_cloud_function_environment() -> bool:
-    """Cloud Functions環境かどうかを判定"""
-    # Cloud Functionsでは K_SERVICE 環境変数が設定される
+def _is_cloud_environment() -> bool:
+    """Cloud環境（Cloud Functions / Cloud Run Services / Cloud Run Jobs）かどうかを判定"""
     return (
-        os.getenv("K_SERVICE") is not None or os.getenv("FUNCTION_TARGET") is not None
+        os.getenv("K_SERVICE") is not None
+        or os.getenv("FUNCTION_TARGET") is not None
+        or os.getenv("CLOUD_RUN_JOB") is not None
     )
 
 
@@ -46,7 +48,7 @@ def get_google_credentials(
     Google API認証情報を取得（シングルトン）。
 
     優先順位:
-    1. Cloud Functions環境: Application Default Credentials (ADC)
+    1. Cloud環境（Cloud Functions / Cloud Run Services / Cloud Run Jobs）: Application Default Credentials (ADC)
     2. ローカル環境:
        a. token.pickle（既存のOAuth認証情報）
        b. credentials.json（OAuthクライアント設定）
@@ -63,8 +65,8 @@ def get_google_credentials(
     Raises:
         FileNotFoundError: 認証ファイルが見つからない場合
     """
-    # Cloud Functions環境ではApplication Default Credentialsを使用
-    if _is_cloud_function_environment():
+    # Cloud環境ではApplication Default Credentialsを使用
+    if _is_cloud_environment():
         creds, project = google.auth.default(scopes=SCOPES)
         return creds
 
