@@ -1,0 +1,154 @@
+name: Build & Push Prod Image
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      target_tag:
+        description: 'ロールバック先の release tag (例: v1.0.0)。指定した場合はそのタグのイメージを latest-prod として再タグ付けします。'
+        required: true
+
+permissions:
+  contents: read
+  id-token: write  # WIF OIDC トークン発行に必要
+
+env:
+  PROJECT_ID: marufeuille-linebot
+  REGION: asia-northeast1
+  REPOSITORY_ID: school-agent-prod
+  IMAGE_NAME: school-agent-v2
+
+jobs:
+  lint:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Ruff lint
+        run: uv run ruff check v2/
+
+      - name: Ruff format check
+        run: uv run ruff format --check v2/
+
+  test:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests
+        run: >
+          uv run pytest
+          tests/unit/
+          tests/integration/
+          -m "not manual"
+          --cov=v2
+          --cov-report=term-missing
+
+  build-push:
+    needs: [lint, test]
+    # lint/test が成功、またはスキップ（ロールバック時）の場合に実行
+    if: |
+      always() &&
+      (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency:
+      group: build-prod
+      cancel-in-progress: false  # ビルド途中でキャンセルしない
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # ---------------------------------------------------------------------------
+      # 通常デプロイ (tag push): ビルド → SHA / release / latest-prod タグで push
+      # ---------------------------------------------------------------------------
+
+      - name: Set up uv
+        if: github.event_name == 'push'
+        uses: astral-sh/setup-uv@v5
+
+      - name: Export requirements.txt
+        if: github.event_name == 'push'
+        run: uv export -o requirements.txt --no-hashes
+
+      - name: Build and push Docker image (normal deploy)
+        if: github.event_name == 'push'
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::7}"
+          RELEASE_TAG="${GITHUB_REF_NAME}"
+          BASE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}"
+
+          SHA_URL="${BASE}:${IMAGE_TAG}"
+          RELEASE_URL="${BASE}:${RELEASE_TAG}"
+          LATEST_PROD_URL="${BASE}:latest-prod"
+
+          docker build --platform linux/amd64 -t "${SHA_URL}" .
+          docker tag "${SHA_URL}" "${RELEASE_URL}"
+          docker tag "${SHA_URL}" "${LATEST_PROD_URL}"
+
+          docker push "${SHA_URL}"
+          docker push "${RELEASE_URL}"
+          docker push "${LATEST_PROD_URL}"
+
+      # ---------------------------------------------------------------------------
+      # ロールバック (workflow_dispatch): 既存イメージを latest-prod として再タグ付け
+      # ---------------------------------------------------------------------------
+
+      - name: Re-tag for rollback
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          TARGET_TAG="${{ github.event.inputs.target_tag }}"
+          BASE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}"
+
+          TARGET_URL="${BASE}:${TARGET_TAG}"
+          LATEST_PROD_URL="${BASE}:latest-prod"
+
+          # ロールバック先イメージの存在確認
+          if ! gcloud artifacts docker images describe "${TARGET_URL}" --quiet 2>/dev/null; then
+            echo "ERROR: イメージ ${TARGET_URL} が Artifact Registry に存在しません" >&2
+            exit 1
+          fi
+
+          # 既存イメージを pull → latest-prod として push
+          docker pull "${TARGET_URL}"
+          docker tag "${TARGET_URL}" "${LATEST_PROD_URL}"
+          docker push "${LATEST_PROD_URL}"

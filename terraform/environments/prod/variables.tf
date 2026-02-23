@@ -10,7 +10,7 @@ variable "region" {
 }
 
 variable "image_url" {
-  description = "デプロイするコンテナイメージ URL（SHA タグ付き。deploy 時に -var で渡す）"
+  description = "デプロイするコンテナイメージ URL（latest-prod タグ固定。cd-prod-terraform.yml から -var で渡す）"
   type        = string
 }
 
