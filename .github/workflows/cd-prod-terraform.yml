@@ -63,6 +63,7 @@ jobs:
   notify:
     needs: [deploy]
     if: always()
+    environment: prod
     uses: ./.github/workflows/_notify-slack.yml
     with:
       environment: prod
