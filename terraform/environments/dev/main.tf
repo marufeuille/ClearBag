@@ -46,6 +46,10 @@ module "artifact_registry" {
   region        = var.region
   repository_id = "school-agent-dev"
   environment   = "dev"
+
+  # IAM 付与 (repoAdmin) と artifact_registry リソース更新の race condition を防ぐため、
+  # github_actions IAM メンバーが確定してから artifact_registry を更新する
+  depends_on = [google_project_iam_member.github_actions]
 }
 
 module "secret_slack_bot_token" {
@@ -162,7 +166,7 @@ module "workload_identity" {
 
 locals {
   github_actions_roles = [
-    "roles/artifactregistry.repoAdmin",      # Docker イメージ push + リポジトリ設定更新 (cleanup policy 等)
+    "roles/artifactregistry.admin",          # Docker イメージ push + リポジトリ設定更新 (cleanup policy 等、repoAdmin は repositories.update を含まない)
     "roles/run.admin",                       # Cloud Run Job 更新・IAM ポリシー設定 (run.jobs.setIamPolicy が必要)
     "roles/iam.serviceAccountUser",          # Cloud Run SA として実行
     "roles/storage.admin",                   # Terraform state (GCS) 読み書き

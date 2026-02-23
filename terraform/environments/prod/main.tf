@@ -58,6 +58,10 @@ module "artifact_registry" {
   region        = var.region
   repository_id = "school-agent-prod"
   environment   = "prod"
+
+  # IAM 付与 (repoAdmin) と artifact_registry リソース更新の race condition を防ぐため、
+  # github_actions_prod IAM メンバーが確定してから artifact_registry を更新する
+  depends_on = [google_project_iam_member.github_actions_prod]
 }
 
 # ---------------------------------------------------------------------------
@@ -166,7 +170,7 @@ module "workload_identity" {
 # GitHub Actions prod SA に付与する IAM ロール
 locals {
   github_actions_prod_roles = [
-    "roles/artifactregistry.repoAdmin",      # Docker イメージ push + リポジトリ設定更新 (cleanup policy 等)
+    "roles/artifactregistry.admin",          # Docker イメージ push + リポジトリ設定更新 (cleanup policy 等、repoAdmin は repositories.update を含まない)
     "roles/run.admin",                       # Cloud Run Job 更新・IAM ポリシー設定 (run.jobs.setIamPolicy が必要)
     "roles/iam.serviceAccountUser",          # Cloud Run SA として実行
     "roles/storage.admin",                   # Terraform state (GCS) 読み書き
