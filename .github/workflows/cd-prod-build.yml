@@ -156,7 +156,6 @@ jobs:
   notify:
     needs: [lint, test, build-push]
     if: always()
-    environment: prod
     uses: ./.github/workflows/_notify-slack.yml
     with:
       environment: prod
