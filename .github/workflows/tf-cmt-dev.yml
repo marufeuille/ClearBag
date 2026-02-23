@@ -14,7 +14,6 @@ env:
   PROJECT_ID: marufeuille-linebot
   REGION: asia-northeast1
   REPOSITORY_ID: school-agent-dev
-  IMAGE_NAME: "asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-dev/school-agent-v2:latest"
 
 jobs:
   terraform:
@@ -54,7 +53,7 @@ jobs:
         run: |
           tfcmt --var target:dev plan --patch -- \
             terraform plan -input=false -no-color \
-              -var="image_url=${IMAGE_URL}" \
+              -var="image_url=asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-dev/school-agent-v2:latest" \
               -var="project_id=${{ env.PROJECT_ID }}" \
               -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
               -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
