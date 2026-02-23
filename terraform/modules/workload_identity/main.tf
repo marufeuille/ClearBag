@@ -4,7 +4,7 @@ data "google_project" "project" {
 
 resource "google_iam_workload_identity_pool" "github" {
   project                   = var.project_id
-  workload_identity_pool_id = "github-actions"
+  workload_identity_pool_id = var.pool_id
   display_name              = "GitHub Actions"
   description               = "GitHub Actions OIDC 認証用 Workload Identity Pool"
 }
@@ -36,7 +36,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 
 resource "google_service_account" "github_actions" {
   project      = var.project_id
-  account_id   = "github-actions-deploy"
+  account_id   = var.sa_account_id
   display_name = "GitHub Actions デプロイ用 SA"
   description  = "GitHub Actions から GCP リソースを操作するためのサービスアカウント"
 }

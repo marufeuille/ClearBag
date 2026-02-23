@@ -1,0 +1,178 @@
+name: CD (prod)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      target_tag:
+        description: 'ロールバック先の release tag (例: v1.0.0)。指定した場合はそのタグのイメージを再デプロイします（再ビルドなし）。'
+        required: true
+
+permissions:
+  contents: read
+  id-token: write  # WIF OIDC トークン発行に必要
+
+env:
+  PROJECT_ID: marufeuille-linebot
+  REGION: asia-northeast1
+  REPOSITORY_ID: school-agent-prod
+  IMAGE_NAME: school-agent-v2
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Ruff lint
+        run: uv run ruff check v2/
+
+      - name: Ruff format check
+        run: uv run ruff format --check v2/
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests
+        run: >
+          uv run pytest
+          tests/unit/
+          tests/integration/
+          -m "not manual"
+          --cov=v2
+          --cov-report=term-missing
+
+  deploy:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false  # デプロイ途中でキャンセルしない
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # ---------------------------------------------------------------------------
+      # 通常デプロイ (tag push): ビルド → SHA タグ + release タグを push
+      # prod-latest は Terraform apply 成功後に更新する
+      # ---------------------------------------------------------------------------
+
+      - name: Set up uv
+        if: github.event_name == 'push'
+        uses: astral-sh/setup-uv@v5
+
+      - name: Export requirements.txt
+        if: github.event_name == 'push'
+        run: uv export -o requirements.txt --no-hashes
+
+      - name: Build and push Docker image (normal deploy)
+        if: github.event_name == 'push'
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::7}"
+          RELEASE_TAG="${GITHUB_REF_NAME}"
+
+          SHA_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          RELEASE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:${RELEASE_TAG}"
+
+          docker build --platform linux/amd64 -t "${SHA_URL}" .
+          docker tag "${SHA_URL}" "${RELEASE_URL}"
+
+          # SHA タグと release タグを push（prod-latest は Terraform apply 成功後に更新）
+          docker push "${SHA_URL}"
+          docker push "${RELEASE_URL}"
+
+          # Terraform には SHA タグの URL を渡す（毎回異なるため差分を確実に検出）
+          echo "SHA_URL=${SHA_URL}" >> $GITHUB_ENV
+
+      # ---------------------------------------------------------------------------
+      # ロールバック (workflow_dispatch): 既存イメージを再デプロイ（ビルドなし）
+      # ---------------------------------------------------------------------------
+
+      - name: Resolve rollback image (rollback deploy)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          TARGET_TAG="${{ github.event.inputs.target_tag }}"
+          SHA_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:${TARGET_TAG}"
+
+          # ロールバック先イメージの存在確認
+          if ! gcloud artifacts docker images describe "${SHA_URL}" --quiet 2>/dev/null; then
+            echo "ERROR: イメージ ${SHA_URL} が Artifact Registry に存在しません" >&2
+            exit 1
+          fi
+
+          # ロールバック時は prod-latest を更新しない（現状の prod-latest を維持）
+          echo "SHA_URL=${SHA_URL}" >> $GITHUB_ENV
+
+      # ---------------------------------------------------------------------------
+      # Terraform apply (通常デプロイ・ロールバック共通)
+      # ---------------------------------------------------------------------------
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.5"
+
+      - name: Terraform Init
+        working-directory: terraform/environments/prod
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: terraform/environments/prod
+        run: |
+          terraform apply -auto-approve \
+            -var="image_url=${SHA_URL}" \
+            -var="project_id=${{ env.PROJECT_ID }}" \
+            -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
+            -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
+            -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}"
+
+      # ---------------------------------------------------------------------------
+      # Terraform apply 成功後にのみ prod-latest を更新
+      # ロールバック時は prod-latest を更新しない（現在 prod で動いているイメージを指し続ける）
+      # ---------------------------------------------------------------------------
+
+      - name: Update prod-latest tag after successful deploy
+        if: github.event_name == 'push'
+        run: |
+          PROD_LATEST_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:prod-latest"
+          docker tag "${SHA_URL}" "${PROD_LATEST_URL}"
+          docker push "${PROD_LATEST_URL}"
