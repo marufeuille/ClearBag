@@ -155,7 +155,7 @@ module "workload_identity" {
 locals {
   github_actions_prod_roles = [
     "roles/artifactregistry.writer",         # Docker イメージ push
-    "roles/run.developer",                   # Cloud Run Job 更新
+    "roles/run.admin",                       # Cloud Run Job 更新・IAM ポリシー設定 (run.jobs.setIamPolicy が必要)
     "roles/iam.serviceAccountUser",          # Cloud Run SA として実行
     "roles/storage.admin",                   # Terraform state (GCS) 読み書き
     "roles/cloudscheduler.admin",            # Cloud Scheduler 管理
