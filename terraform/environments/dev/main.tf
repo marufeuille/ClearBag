@@ -114,6 +114,14 @@ module "cloud_scheduler" {
   service_account_email = google_service_account.cloud_run.email
 }
 
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_id         = var.project_id
+  job_name           = module.cloud_run_job.job_name
+  notification_email = var.notification_email
+}
+
 # ---------------------------------------------------------------------------
 # Workload Identity Federation (WIF) — GitHub Actions 用 GCP 認証基盤
 # ---------------------------------------------------------------------------

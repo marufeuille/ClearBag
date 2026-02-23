@@ -28,3 +28,8 @@ variable "archive_folder_id" {
   description = "アーカイブフォルダID（Google Drive）"
   type        = string
 }
+
+variable "notification_email" {
+  description = "Cloud Monitoring アラート通知先メールアドレス"
+  type        = string
+}

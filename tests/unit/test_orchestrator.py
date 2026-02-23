@@ -1,10 +1,9 @@
 """Orchestrator のテスト"""
 
-import pytest
-from unittest.mock import MagicMock
-from v2.domain.models import Category, DocumentAnalysis, FileInfo, ProcessingResult
+import logging
+
+from v2.domain.models import Category, DocumentAnalysis, FileInfo
 from v2.services.orchestrator import Orchestrator
-from v2.services.action_dispatcher import DispatchResult
 
 
 class TestOrchestrator:
@@ -277,6 +276,42 @@ class TestOrchestrator:
         assert results[1].error is None  # file2は成功
         assert results[1].archived is True
 
+    def test_run_logs_execution_summary(
+        self,
+        mock_config,
+        mock_storage,
+        mock_analyzer,
+        mock_calendar,
+        mock_task_service,
+        mock_notifier,
+        caplog,
+    ):
+        """run() の終了時に execution_summary ログが出力されること"""
+        # Arrange
+        from v2.services.action_dispatcher import ActionDispatcher
+
+        dispatcher = ActionDispatcher(
+            mock_calendar, mock_task_service, mock_notifier
+        )
+        orchestrator = Orchestrator(
+            mock_config, mock_storage, mock_analyzer, dispatcher
+        )
+
+        # Act
+        with caplog.at_level(logging.INFO, logger="v2.services.orchestrator"):
+            orchestrator.run()
+
+        # Assert: サマリーログに必須フィールドが含まれること
+        summary_logs = [r for r in caplog.records if "execution_summary" in r.getMessage()]
+        assert len(summary_logs) == 1, "execution_summary ログが1件出力されること"
+
+        summary_message = summary_logs[0].getMessage()
+        assert "files=" in summary_message
+        assert "events=" in summary_message
+        assert "tasks=" in summary_message
+        assert "errors=" in summary_message
+        assert "duration=" in summary_message
+
     def test_archive_uses_fallback_name_when_gemini_returns_empty(
         self,
         mock_config,
@@ -304,7 +339,7 @@ class TestOrchestrator:
         )
 
         # Act
-        results = orchestrator.run()
+        orchestrator.run()
 
         # Assert
         expected_name = f"PROCESSED_{sample_file_info.name}"
