@@ -7,6 +7,7 @@ Ports（Protocol）にのみ依存し、外部APIの実装詳細からは独立�
 from __future__ import annotations
 
 import logging
+import time
 
 from v2.domain.models import FileInfo, ProcessingResult
 from v2.domain.ports import (
@@ -60,6 +61,7 @@ class Orchestrator:
             list[ProcessingResult]: 各ファイルの処理結果
         """
         logger.info("=== School Agent v2 Started ===")
+        start_time = time.monotonic()
 
         # 1. 設定読み込み
         logger.info("Loading configuration...")
@@ -86,7 +88,19 @@ class Orchestrator:
             result = self._process_single(file_info, profiles, rules)
             results.append(result)
 
-        logger.info("=== Processing complete: %d files processed ===", len(results))
+        total_events = sum(r.events_created for r in results)
+        total_tasks = sum(r.tasks_created for r in results)
+        total_errors = sum(1 for r in results if r.error)
+        elapsed = time.monotonic() - start_time
+
+        logger.info(
+            "execution_summary: files=%d events=%d tasks=%d errors=%d duration=%.1fs",
+            len(results),
+            total_events,
+            total_tasks,
+            total_errors,
+            elapsed,
+        )
         return results
 
     def _process_single(self, file_info: FileInfo, profiles, rules) -> ProcessingResult:

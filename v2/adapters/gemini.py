@@ -118,6 +118,16 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
                 stream=False,
             )
 
+            # トークン使用量をログに記録
+            usage = getattr(responses, "usage_metadata", None)
+            if usage:
+                logger.info(
+                    "Gemini token usage: input=%d, output=%d, total=%d",
+                    usage.prompt_token_count,
+                    usage.candidates_token_count,
+                    usage.total_token_count,
+                )
+
             # JSONレスポンスをパース
             raw_json = self._parse_response(responses.text)
             analysis = self._convert_to_domain_model(raw_json)

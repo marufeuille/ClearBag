@@ -138,6 +138,14 @@ module "cloud_scheduler" {
   service_account_email = google_service_account.cloud_run.email
 }
 
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_id         = var.project_id
+  job_name           = module.cloud_run_job.job_name
+  notification_email = var.notification_email
+}
+
 # ---------------------------------------------------------------------------
 # Workload Identity Federation (prod 専用)
 # dev とは別の Pool/Provider/SA を作成し、独立して管理する

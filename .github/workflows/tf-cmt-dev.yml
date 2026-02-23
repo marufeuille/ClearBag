@@ -60,5 +60,6 @@ jobs:
               -var="project_id=${{ env.PROJECT_ID }}" \
               -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
               -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
-              -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}"
+              -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}" \
+              -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}"
         working-directory: terraform/environments/dev
