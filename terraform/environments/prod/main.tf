@@ -144,6 +144,10 @@ module "monitoring" {
   project_id         = var.project_id
   job_name           = module.cloud_run_job.job_name
   notification_email = var.notification_email
+
+  # IAM 付与と monitoring リソース作成の race condition を防ぐため、
+  # github_actions_prod IAM メンバーが確定してから monitoring を作成する
+  depends_on = [google_project_iam_member.github_actions_prod]
 }
 
 # ---------------------------------------------------------------------------
