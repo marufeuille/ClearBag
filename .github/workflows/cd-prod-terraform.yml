@@ -59,3 +59,14 @@ jobs:
             -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
             -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}" \
             -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}"
+
+  notify:
+    needs: [deploy]
+    if: always()
+    uses: ./.github/workflows/_notify-slack.yml
+    with:
+      environment: prod
+      workflow_name: "CD Terraform (prod)"
+      result: ${{ needs.deploy.result }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

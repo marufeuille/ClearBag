@@ -1,0 +1,90 @@
+name: _Notify Slack
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "デプロイ対象環境 (例: dev, prod)"
+        required: true
+        type: string
+      workflow_name:
+        description: "呼び出し元ワークフロー名 (例: CD (dev))"
+        required: true
+        type: string
+      result:
+        description: "デプロイジョブの結果 (success / failure / skipped / cancelled)"
+        required: true
+        type: string
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build notification metadata
+        id: meta
+        run: |
+          echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          if [ "${{ inputs.result }}" = "success" ]; then
+            echo "header=✅ Deploy Succeeded" >> $GITHUB_OUTPUT
+          else
+            echo "header=❌ Deploy Failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ steps.meta.outputs.header }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment*\n${{ inputs.environment }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow*\n${{ inputs.workflow_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status*\n${{ inputs.result }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit*\n`${{ steps.meta.outputs.short_sha }}`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Triggered by*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }

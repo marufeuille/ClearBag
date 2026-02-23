@@ -127,3 +127,14 @@ jobs:
             -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
             -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}" \
             -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}"
+
+  notify:
+    needs: [lint, test, deploy]
+    if: always()
+    uses: ./.github/workflows/_notify-slack.yml
+    with:
+      environment: dev
+      workflow_name: "CD (dev)"
+      result: ${{ needs.deploy.result }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

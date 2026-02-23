@@ -152,3 +152,14 @@ jobs:
           docker pull "${TARGET_URL}"
           docker tag "${TARGET_URL}" "${LATEST_PROD_URL}"
           docker push "${LATEST_PROD_URL}"
+
+  notify:
+    needs: [lint, test, build-push]
+    if: always()
+    uses: ./.github/workflows/_notify-slack.yml
+    with:
+      environment: prod
+      workflow_name: "Build & Push Prod Image"
+      result: ${{ needs.build-push.result }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
