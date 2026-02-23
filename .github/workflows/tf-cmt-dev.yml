@@ -53,5 +53,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tfcmt --var target:dev plan --patch -- \
-            terraform plan -input=false -no-color
+            terraform plan -input=false -no-color \
+              -var="image_url=${IMAGE_URL}" \
+              -var="project_id=${{ env.PROJECT_ID }}" \
+              -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
+              -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
+              -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}"
         working-directory: terraform/environments/dev
