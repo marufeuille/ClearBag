@@ -43,7 +43,7 @@ jobs:
           terraform_version: "~> 1.5"
 
       - name: Terraform Init
-        run: terraform -chdir=infrastructure init -input=false
+        run: terraform init -input=false
         working-directory: terraform/environments/dev
 
       - name: Plan with PR Comment
