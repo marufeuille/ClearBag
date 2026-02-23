@@ -14,7 +14,7 @@ env:
   PROJECT_ID: marufeuille-linebot
   REGION: asia-northeast1
   REPOSITORY_ID: school-agent-dev
-  IMAGE_NAME: school-agent-v2
+  IMAGE_NAME: "asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-dev/school-agent-v2:latest"
 
 jobs:
   terraform:
