@@ -131,6 +131,7 @@ jobs:
   notify:
     needs: [lint, test, deploy]
     if: always()
+    environment: dev
     uses: ./.github/workflows/_notify-slack.yml
     with:
       environment: dev
