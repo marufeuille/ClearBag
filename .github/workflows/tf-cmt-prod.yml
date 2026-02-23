@@ -1,0 +1,64 @@
+name: terraform plan prod
+
+on:
+  pull_request:
+    paths:
+      - "terraform/environments/prod/**"
+      - "terraform/modules/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # WIF OIDC トークン発行に必要
+  pull-requests: write # PRコメント投稿用
+  issues: write # tfcmtがラベル作成する場合は必要
+
+env:
+  PROJECT_ID: marufeuille-linebot
+  REGION: asia-northeast1
+  REPOSITORY_ID: school-agent-prod
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tfcmt
+        env:
+          TFCMT_VERSION: v4.14.15
+        run: |
+          wget "https://github.com/suzuki-shunsuke/tfcmt/releases/download/${TFCMT_VERSION}/tfcmt_linux_amd64.tar.gz" -O /tmp/tfcmt.tar.gz
+          tar xzf /tmp/tfcmt.tar.gz -C /tmp
+          sudo mv /tmp/tfcmt /usr/local/bin
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.5"
+
+      - name: Terraform Init
+        run: terraform init -input=false
+        working-directory: terraform/environments/prod
+
+      - name: Plan with PR Comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tfcmt --var target:prod plan --patch -- \
+            terraform plan -input=false -no-color \
+              -var="image_url=asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-prod/school-agent-v2:prod-latest" \
+              -var="project_id=${{ env.PROJECT_ID }}" \
+              -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
+              -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
+              -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}"
+        working-directory: terraform/environments/prod
