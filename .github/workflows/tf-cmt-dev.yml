@@ -7,6 +7,8 @@ on:
 permissions:
   contents: read
   id-token: write # WIF OIDC トークン発行に必要
+  pull-requests: write # PRコメント投稿用
+  issues: write # tfcmtがラベル作成する場合は必要
 
 env:
   PROJECT_ID: marufeuille-linebot
