@@ -1,0 +1,66 @@
+name: CD Terraform (prod)
+
+on:
+  workflow_run:
+    workflows: ["Build & Push Prod Image"]
+    types: [completed]
+
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/environments/prod/**'
+      - 'terraform/modules/**'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write  # WIF OIDC トークン発行に必要
+
+env:
+  PROJECT_ID: marufeuille-linebot
+  REGION: asia-northeast1
+
+jobs:
+  deploy:
+    # workflow_run の場合はビルドが成功した時のみ実行
+    if: |
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false  # デプロイ途中でキャンセルしない
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.5"
+
+      - name: Terraform Init
+        working-directory: terraform/environments/prod
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: terraform/environments/prod
+        run: |
+          LATEST_PROD_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/school-agent-prod/school-agent-v2:latest-prod"
+          terraform apply -auto-approve \
+            -var="image_url=${LATEST_PROD_URL}" \
+            -var="project_id=${{ env.PROJECT_ID }}" \
+            -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
+            -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
+            -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}"
