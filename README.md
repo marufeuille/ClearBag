@@ -1,17 +1,15 @@
-# School Agent v2
+# ClearBag
 
-学校のプリントや書類の処理を自動化するAIエージェントです。Google Driveからファイルを読み込み、Google Geminiを使って内容・文脈・日付を解析し、自動的にGoogleカレンダーへの予定登録、Todoistへのタスク追加、Slackへの通知を行います。
-
-**v2ではHexagonal Architecture(ヘキサゴナルアーキテクチャ)を採用し、テスタビリティと拡張性を大幅に向上させました。**
+学校プリントを自動処理するAIエージェント。Google Drive の Inbox フォルダを監視し、Gemini 2.5 Pro で内容を解析してカレンダー・Todoist・Slack に自動連携する。
 
 ## 機能
 
-- **自動スキャン**: 特定のGoogle Driveフォルダ (`Inbox`) を監視します。
-- **AI解析**: Gemini 2.5 Pro を使用して、文書の内容を理解します。
-- **カレンダー連携**: 家族メンバーごとに指定されたGoogleカレンダーに予定を追加します。
-- **タスク管理**: アクションが必要な項目(例:「提出」「持ち物」)をTodoistに登録します。
-- **通知**: 処理結果の要約をSlackに送信します。
-- **アーカイブ**: ファイルを検索しやすい名前 (`YYYYMMDD_タイトル`) にリネームし、`Archive` フォルダに移動します。
+- **自動スキャン**: 特定の Google Drive フォルダ (`Inbox`) を監視
+- **AI解析**: Gemini 2.5 Pro で文書の内容・日付・アクションを理解
+- **カレンダー連携**: 家族メンバーごとの Google カレンダーに予定を追加
+- **タスク管理**: アクションが必要な項目を Todoist に登録
+- **通知**: 処理結果の要約を Slack に送信
+- **アーカイブ**: ファイルを `YYYYMMDD_タイトル` にリネームして `Archive` フォルダに移動
 
 ## アーキテクチャ
 
@@ -21,35 +19,80 @@
 - **ストレージ**: Google Drive
 - **設定管理**: Google Sheets
 - **連携**: Google Calendar, Todoist, Slack
-- **テストカバレッジ**: 100% (31 unit tests)
+- **実行基盤**: Cloud Run Jobs（Cloud Scheduler で毎日 9:00 / 17:00 JST）
+- **インフラ**: Terraform（`dev` / `prod` 環境分離）
+
+## ディレクトリ構成
+
+```
+.
+├── v2/                    # アプリケーション本体（Hexagonal Architecture）
+│   ├── domain/           # ドメインモデル・ポート定義
+│   │   ├── models.py     # dataclass（Profile, Rule, EventData 等）
+│   │   ├── errors.py     # ドメイン固有の例外
+│   │   └── ports.py      # ABC ポート（ConfigSource, FileStorage 等）
+│   ├── services/         # ビジネスロジック
+│   │   ├── orchestrator.py       # メインワークフロー
+│   │   └── action_dispatcher.py  # 解析結果→アクション振り分け
+│   ├── adapters/         # 外部サービス実装
+│   │   ├── credentials.py
+│   │   ├── google_sheets.py
+│   │   ├── google_drive.py
+│   │   ├── google_calendar.py
+│   │   ├── gemini.py
+│   │   ├── todoist.py
+│   │   └── slack.py
+│   ├── entrypoints/      # エントリーポイント
+│   │   ├── factory.py    # DI 組み立て（Null Object Pattern 含む）
+│   │   └── cli.py        # CLI 実行
+│   └── config.py         # 環境変数からの設定読み込み
+├── terraform/             # インフラ定義
+│   ├── environments/
+│   │   ├── dev/          # dev 環境
+│   │   └── prod/         # prod 環境
+│   └── modules/          # 共通モジュール
+│       ├── artifact_registry/
+│       ├── cloud_run_job/
+│       ├── cloud_scheduler/
+│       ├── secret_manager/
+│       └── workload_identity/
+├── .github/workflows/     # CI/CD
+│   ├── ci.yml            # Lint + Test（PR 時）
+│   ├── cd-dev.yml        # dev デプロイ（main push）
+│   ├── cd-prod-build.yml # prod Docker ビルド（v* タグ）
+│   └── cd-prod-terraform.yml # prod Terraform Apply（v* タグ）
+├── tests/
+│   ├── unit/             # ユニットテスト（37 tests）
+│   ├── integration/      # 統合テスト
+│   ├── e2e/              # End-to-End テスト
+│   └── manual/           # 手動実行用
+├── Dockerfile
+├── build_push.sh          # ローカルから Docker ビルド & push
+├── pyproject.toml
+├── ARCHITECTURE_V2.md
+└── SPECIFICATION.md
+```
 
 ## セットアップ
 
-### 1. 前提条件
+### 前提条件
 
-- Google Cloud Project (以下のAPIを有効化):
-    - Google Drive API
-    - Google Sheets API
-    - Google Calendar API
-    - Vertex AI API
+- Google Cloud Project（Drive / Sheets / Calendar / Vertex AI API 有効化）
 - 適切な権限を持つサービスアカウント
-- Todoist アカウント & APIトークン (オプション)
-- Slack ワークスペース & Botトークン (オプション)
+- Todoist アカウント & API トークン（オプション）
+- Slack ワークスペース & Bot トークン（オプション）
 
-### 2. インストール
-
-本プロジェクトはパッケージ管理に [uv](https://github.com/astral-sh/uv) を使用しています。
+### インストール
 
 ```bash
 git clone <repository-url>
-cd school_ai_app
+cd ClearBag
 uv sync
 ```
 
-### 3. 設定
+### 環境変数
 
-1.  **Google Sheets**: `Profiles` と `Rules` タブを持つ設定用シートを作成します(詳細は `SPECIFICATION.md` 参照)。
-2.  **環境変数**: ルートディレクトリに `.env` ファイルを作成します:
+ルートディレクトリに `.env` ファイルを作成:
 
 ```env
 # 必須
@@ -58,160 +101,76 @@ SPREADSHEET_ID=your-config-sheet-id
 INBOX_FOLDER_ID=your-inbox-drive-folder-id
 ARCHIVE_FOLDER_ID=your-archive-drive-folder-id
 
-# オプショナル(未設定の場合はスキップされます)
+# オプション（未設定の場合はスキップ）
 TODOIST_API_TOKEN=your-todoist-token
 SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
 SLACK_CHANNEL_ID=your-slack-channel-id
 
 # デフォルト値あり
-VERTEX_AI_LOCATION=us-central1  # デフォルト: us-central1
-GEMINI_MODEL=gemini-2.5-pro     # デフォルト: gemini-2.5-pro
+VERTEX_AI_LOCATION=us-central1
+GEMINI_MODEL=gemini-2.5-pro
 ```
 
-3.  **認証情報**: `service_account.json` をルートディレクトリに配置、または環境変数で指定します:
+認証情報:
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 ```
 
-### 4. 使用方法
+## 使用方法
 
-#### CLI実行
-
-```bash
-# 基本実行
-python -m v2.entrypoints.cli
-
-# ログレベル変更
-LOG_LEVEL=DEBUG python -m v2.entrypoints.cli
-```
-
-#### Cloud Functionsデプロイ
+### CLI 実行
 
 ```bash
-# デプロイスクリプトの実行
-./deploy_v2.sh
+uv run python -m v2.entrypoints.cli
 
-# または手動でデプロイ
-gcloud functions deploy school-agent-v2 \
-  --gen2 \
-  --runtime=python313 \
-  --region=asia-northeast1 \
-  --source=. \
-  --entry-point=school_agent_http \
-  --trigger-http \
-  --allow-unauthenticated \
-  --timeout=540s \
-  --memory=1024Mi \
-  --set-env-vars PROJECT_ID=xxx,SPREADSHEET_ID=xxx,...
+# デバッグ
+LOG_LEVEL=DEBUG uv run python -m v2.entrypoints.cli
 ```
 
-## ディレクトリ構成
+### Cloud Run Jobs（本番）
 
-```
-.
-├── v2/                   # v2実装(Hexagonal Architecture)
-│   ├── domain/          # ドメインモデル・ポート定義
-│   │   ├── models.py    # 8つのdataclass(Profile, Rule, EventData等)
-│   │   ├── errors.py    # ドメイン固有の例外
-│   │   └── ports.py     # 6つのABC(ConfigSource, FileStorage等)
-│   ├── services/        # ビジネスロジック
-│   │   ├── orchestrator.py       # メインワークフロー
-│   │   └── action_dispatcher.py  # 解析結果→アクション振り分け
-│   ├── adapters/        # 外部サービス実装
-│   │   ├── credentials.py        # Google認証
-│   │   ├── google_sheets.py      # ConfigSource実装
-│   │   ├── google_drive.py       # FileStorage実装
-│   │   ├── google_calendar.py    # CalendarService実装
-│   │   ├── gemini.py             # DocumentAnalyzer実装(Gemini 2.5 Pro)
-│   │   ├── todoist.py            # TaskService実装
-│   │   └── slack.py              # Notifier実装
-│   ├── entrypoints/     # エントリーポイント
-│   │   ├── factory.py            # DI組み立て(Null Object Pattern含む)
-│   │   ├── cli.py                # CLI実行
-│   │   └── cloud_function.py     # Cloud Functions実行
-│   └── config.py        # 環境変数からの設定読み込み
-├── tests/
-│   ├── conftest.py      # 共通fixture(モックとサンプルデータ)
-│   ├── unit/            # ユニットテスト(31テスト、100%カバレッジ)
-│   ├── integration/     # 統合テスト
-│   ├── e2e/            # End-to-Endテスト
-│   └── manual/         # 手動実行用テスト・ユーティリティ
-├── main_v2.py          # Cloud Functionsデプロイ用エントリーポイント
-├── deploy_v2.sh        # デプロイスクリプト
-├── .env                # 環境変数 (git管理外)
-├── requirements.txt    # Python依存ライブラリ
-├── service_account.json# Google認証情報 (git管理外)
-├── ARCHITECTURE_V2.md  # 詳細設計ドキュメント
-└── SPECIFICATION.md    # システム仕様書
-```
+Terraform でデプロイ済み。Cloud Scheduler が毎日 9:00 / 17:00 JST に自動実行する。
+
+## CI/CD
+
+| トリガー | ワークフロー | 内容 |
+|----------|-------------|------|
+| PR | `ci.yml` | Lint (ruff) + Unit/Integration テスト |
+| `main` push | `cd-dev.yml` | Lint + テスト → Docker ビルド → Terraform Apply (dev) |
+| `v*` タグ | `cd-prod-build.yml` | Docker ビルド & `latest-prod` タグ付与 |
+| `v*` タグ | `cd-prod-terraform.yml` | Terraform Apply (prod) |
+
+GCP 認証は Workload Identity Federation (OIDC) を使用。
 
 ## テスト
 
 ```bash
-# 全ユニットテスト実行
-pytest tests/unit -v
+# ユニットテスト
+uv run pytest tests/unit -v
 
 # カバレッジ付き
-pytest tests/unit --cov=v2 --cov-report=html
-
-# E2Eテスト
-pytest tests/e2e/test_v2_full_pipeline.py -v
-
-# 個別アダプタテスト
-python tests/manual/adapters/test_all_adapters.py
+uv run pytest tests/unit tests/integration -m "not manual" --cov=v2 --cov-report=term-missing
 ```
 
-**現在のテストカバレッジ: 100% (31 unit tests)**
+現在のテストカバレッジ: **100% (37 unit tests)**
 
 ## 設計原則
 
-### Hexagonal Architecture
+**Hexagonal Architecture**:
 
-- **Domain層**: ビジネスロジックのみ。外部依存なし。
-- **Ports**: ABCで定義。型安全性を確保。
+- **Domain 層**: ビジネスロジックのみ。外部依存なし。
+- **Ports**: ABC で定義。型安全性を確保。
 - **Adapters**: 外部サービス実装。ポートに準拠。
 - **Entrypoints**: 依存性を組み立ててドメインを起動。
 
-### 重要な設計判断
+主な設計判断: ABC > Protocol（実装漏れをインスタンス化時に検出）、frozen dataclass（不変性保証）、Null Object Pattern（オプショナルサービスの優雅な処理）。
 
-1. **ABC > Protocol**: 実装漏れをインスタンス化時に即座に検出
-2. **frozen dataclass > Pydantic**: 標準ライブラリのみ。不変性保証
-3. **Constructor Injection**: テスト時にモック差し替えが容易
-4. **Null Object Pattern**: オプショナルサービス(Todoist/Slack)の優雅な処理
-5. **logging > print**: テストで`caplog` fixture検証可能
+## ドキュメント
 
-### 拡張性
-
-- 新しい通知先追加: `Notifier` ABCを実装するだけ
-- 新しいストレージ: `FileStorage` ABCを実装するだけ
-- 新しいLLM: `DocumentAnalyzer` ABCを実装するだけ
-
-## トラブルシューティング
-
-### Todoist/Slack通知が送信されない
-
-トークンが設定されていない場合、Null Objectパターンで処理がスキップされます。
-ログに以下のメッセージが出力されます:
-
-```
-WARNING: TODOIST_API_TOKEN not set, tasks will not be created
-WARNING: Slack tokens not set, notifications will not be sent
-```
-
-必要に応じて `.env` にトークンを追加してください。
-
-### Gemini解析エラー
-
-- `PROJECT_ID` が正しいか確認
-- Service Accountに Vertex AI User ロールが付与されているか確認
-- リージョン(`VERTEX_AI_LOCATION`)が正しいか確認
-
-## 詳細ドキュメント
-
-- [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) - v2設計詳細
-- [v2/README.md](v2/README.md) - v2実装ドキュメント
+- [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) - 設計詳細
 - [SPECIFICATION.md](SPECIFICATION.md) - システム仕様書
+- [docs/](docs/) - 各種計画・レビュードキュメント
 
 ## ライセンス
 
