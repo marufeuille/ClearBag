@@ -1,4 +1,4 @@
-name: CD (dev)
+name: terraform plan dev
 
 on:
   pull_request:
@@ -24,7 +24,7 @@ jobs:
         env:
           TFCMT_VERSION: v4.14.15
         run: |
-          wget "<https://github.com/suzuki-shunsuke/tfcmt/releases/download/${TFCMT_VERSION}/tfcmt_linux_amd64.tar.gz>" -O /tmp/tfcmt.tar.gz
+          wget "https://github.com/suzuki-shunsuke/tfcmt/releases/download/${TFCMT_VERSION}/tfcmt_linux_amd64.tar.gz" -O /tmp/tfcmt.tar.gz
           tar xzf /tmp/tfcmt.tar.gz -C /tmp
           sudo mv /tmp/tfcmt /usr/local/bin
 
