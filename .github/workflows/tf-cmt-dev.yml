@@ -53,8 +53,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tfcmt --var target:dev plan --patch -- \\\\
-            terraform plan \\\\
-              -var-file=environments/dev.tfvars \\\\
-              -input=false \\\\
-              -no-color
+            terraform plan -input=false -no-color
         working-directory: terraform/environments/dev
