@@ -2,6 +2,9 @@ name: terraform plan dev
 
 on:
   pull_request:
+    paths:
+      - "terraform/environments/dev/**"
+      - "terraform/modules/**"
   workflow_dispatch:
 
 permissions:

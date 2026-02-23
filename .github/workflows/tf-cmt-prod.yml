@@ -2,6 +2,9 @@ name: terraform plan prod
 
 on:
   pull_request:
+    paths:
+      - "terraform/environments/prod/**"
+      - "terraform/modules/**"
   workflow_dispatch:
 
 permissions:
@@ -53,7 +56,7 @@ jobs:
         run: |
           tfcmt --var target:prod plan --patch -- \
             terraform plan -input=false -no-color \
-              -var="image_url=asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-prod/school-agent-v2:latest" \
+              -var="image_url=asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-prod/school-agent-v2:prod-latest" \
               -var="project_id=${{ env.PROJECT_ID }}" \
               -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
               -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
