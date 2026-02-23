@@ -17,11 +17,13 @@ on:
         type: string
     secrets:
       SLACK_WEBHOOK_URL:
-        required: true
+        required: false
 
 jobs:
   notify:
     runs-on: ubuntu-latest
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Build notification metadata
         id: meta
@@ -34,6 +36,7 @@ jobs:
           fi
 
       - name: Send Slack notification
+        if: env.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v2.1.0
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
