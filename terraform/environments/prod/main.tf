@@ -172,6 +172,7 @@ locals {
     "roles/serviceusage.serviceUsageAdmin",  # API 有効化 (google_project_service)
     "roles/iam.serviceAccountAdmin",         # SA の作成・管理
     "roles/iam.workloadIdentityPoolAdmin",   # WIF Pool/Provider の管理
+    "roles/monitoring.admin",                # Cloud Monitoring アラートポリシー・通知チャンネル管理
   ]
 }
 
