@@ -2,14 +2,15 @@
 
 DocumentAnalyzer ABCの実装。
 既存 src/gemini_client.py を移植し、ABCに準拠。
+
+vertexai.init() はコンストラクタから分離されており、
+呼び出し側（factory等）が事前に初期化した GenerativeModel を渡す。
 """
 
 import json
 import logging
 
-import vertexai
 import vertexai.preview.generative_models as generative_models
-from google.oauth2.credentials import Credentials
 from vertexai.generative_models import GenerativeModel, Part
 
 from v2.domain.models import (
@@ -30,40 +31,24 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
     Gemini 2.5 Proを使った文書解析実装。
 
     PDF/画像から構造化データ（イベント・タスク・要約）を抽出する。
+
+    vertexai.init() は外部で実行済みであることを前提とし、
+    初期化済みの GenerativeModel インスタンスを受け取る。
+    これにより、テスト時のモック差し替えとマルチテナント化が容易になる。
     """
 
-    def __init__(
-        self,
-        credentials: Credentials,
-        project_id: str,
-        location: str = "us-central1",
-        model_name: str = "gemini-2.5-pro",
-    ):
+    def __init__(self, model: GenerativeModel) -> None:
         """
         Args:
-            credentials: Google API認証情報
-            project_id: GCPプロジェクトID
-            location: Vertex AIのリージョン（デフォルト: us-central1）
-            model_name: 使用するモデル名（デフォルト: gemini-2.5-pro）
+            model: 初期化済みの GenerativeModel インスタンス。
+                   呼び出し側で vertexai.init() を実行してから渡すこと。
         """
-        if not credentials:
-            raise ValueError("credentials is required")
-        if not project_id:
-            raise ValueError("project_id is required")
+        if model is None:
+            raise ValueError("model is required")
 
-        # Vertex AI初期化
-        vertexai.init(project=project_id, location=location, credentials=credentials)
+        self._model = model
 
-        self._model = GenerativeModel(model_name)
-        self._project_id = project_id
-        self._location = location
-
-        logger.info(
-            "Gemini initialized: project=%s, location=%s, model=%s",
-            project_id,
-            location,
-            model_name,
-        )
+        logger.info("GeminiDocumentAnalyzer initialized")
 
     def analyze(
         self,
