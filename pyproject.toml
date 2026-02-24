@@ -21,6 +21,11 @@ dependencies = [
     "python-multipart>=0.0.20",
     # --- カレンダーフィード ---
     "icalendar>=6.0.0",
+    # --- 通知 ---
+    "sendgrid>=6.11.0",
+    "pywebpush>=2.0.0",
+    # --- リトライ ---
+    "tenacity>=9.0.0",
     # --- ユーティリティ ---
     "python-dotenv>=1.2.1",
     "slack-sdk>=3.39.0",

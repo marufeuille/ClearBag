@@ -11,6 +11,17 @@ import json
 import logging
 
 import vertexai.preview.generative_models as generative_models
+from google.api_core.exceptions import (
+    InternalServerError,
+    ResourceExhausted,
+    ServiceUnavailable,
+)
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 from vertexai.generative_models import GenerativeModel, Part
 
 from v2.domain.models import (
@@ -96,11 +107,8 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlock.BLOCK_MEDIUM_AND_ABOVE,
             }
 
-            responses = self._model.generate_content(
-                [document_part, user_prompt],
-                generation_config=generation_config,
-                safety_settings=safety_settings,
-                stream=False,
+            responses = self._call_gemini(
+                document_part, user_prompt, generation_config, safety_settings
             )
 
             # トークン使用量をログに記録
@@ -129,6 +137,32 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
         except Exception:
             logger.exception("Failed to analyze document")
             raise
+
+    @retry(
+        retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, InternalServerError)),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        stop=stop_after_attempt(4),
+        reraise=True,
+    )
+    def _call_gemini(
+        self,
+        document_part: Part,
+        user_prompt: str,
+        generation_config: dict,
+        safety_settings: dict,
+    ):
+        """Gemini API 呼び出し（自動リトライ付き）。
+
+        Rate Limit (429) / ServiceUnavailable (503) / InternalServerError (500) の場合に
+        指数バックオフで最大4回リトライする。
+        """
+        logger.debug("Calling Gemini API (with retry)")
+        return self._model.generate_content(
+            [document_part, user_prompt],
+            generation_config=generation_config,
+            safety_settings=safety_settings,
+            stream=False,
+        )
 
     def _build_system_prompt(self) -> str:
         """システムプロンプトを構築"""

@@ -160,6 +160,65 @@ def _convert_profiles(user_profiles: list[UserProfile]) -> dict[str, Profile]:
     }
 
 
+@worker_app.post("/worker/morning-digest", status_code=status.HTTP_200_OK)
+async def morning_digest(request: Request) -> dict:
+    """
+    朝のダイジェストメール送信エンドポイント（Cloud Scheduler から呼び出し）。
+
+    登録済みの全ユーザーに対して今後7日間の予定・未完了タスクをメールで送信する。
+    Cloud Scheduler の OIDC トークンで保護する想定。
+    """
+    _ensure_firebase_init()
+
+    db = firestore.Client()
+    doc_repo = FirestoreDocumentRepository(db)
+
+    sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
+    if not sendgrid_key:
+        logger.warning("SENDGRID_API_KEY not set, skipping morning digest")
+        return {"status": "skipped", "reason": "no_sendgrid_key"}
+
+    from v2.adapters.email_notifier import EmailConfig, SendGridEmailNotifier
+
+    notifier = SendGridEmailNotifier(EmailConfig(api_key=sendgrid_key))
+
+    import datetime
+
+    today = datetime.date.today()
+    from_date = today.isoformat()
+    to_date = (today + datetime.timedelta(days=7)).isoformat()
+
+    sent = 0
+    errors = 0
+
+    # 全ユーザーを走査（本番では Firestore のページネーションを考慮すること）
+    users_ref = db.collection("users").stream()
+    for user_doc in users_ref:
+        uid = user_doc.id
+        user_data = user_doc.to_dict() or {}
+        prefs = user_data.get("notification_preferences", {})
+        user_email = user_data.get("email", "")
+
+        if not prefs.get("email", False) or not user_email:
+            continue
+
+        try:
+            events = doc_repo.list_events(uid, from_date=from_date, to_date=to_date)
+            tasks = doc_repo.list_tasks(uid, completed=False)
+            notifier.send_morning_digest(
+                to_email=user_email,
+                upcoming_events=events,
+                pending_tasks=tasks,
+            )
+            sent += 1
+        except Exception:
+            logger.exception("Morning digest failed for uid=%s", uid)
+            errors += 1
+
+    logger.info("Morning digest complete: sent=%d, errors=%d", sent, errors)
+    return {"status": "ok", "sent": sent, "errors": errors}
+
+
 def _try_send_notification(uid, document_id, analysis, user_repo, db) -> None:
     """
     通知設定に基づいてメール/WebPush 通知を試みる。
