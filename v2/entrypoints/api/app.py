@@ -27,6 +27,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from v2.entrypoints import worker
 from v2.entrypoints.api.routes import (
     documents,
     events,
@@ -70,6 +71,10 @@ app.include_router(tasks.router, prefix=_PREFIX)
 app.include_router(profiles.router, prefix=_PREFIX)
 app.include_router(ical.router, prefix=_PREFIX)
 app.include_router(settings.router, prefix=_PREFIX)
+
+# ── Cloud Tasks ワーカールート（/worker/*）────────────────────────────────────
+# Firebase Auth なし。Cloud Tasks の OIDC トークンで保護される。
+app.include_router(worker.router, prefix="/worker")
 
 
 @app.get("/health")

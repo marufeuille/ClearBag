@@ -86,6 +86,9 @@ module "cloud_run_job" {
   service_account_email         = google_service_account.cloud_run.email
   invoker_service_account_email = google_service_account.cloud_run.email
 
+  # API サーバーと同一イメージを使用し、バッチ CLI を起動するよう上書き
+  command = ["python", "-m", "v2.entrypoints.cli"]
+
   env_vars = {
     PROJECT_ID        = var.project_id
     SPREADSHEET_ID    = var.spreadsheet_id

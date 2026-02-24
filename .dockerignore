@@ -1,22 +1,36 @@
+# バージョン管理
 .git
+.gitignore
+
+# Python
 __pycache__
 *.pyc
+*.pyo
 .pytest_cache
 .coverage
-htmlcov
-.env
+htmlcov/
 .venv
 venv/
-*.md
-!.gitignore
-!requirements.txt
-Dockerfile
-.dockerignore
+
+# 環境変数
+.env
+.env.local
+
+# ドキュメント・設定（実行不要）
 terraform/
 .github/
 tests/
 docs/
 examples/
 *.sh
-uv.lock
-.coverage
+*.md
+
+# フロントエンド（バックエンドイメージには不要）
+frontend/
+
+# Docker自身
+Dockerfile
+.dockerignore
+
+# その他
+requirements.txt

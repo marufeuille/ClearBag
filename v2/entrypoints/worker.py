@@ -25,10 +25,7 @@ import os
 
 import firebase_admin
 import vertexai
-
-# Worker は FastAPI のサブアプリとして /worker プレフィックスでマウントすることも可能。
-# MVP では単独の FastAPI ルートとして実装する。
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, status
 from firebase_admin import credentials as fb_creds
 from google.cloud import firestore
 from vertexai.generative_models import GenerativeModel
@@ -40,10 +37,8 @@ from v2.adapters.firestore_repository import (
 )
 from v2.adapters.gemini import GeminiDocumentAnalyzer
 from v2.domain.models import Profile, UserProfile
-from v2.logging_config import setup_logging
 from v2.services.document_processor import DocumentProcessor
 
-setup_logging()
 logger = logging.getLogger(__name__)
 
 # ── 初期化（プロセス起動時に1回のみ実行） ────────────────────────────────────
@@ -72,12 +67,12 @@ def _build_processor() -> DocumentProcessor:
     return DocumentProcessor(analyzer=analyzer)
 
 
-# ── Worker FastAPI アプリ ─────────────────────────────────────────────────────
+# ── Worker ルーター（app.py で /worker プレフィックスにマウント） ───────────────
 
-worker_app = FastAPI(title="ClearBag Worker")
+router = APIRouter()
 
 
-@worker_app.post("/worker/analyze", status_code=status.HTTP_200_OK)
+@router.post("/analyze", status_code=status.HTTP_200_OK)
 async def analyze_document(request: Request) -> dict:
     """
     Cloud Tasks から呼び出されるドキュメント解析エンドポイント。
@@ -160,7 +155,7 @@ def _convert_profiles(user_profiles: list[UserProfile]) -> dict[str, Profile]:
     }
 
 
-@worker_app.post("/worker/morning-digest", status_code=status.HTTP_200_OK)
+@router.post("/morning-digest", status_code=status.HTTP_200_OK)
 async def morning_digest(request: Request) -> dict:
     """
     朝のダイジェストメール送信エンドポイント（Cloud Scheduler から呼び出し）。

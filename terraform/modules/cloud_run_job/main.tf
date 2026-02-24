@@ -14,7 +14,8 @@ resource "google_cloud_run_v2_job" "this" {
       timeout         = var.timeout
 
       containers {
-        image = var.image_url
+        image   = var.image_url
+        command = length(var.command) > 0 ? var.command : null
 
         resources {
           limits = {
