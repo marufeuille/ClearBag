@@ -1,0 +1,219 @@
+"""Cloud Tasks ワーカー エントリーポイント
+
+Cloud Tasks から HTTP POST を受け取り、ドキュメント解析を非同期実行する。
+
+受け取るペイロード（JSON）:
+  {
+    "uid": "firebase-auth-uid",
+    "document_id": "uuid",
+    "storage_path": "uploads/{uid}/{document_id}.pdf",
+    "mime_type": "application/pdf"
+  }
+
+処理フロー:
+  1. GCS からファイルをダウンロード
+  2. Firestore からユーザーのプロファイルを取得
+  3. DocumentProcessor で AI 解析
+  4. 解析結果を Firestore に保存
+  5. メール/WebPush 通知（設定済みの場合）
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+
+import firebase_admin
+import vertexai
+
+# Worker は FastAPI のサブアプリとして /worker プレフィックスでマウントすることも可能。
+# MVP では単独の FastAPI ルートとして実装する。
+from fastapi import FastAPI, HTTPException, Request, status
+from firebase_admin import credentials as fb_creds
+from google.cloud import firestore
+from vertexai.generative_models import GenerativeModel
+
+from v2.adapters.cloud_storage import GCSBlobStorage
+from v2.adapters.firestore_repository import (
+    FirestoreDocumentRepository,
+    FirestoreUserConfigRepository,
+)
+from v2.adapters.gemini import GeminiDocumentAnalyzer
+from v2.domain.models import Profile, UserProfile
+from v2.logging_config import setup_logging
+from v2.services.document_processor import DocumentProcessor
+
+setup_logging()
+logger = logging.getLogger(__name__)
+
+# ── 初期化（プロセス起動時に1回のみ実行） ────────────────────────────────────
+
+_firebase_initialized = False
+
+
+def _ensure_firebase_init() -> None:
+    global _firebase_initialized
+    if not _firebase_initialized:
+        cred = fb_creds.ApplicationDefault()
+        firebase_admin.initialize_app(cred)
+        _firebase_initialized = True
+        logger.info("Firebase Admin initialized (worker)")
+
+
+def _build_processor() -> DocumentProcessor:
+    """DocumentProcessor を組み立てる"""
+    project_id = os.environ["PROJECT_ID"]
+    location = os.environ.get("VERTEX_AI_LOCATION", "us-central1")
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-pro")
+
+    vertexai.init(project=project_id, location=location)
+    model = GenerativeModel(model_name)
+    analyzer = GeminiDocumentAnalyzer(model=model)
+    return DocumentProcessor(analyzer=analyzer)
+
+
+# ── Worker FastAPI アプリ ─────────────────────────────────────────────────────
+
+worker_app = FastAPI(title="ClearBag Worker")
+
+
+@worker_app.post("/worker/analyze", status_code=status.HTTP_200_OK)
+async def analyze_document(request: Request) -> dict:
+    """
+    Cloud Tasks から呼び出されるドキュメント解析エンドポイント。
+
+    Cloud Tasks の OIDC トークン検証は Cloud Run のオーディエンス設定で行う。
+    """
+    _ensure_firebase_init()
+
+    payload = await request.json()
+    uid: str = payload["uid"]
+    document_id: str = payload["document_id"]
+    storage_path: str = payload["storage_path"]
+    mime_type: str = payload["mime_type"]
+
+    logger.info("Worker received task: uid=%s, doc_id=%s", uid, document_id)
+
+    # Firestore / GCS クライアント初期化
+    db = firestore.Client()
+    doc_repo = FirestoreDocumentRepository(db)
+    user_repo = FirestoreUserConfigRepository(db)
+
+    bucket_name = os.environ["GCS_BUCKET_NAME"]
+    blob_storage = GCSBlobStorage(bucket_name=bucket_name)
+
+    try:
+        # ── 1. ステータスを processing に更新 ─────────────────────────────
+        doc_repo.update_status(uid, document_id, "processing")
+
+        # ── 2. GCS からファイルをダウンロード ─────────────────────────────
+        content = blob_storage.download(storage_path)
+        logger.info("Downloaded: path=%s, size=%d bytes", storage_path, len(content))
+
+        # ── 3. ユーザープロファイルを Firestore から取得 ───────────────────
+        user_profiles = user_repo.list_profiles(uid)
+        profiles = _convert_profiles(user_profiles)
+        rules = []  # MVP: ルールは空（将来拡張予定）
+
+        # ── 4. DocumentProcessor で AI 解析 ───────────────────────────────
+        processor = _build_processor()
+        analysis = processor.process(content, mime_type, profiles, rules)
+
+        # ── 5. 解析結果を Firestore に保存 ────────────────────────────────
+        doc_repo.save_analysis(uid, document_id, analysis)
+        logger.info(
+            "Analysis saved: uid=%s, doc_id=%s, category=%s",
+            uid,
+            document_id,
+            analysis.category.value,
+        )
+
+        # ── 6. 通知送信（settings に基づく） ────────────────────────────
+        _try_send_notification(uid, document_id, analysis, user_repo, db)
+
+        return {"status": "completed", "document_id": document_id}
+
+    except Exception as e:
+        logger.exception("Worker failed: uid=%s, doc_id=%s, error=%s", uid, document_id, e)
+        doc_repo.update_status(uid, document_id, "error", error_message=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Analysis failed: {e}",
+        ) from e
+
+
+def _convert_profiles(user_profiles: list[UserProfile]) -> dict[str, Profile]:
+    """
+    UserProfile（B2C）を Profile（既存 Gemini アナライザー用）に変換。
+
+    B2C では calendar_id は不要なので空文字列を設定する。
+    """
+    return {
+        p.id: Profile(
+            id=p.id,
+            name=p.name,
+            grade=p.grade,
+            keywords=p.keywords,
+            calendar_id="",  # B2C では不使用
+        )
+        for p in user_profiles
+    }
+
+
+def _try_send_notification(uid, document_id, analysis, user_repo, db) -> None:
+    """
+    通知設定に基づいてメール/WebPush 通知を試みる。
+    通知の失敗は無視してメインフローを継続する。
+    """
+    try:
+        user = user_repo.get_user(uid)
+        prefs = user.get("notification_preferences", {})
+
+        # メール通知
+        sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
+        user_email = user.get("email", "")
+        if prefs.get("email", False) and sendgrid_key and user_email:
+            from v2.adapters.email_notifier import EmailConfig, SendGridEmailNotifier
+
+            notifier = SendGridEmailNotifier(EmailConfig(api_key=sendgrid_key))
+            doc_snap = db.collection("users").document(uid).collection("documents").document(document_id).get()
+            original_filename = doc_snap.get("original_filename") if doc_snap.exists else "document"
+            notifier.notify_analysis_complete(
+                to_email=user_email,
+                original_filename=original_filename,
+                summary=analysis.summary,
+                events=analysis.events,
+                tasks=analysis.tasks,
+            )
+
+        # Web Push 通知
+        if prefs.get("web_push", False):
+            subscription_data = user.get("web_push_subscription")
+            vapid_private_key = os.environ.get("VAPID_PRIVATE_KEY", "")
+            vapid_public_key = os.environ.get("VAPID_PUBLIC_KEY", "")
+            vapid_email = os.environ.get("VAPID_CLAIMS_EMAIL", "")
+
+            if subscription_data and vapid_private_key:
+                from v2.adapters.webpush_notifier import (
+                    PushSubscription,
+                    VapidConfig,
+                    WebPushNotifier,
+                )
+
+                notifier_wp = WebPushNotifier(
+                    VapidConfig(
+                        private_key=vapid_private_key,
+                        public_key=vapid_public_key,
+                        claims_email=vapid_email,
+                    )
+                )
+                sub = PushSubscription(
+                    endpoint=subscription_data["endpoint"],
+                    keys=subscription_data["keys"],
+                )
+                doc_snap = db.collection("users").document(uid).collection("documents").document(document_id).get()
+                original_filename = doc_snap.get("original_filename") if doc_snap.exists else "document"
+                notifier_wp.notify_analysis_complete(sub, original_filename, document_id)
+
+    except Exception:
+        logger.exception("Notification failed (non-critical): uid=%s, doc_id=%s", uid, document_id)
