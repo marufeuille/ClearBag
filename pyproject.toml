@@ -66,3 +66,7 @@ select = [
 ignore = [
     "E501", # 行長はformatterが管理するため、linterでは除外
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI の Depends() は引数デフォルト値での使用が公式パターン (B008)
+"v2/entrypoints/api/**" = ["B008"]
