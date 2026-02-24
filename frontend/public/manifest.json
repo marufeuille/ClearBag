@@ -1,0 +1,24 @@
+{
+  "name": "ClearBag - 学校配布物AIアシスタント",
+  "short_name": "ClearBag",
+  "description": "学校のお便りをAIが自動解析。カレンダー・タスクに一括登録。",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
