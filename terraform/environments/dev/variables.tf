@@ -14,6 +14,12 @@ variable "image_url" {
   type        = string
 }
 
+variable "api_image_url" {
+  description = "B2C API サーバーのコンテナイメージ URL（deploy 時に -var で渡す）"
+  type        = string
+  default     = "asia-northeast1-docker.pkg.dev/clearbag-dev/school-agent-dev/clearbag-api:latest"
+}
+
 variable "spreadsheet_id" {
   description = "Google スプレッドシートID"
   type        = string

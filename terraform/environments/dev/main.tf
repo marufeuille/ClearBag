@@ -177,6 +177,8 @@ locals {
     "roles/iam.serviceAccountAdmin",         # SA の作成・管理
     "roles/iam.workloadIdentityPoolAdmin",   # WIF Pool/Provider の管理
     "roles/monitoring.admin",                # Cloud Monitoring アラートポリシー・通知チャンネル管理
+    "roles/datastore.owner",                 # Firestore 管理 (B2C)
+    "roles/cloudtasks.admin",                # Cloud Tasks キュー管理 (B2C)
   ]
 }
 
@@ -185,4 +187,101 @@ resource "google_project_iam_member" "github_actions" {
   project  = var.project_id
   role     = each.value
   member   = "serviceAccount:${module.workload_identity.service_account_email}"
+}
+
+# ---------------------------------------------------------------------------
+# B2C SaaS 基盤 (Phase 1〜4 で追加)
+# ---------------------------------------------------------------------------
+
+module "firestore" {
+  source = "../../modules/firestore"
+
+  project_id            = var.project_id
+  location              = var.region
+  service_account_email = google_service_account.cloud_run.email
+}
+
+module "cloud_storage_uploads" {
+  source = "../../modules/cloud_storage"
+
+  project_id            = var.project_id
+  bucket_name           = "${var.project_id}-clearbag-uploads-dev"
+  service_account_email = google_service_account.cloud_run.email
+  lifecycle_delete_days = 180
+}
+
+module "cloud_tasks_analysis" {
+  source = "../../modules/cloud_tasks"
+
+  project_id            = var.project_id
+  queue_name            = "clearbag-analysis-dev"
+  service_account_email = google_service_account.cloud_run.email
+
+  # Gemini 2.5 Pro のレート制限に合わせて同時実行数を制限
+  max_dispatches_per_second = 1
+  max_concurrent_dispatches = 3
+}
+
+module "secret_sendgrid_api_key" {
+  source = "../../modules/secret_manager"
+
+  project_id            = var.project_id
+  secret_id             = "clearbag-sendgrid-api-key-dev"
+  service_account_email = google_service_account.cloud_run.email
+}
+
+module "secret_vapid_private_key" {
+  source = "../../modules/secret_manager"
+
+  project_id            = var.project_id
+  secret_id             = "clearbag-vapid-private-key-dev"
+  service_account_email = google_service_account.cloud_run.email
+}
+
+module "api_service" {
+  source = "../../modules/cloud_run_service"
+
+  project_id            = var.project_id
+  region                = var.region
+  service_name          = "clearbag-api-dev"
+  image_url             = var.api_image_url
+  service_account_email = google_service_account.cloud_run.email
+  allow_unauthenticated = true
+  memory                = "1Gi"
+
+  env_vars = {
+    PROJECT_ID        = var.project_id
+    GCS_BUCKET_NAME   = module.cloud_storage_uploads.bucket_name
+    CLOUD_TASKS_QUEUE = module.cloud_tasks_analysis.queue_id
+    VERTEX_AI_LOCATION = var.region
+    GEMINI_MODEL      = "gemini-2.5-pro"
+  }
+
+  secret_env_vars = {
+    SENDGRID_API_KEY = module.secret_sendgrid_api_key.secret_id
+    VAPID_PRIVATE_KEY = module.secret_vapid_private_key.secret_id
+  }
+
+  depends_on = [
+    module.firestore,
+    module.cloud_storage_uploads,
+    module.cloud_tasks_analysis,
+    module.secret_sendgrid_api_key,
+    module.secret_vapid_private_key,
+  ]
+}
+
+# 朝のダイジェストメール: 毎朝 7:30 JST に /worker/morning-digest を呼び出す
+module "morning_digest_scheduler" {
+  source = "../../modules/cloud_scheduler"
+
+  project_id            = var.project_id
+  region                = var.region
+  job_name              = "clearbag-morning-digest-dev"
+  schedule              = "30 7 * * *"
+  time_zone             = "Asia/Tokyo"
+  target_url            = "${module.api_service.service_url}/worker/morning-digest"
+  service_account_email = google_service_account.cloud_run.email
+
+  depends_on = [module.api_service]
 }
