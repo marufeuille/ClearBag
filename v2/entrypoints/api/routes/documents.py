@@ -82,13 +82,12 @@ async def upload_document(
     """
     # ── 無料プランのレート制限チェック ──────────────────────────────────────
     user_settings = user_repo.get_user(uid)
-    if user_settings.get("plan", "free") == "free":
-        used = user_settings.get("documents_this_month", 0)
-        if used >= _FREE_PLAN_LIMIT:
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=f"無料プランの月間上限（{_FREE_PLAN_LIMIT}枚）に達しました。プレミアムプランへのアップグレードをご検討ください。",
-            )
+    used = user_settings.get("documents_this_month", 0)
+    if user_settings.get("plan", "free") == "free" and used >= _FREE_PLAN_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"無料プランの月間上限（{_FREE_PLAN_LIMIT}枚）に達しました。プレミアムプランへのアップグレードをご検討ください。",
+        )
 
     content = await file.read()
 
