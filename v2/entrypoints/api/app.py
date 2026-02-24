@@ -23,6 +23,7 @@ Cloud Run Service として動作し、Firebase Auth で認証する。
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -75,6 +76,21 @@ app.include_router(settings.router, prefix=_PREFIX)
 # ── Cloud Tasks ワーカールート（/worker/*）────────────────────────────────────
 # Firebase Auth なし。Cloud Tasks の OIDC トークンで保護される。
 app.include_router(worker.router, prefix="/worker")
+
+
+@app.on_event("startup")
+async def _on_startup() -> None:
+    """LOCAL_MODE 時にエミュレーター上の GCS バケットを自動作成する"""
+    if os.environ.get("LOCAL_MODE"):
+        bucket_name = os.environ.get("GCS_BUCKET_NAME", "clearbag-local")
+        try:
+            from google.cloud import storage as gcs
+            client = gcs.Client()
+            if not client.bucket(bucket_name).exists():
+                client.create_bucket(bucket_name)
+                logger.info("LOCAL_MODE: created GCS bucket '%s'", bucket_name)
+        except Exception:
+            logger.warning("LOCAL_MODE: could not auto-create GCS bucket (may already exist)")
 
 
 @app.get("/health")

@@ -35,10 +35,13 @@ _firebase_app: firebase_admin.App | None = None
 def _get_firebase_app() -> firebase_admin.App:
     global _firebase_app
     if _firebase_app is None:
-        # Cloud Run 環境では Application Default Credentials を使用
-        cred = fb_creds.ApplicationDefault()
-        _firebase_app = firebase_admin.initialize_app(cred)
-        logger.info("Firebase Admin initialized")
+        try:
+            # 既に初期化済み（worker などが先に初期化した場合）
+            _firebase_app = firebase_admin.get_app()
+        except ValueError:
+            cred = fb_creds.ApplicationDefault()
+            _firebase_app = firebase_admin.initialize_app(cred)
+            logger.info("Firebase Admin initialized (deps)")
     return _firebase_app
 
 
@@ -103,8 +106,14 @@ def get_blob_storage() -> GCSBlobStorage:
     return GCSBlobStorage(bucket_name=bucket)
 
 
-def get_task_queue() -> CloudTasksQueue:
-    """TaskQueue を返す依存関数"""
+def get_task_queue() -> CloudTasksQueue | None:
+    """
+    TaskQueue を返す依存関数。
+
+    LOCAL_MODE=true の場合は None を返す（BackgroundTasks で代替）。
+    """
+    if os.environ.get("LOCAL_MODE"):
+        return None  # type: ignore[return-value]
     return CloudTasksQueue(
         project_id=os.environ["PROJECT_ID"],
         location=os.environ.get("CLOUD_TASKS_LOCATION", "asia-northeast1"),

@@ -10,9 +10,17 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel
 
 from v2.adapters.cloud_storage import GCSBlobStorage
@@ -66,6 +74,7 @@ def _to_response(record: DocumentRecord) -> DocumentResponse:
 @router.post("/upload", status_code=status.HTTP_202_ACCEPTED, response_model=UploadResponse)
 async def upload_document(
     file: UploadFile,
+    background_tasks: BackgroundTasks,
     uid: str = Depends(get_current_uid),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
     user_repo: FirestoreUserConfigRepository = Depends(get_user_config_repo),
@@ -117,15 +126,20 @@ async def upload_document(
     )
     doc_repo.create(uid, record)
 
-    # ── Cloud Tasks に解析ジョブをキューイング ───────────────────────────────
-    queue.enqueue(
-        {
-            "uid": uid,
-            "document_id": document_id,
-            "storage_path": storage_path,
-            "mime_type": mime_type,
-        }
-    )
+    # ── 解析ジョブをディスパッチ ──────────────────────────────────────────────
+    payload = {
+        "uid": uid,
+        "document_id": document_id,
+        "storage_path": storage_path,
+        "mime_type": mime_type,
+    }
+    if os.environ.get("LOCAL_MODE"):
+        # ローカル開発: Cloud Tasks を使わず同プロセスの BackgroundTasks で実行
+        from v2.entrypoints.worker import run_analysis_sync
+        background_tasks.add_task(run_analysis_sync, uid, document_id, storage_path, mime_type)
+        logger.info("LOCAL_MODE: scheduled background analysis for doc_id=%s", document_id)
+    else:
+        queue.enqueue(payload)
 
     # ── 月間利用枚数をインクリメント ──────────────────────────────────────────
     user_repo.update_user(uid, {"documents_this_month": used + 1})

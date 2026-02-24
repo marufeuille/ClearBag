@@ -43,15 +43,13 @@ logger = logging.getLogger(__name__)
 
 # ── 初期化（プロセス起動時に1回のみ実行） ────────────────────────────────────
 
-_firebase_initialized = False
-
-
 def _ensure_firebase_init() -> None:
-    global _firebase_initialized
-    if not _firebase_initialized:
+    """Firebase Admin を初期化する（二重初期化を防ぐ）"""
+    try:
+        firebase_admin.get_app()
+    except ValueError:
         cred = fb_creds.ApplicationDefault()
         firebase_admin.initialize_app(cred)
-        _firebase_initialized = True
         logger.info("Firebase Admin initialized (worker)")
 
 
@@ -67,6 +65,47 @@ def _build_processor() -> DocumentProcessor:
     return DocumentProcessor(analyzer=analyzer)
 
 
+def run_analysis_sync(uid: str, document_id: str, storage_path: str, mime_type: str) -> None:
+    """
+    ドキュメント解析のコアロジック。
+
+    Cloud Tasks HTTP ハンドラーとローカル開発の BackgroundTasks の両方から
+    呼び出される共通実装。
+    """
+    _ensure_firebase_init()
+    logger.info("Analysis started: uid=%s, doc_id=%s", uid, document_id)
+
+    db = firestore.Client()
+    doc_repo = FirestoreDocumentRepository(db)
+    user_repo = FirestoreUserConfigRepository(db)
+    blob_storage = GCSBlobStorage(bucket_name=os.environ["GCS_BUCKET_NAME"])
+
+    try:
+        doc_repo.update_status(uid, document_id, "processing")
+
+        content = blob_storage.download(storage_path)
+        logger.info("Downloaded: path=%s, size=%d bytes", storage_path, len(content))
+
+        user_profiles = user_repo.list_profiles(uid)
+        profiles = _convert_profiles(user_profiles)
+
+        processor = _build_processor()
+        analysis = processor.process(content, mime_type, profiles, rules=[])
+
+        doc_repo.save_analysis(uid, document_id, analysis)
+        logger.info(
+            "Analysis saved: uid=%s, doc_id=%s, category=%s",
+            uid, document_id, analysis.category.value,
+        )
+
+        _try_send_notification(uid, document_id, analysis, user_repo, db)
+
+    except Exception as e:
+        logger.exception("Worker failed: uid=%s, doc_id=%s", uid, document_id)
+        doc_repo.update_status(uid, document_id, "error", error_message=str(e))
+        raise
+
+
 # ── Worker ルーター（app.py で /worker プレフィックスにマウント） ───────────────
 
 router = APIRouter()
@@ -79,58 +118,16 @@ async def analyze_document(request: Request) -> dict:
 
     Cloud Tasks の OIDC トークン検証は Cloud Run のオーディエンス設定で行う。
     """
-    _ensure_firebase_init()
-
     payload = await request.json()
     uid: str = payload["uid"]
     document_id: str = payload["document_id"]
     storage_path: str = payload["storage_path"]
     mime_type: str = payload["mime_type"]
 
-    logger.info("Worker received task: uid=%s, doc_id=%s", uid, document_id)
-
-    # Firestore / GCS クライアント初期化
-    db = firestore.Client()
-    doc_repo = FirestoreDocumentRepository(db)
-    user_repo = FirestoreUserConfigRepository(db)
-
-    bucket_name = os.environ["GCS_BUCKET_NAME"]
-    blob_storage = GCSBlobStorage(bucket_name=bucket_name)
-
     try:
-        # ── 1. ステータスを processing に更新 ─────────────────────────────
-        doc_repo.update_status(uid, document_id, "processing")
-
-        # ── 2. GCS からファイルをダウンロード ─────────────────────────────
-        content = blob_storage.download(storage_path)
-        logger.info("Downloaded: path=%s, size=%d bytes", storage_path, len(content))
-
-        # ── 3. ユーザープロファイルを Firestore から取得 ───────────────────
-        user_profiles = user_repo.list_profiles(uid)
-        profiles = _convert_profiles(user_profiles)
-        rules = []  # MVP: ルールは空（将来拡張予定）
-
-        # ── 4. DocumentProcessor で AI 解析 ───────────────────────────────
-        processor = _build_processor()
-        analysis = processor.process(content, mime_type, profiles, rules)
-
-        # ── 5. 解析結果を Firestore に保存 ────────────────────────────────
-        doc_repo.save_analysis(uid, document_id, analysis)
-        logger.info(
-            "Analysis saved: uid=%s, doc_id=%s, category=%s",
-            uid,
-            document_id,
-            analysis.category.value,
-        )
-
-        # ── 6. 通知送信（settings に基づく） ────────────────────────────
-        _try_send_notification(uid, document_id, analysis, user_repo, db)
-
+        run_analysis_sync(uid, document_id, storage_path, mime_type)
         return {"status": "completed", "document_id": document_id}
-
     except Exception as e:
-        logger.exception("Worker failed: uid=%s, doc_id=%s, error=%s", uid, document_id, e)
-        doc_repo.update_status(uid, document_id, "error", error_message=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Analysis failed: {e}",
