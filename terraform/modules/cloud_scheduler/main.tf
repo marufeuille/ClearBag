@@ -9,9 +9,20 @@ resource "google_cloud_scheduler_job" "this" {
     http_method = "POST"
     uri         = var.target_url
 
-    oauth_token {
-      service_account_email = var.service_account_email
-      scope                 = "https://www.googleapis.com/auth/cloud-platform"
+    dynamic "oauth_token" {
+      for_each = var.use_oidc ? [] : [1]
+      content {
+        service_account_email = var.service_account_email
+        scope                 = "https://www.googleapis.com/auth/cloud-platform"
+      }
+    }
+
+    dynamic "oidc_token" {
+      for_each = var.use_oidc ? [1] : []
+      content {
+        service_account_email = var.service_account_email
+        audience              = var.target_url
+      }
     }
   }
 }
