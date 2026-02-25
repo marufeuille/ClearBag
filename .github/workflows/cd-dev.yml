@@ -63,8 +63,34 @@ jobs:
           --cov=v2
           --cov-report=term-missing
 
+  # 変更ファイルの検出 — 各デプロイジョブの実行要否を判定する
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'v2/**'
+              - 'Dockerfile'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            terraform:
+              - 'terraform/**'
+            frontend:
+              - 'frontend/**'
+
   deploy:
-    needs: [lint, test]
+    needs: [lint, test, changes]
+    # バックエンドコードまたは Terraform に変更があった場合のみ実行
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     environment: dev
     concurrency:
@@ -86,23 +112,30 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker for Artifact Registry
+        if: needs.changes.outputs.backend == 'true'
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      - name: Build Docker image
+      - name: Build and push Docker image
+        if: needs.changes.outputs.backend == 'true'
         run: |
           IMAGE_TAG="${GITHUB_SHA::7}"
           SHA_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
           LATEST_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:latest"
           docker build --platform linux/amd64 -t "${SHA_URL}" .
           docker tag "${SHA_URL}" "${LATEST_URL}"
-          # Terraform には latest タグの URL を渡す
-          echo "IMAGE_URL=${LATEST_URL}" >> $GITHUB_ENV
-          echo "SHA_URL=${SHA_URL}" >> $GITHUB_ENV
-
-      - name: Push Docker image
-        run: |
           docker push "${SHA_URL}"
-          docker push "${IMAGE_URL}"
+          docker push "${LATEST_URL}"
+          echo "IMAGE_URL=${LATEST_URL}" >> $GITHUB_ENV
+
+      - name: Get current image URL (Terraform-only change)
+        # バックエンド変更なし → 現行の Cloud Run イメージ URL を引き継ぐ
+        if: needs.changes.outputs.backend != 'true'
+        run: |
+          URL=$(gcloud run services describe clearbag-api-dev \
+            --region=${{ env.REGION }} \
+            --format="value(spec.template.spec.containers[0].image)" 2>/dev/null \
+            || echo "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:latest")
+          echo "IMAGE_URL=${URL}" >> $GITHUB_ENV
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -134,7 +167,14 @@ jobs:
           echo "api_service_url=$(terraform output -raw api_service_url)" >> $GITHUB_OUTPUT
 
   deploy-frontend:
-    needs: [deploy]
+    needs: [lint, test, changes, deploy]
+    # frontend に変更があり、かつ deploy が成功 or スキップされた場合のみ実行
+    if: |
+      always() &&
+      needs.changes.outputs.frontend == 'true' &&
+      needs.lint.result == 'success' &&
+      needs.test.result == 'success' &&
+      (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
     runs-on: ubuntu-latest
     environment: dev
 
@@ -146,6 +186,21 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve API base URL
+        # deploy ジョブが実行済みなら output を使用、スキップなら Cloud Run から取得
+        run: |
+          if [ -n "${{ needs.deploy.outputs.api_service_url }}" ]; then
+            echo "NEXT_PUBLIC_API_BASE_URL=${{ needs.deploy.outputs.api_service_url }}" >> $GITHUB_ENV
+          else
+            URL=$(gcloud run services describe clearbag-api-dev \
+              --region=${{ env.REGION }} \
+              --format="value(status.url)")
+            echo "NEXT_PUBLIC_API_BASE_URL=${URL}" >> $GITHUB_ENV
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -167,7 +222,7 @@ jobs:
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-          NEXT_PUBLIC_API_BASE_URL: ${{ needs.deploy.outputs.api_service_url }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ env.NEXT_PUBLIC_API_BASE_URL }}
         run: npm run build
 
       - name: Install Firebase CLI
@@ -183,7 +238,10 @@ jobs:
     with:
       environment: dev
       workflow_name: "CD (dev)"
-      # deploy と deploy-frontend の両方が成功した場合のみ success
-      result: ${{ (needs.deploy.result == 'success' && needs.deploy-frontend.result == 'success') && 'success' || 'failure' }}
+      # 各ジョブは success か skipped であれば正常（skipped = 変更なしでスキップ）
+      result: ${{ (
+          (needs.deploy.result == 'success' || needs.deploy.result == 'skipped') &&
+          (needs.deploy-frontend.result == 'success' || needs.deploy-frontend.result == 'skipped')
+        ) && 'success' || 'failure' }}
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
