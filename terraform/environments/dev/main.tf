@@ -196,12 +196,32 @@ resource "google_project_iam_member" "github_actions" {
 # B2C SaaS 基盤 (Phase 1〜4 で追加)
 # ---------------------------------------------------------------------------
 
+# B2C に必要な GCP API
+resource "google_project_service" "firestore" {
+  project            = var.project_id
+  service            = "firestore.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "cloudtasks" {
+  project            = var.project_id
+  service            = "cloudtasks.googleapis.com"
+  disable_on_destroy = false
+}
+
 module "firestore" {
   source = "../../modules/firestore"
 
   project_id            = var.project_id
   location              = var.region
   service_account_email = google_service_account.cloud_run.email
+
+  # IAM 付与と Firestore 作成の race condition を防ぐため、
+  # github_actions IAM メンバーが確定してから Firestore を作成する
+  depends_on = [
+    google_project_iam_member.github_actions,
+    google_project_service.firestore,
+  ]
 }
 
 module "cloud_storage_uploads" {
@@ -223,6 +243,12 @@ module "cloud_tasks_analysis" {
   # Gemini 2.5 Pro のレート制限に合わせて同時実行数を制限
   max_dispatches_per_second = 1
   max_concurrent_dispatches = 3
+
+  # API 有効化と IAM 付与を待ってからキューを作成する
+  depends_on = [
+    google_project_iam_member.github_actions,
+    google_project_service.cloudtasks,
+  ]
 }
 
 module "secret_sendgrid_api_key" {
