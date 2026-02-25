@@ -311,6 +311,8 @@ module "api_service" {
     SERVICE_ACCOUNT_EMAIL   = google_service_account.cloud_run.email
     # ログイン許可メールアドレス（カンマ区切り）。未設定の場合は全員許可
     ALLOWED_EMAILS          = var.allowed_emails
+    # Firebase Hosting のオリジン（カンマ区切り）
+    CORS_ORIGINS            = "https://${var.firebase_project_id}.web.app,https://${var.firebase_project_id}.firebaseapp.com"
   }
 
   # SENDGRID_API_KEY / VAPID_PRIVATE_KEY は Secret Manager にまだ値が未登録のため
