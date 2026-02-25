@@ -333,6 +333,8 @@ module "api_service" {
     SERVICE_ACCOUNT_EMAIL   = google_service_account.cloud_run.email
     # ログイン許可メールアドレス（カンマ区切り）。未設定の場合は全員許可
     ALLOWED_EMAILS          = var.allowed_emails
+    # 開発環境では枚数制限を無効化
+    DISABLE_RATE_LIMIT      = "true"
     # Firebase Hosting のオリジン（カンマ区切り）
     CORS_ORIGINS            = "https://${var.firebase_project_id}.web.app,https://${var.firebase_project_id}.firebaseapp.com"
   }
