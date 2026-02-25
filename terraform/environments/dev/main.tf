@@ -39,6 +39,13 @@ resource "google_service_account_iam_member" "scheduler_token_creator" {
   member             = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
 }
 
+# Cloud Run SA が Cloud Tasks タスク作成時に自分自身の OIDC トークンを生成するために必要
+resource "google_service_account_iam_member" "cloud_run_self_token_creator" {
+  service_account_id = google_service_account.cloud_run.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.cloud_run.email}"
+}
+
 module "artifact_registry" {
   source = "../../modules/artifact_registry"
 
