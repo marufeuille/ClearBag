@@ -51,12 +51,15 @@ app = FastAPI(
 )
 
 # ── CORS（PWA フロントエンドからのリクエストを許可） ─────────────────────────
+# CORS_ORIGINS 環境変数でカンマ区切りの追加オリジンを指定可能
+_extra_origins = [
+    o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://clearbag.app",
-        "https://clearbag-dev.web.app",
         "http://localhost:3000",  # ローカル開発用
+        *_extra_origins,
     ],
     allow_credentials=True,
     allow_methods=["*"],
