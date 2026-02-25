@@ -15,7 +15,8 @@
 | **カレンダー表示** | 抽出された予定を日付順で一覧 |
 | **タスク管理** | 期限付きタスクを一覧・完了チェック |
 | **家族プロファイル** | 子どもごとのプロファイルで解析精度を向上 |
-| **iCal連携** | カレンダーアプリへの購読URLを発行 |
+| **iCal連携** | カレンダーアプリへの購読URLを発行（Cloud Run URLベース） |
+| **朝のダイジェスト** | 毎朝 7:30 JST に未完了タスク・今後の予定を通知 |
 | **PWA対応** | ホーム画面追加・オフラインUI |
 | **無料プラン** | 月5枚まで無料解析 |
 
@@ -226,22 +227,66 @@ uv run pytest tests/ --cov=v2 --cov-report=term-missing
 
 ## デプロイ
 
-### 初回（dev環境）
+### 初回（dev環境）セットアップ
+
+#### 1. 前提 GCP/Firebase リソースの確認
+
+- GCP プロジェクト（Terraform で管理）
+- Firebase プロジェクト（GCP プロジェクトと別でも可）
+  - Firebase コンソールで **Authentication（Google Sign-in）** を有効化
+  - Firebase コンソールから **ウェブアプリを追加** し、設定値を取得
+
+#### 2. GitHub Environment を作成
+
+リポジトリ → **Settings → Environments → New environment** で `dev` を作成。
+
+#### 3. GitHub Secrets を設定（Environment: dev）
+
+| Secret 名 | 説明 |
+|---|---|
+| `WIF_PROVIDER` | Workload Identity Federation プロバイダー URI |
+| `WIF_SERVICE_ACCOUNT` | WIF 用サービスアカウント（`github-actions-deploy@...`） |
+| `TF_VAR_NOTIFICATION_EMAIL` | Cloud Monitoring アラート通知先メール |
+| `TF_VAR_ALLOWED_EMAILS` | ログイン許可メール（カンマ区切り、空で全員許可） |
+| `FIREBASE_PROJECT_ID` | Firebase プロジェクト ID（`clear-bag` 等） |
+| `SLACK_WEBHOOK_URL` | CD 完了通知用 Slack Webhook |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase ウェブアプリの API キー |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `{project}.firebaseapp.com` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase プロジェクト ID |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | `{project}.appspot.com` |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase App ID |
+
+> **補足**: `TF_VAR_SPREADSHEET_ID`、`TF_VAR_INBOX_FOLDER_ID`、`TF_VAR_ARCHIVE_FOLDER_ID` は旧バッチ（school-agent-v2）用。B2C のみ使うなら不要（Terraform 変数のデフォルト値 `""` で OK）。
+
+#### 4. Firebase Hosting のプロジェクト設定
+
+Firebase の WIF サービスアカウントにクロスプロジェクト権限が必要な場合（Firebase プロジェクト ≠ GCP プロジェクトのとき）:
 
 ```bash
-# 1. Terraformでインフラ構築
-cd terraform/environments/dev
-terraform init
-terraform apply
-
-# 2. Secret Managerにシークレットを登録
-gcloud secrets versions add sendgrid-api-key --data-file=- <<< "your-key"
-
-# 3. GitHub Secretsを設定
-#    NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, ...
-
-# 4. main ブランチにpush → CI/CDが自動デプロイ
+gcloud projects add-iam-policy-binding YOUR_FIREBASE_PROJECT_ID \
+  --member="serviceAccount:github-actions-deploy@YOUR_GCP_PROJECT.iam.gserviceaccount.com" \
+  --role="roles/firebasehosting.admin"
 ```
+
+#### 5. main ブランチに push → CI/CD が自動デプロイ
+
+```bash
+git push origin main
+# lint → test → Docker build → Terraform apply → Firebase Hosting deploy
+```
+
+> **注意**: 初回 Terraform apply は既存 Firestore DB があると 409 エラーになる場合があります。`dev/main.tf` の `import {}` ブロックで対処済みです。
+
+### iCal URL について
+
+iCal フィードは **Cloud Run の URL** で提供されます（Firebase Hosting ではない）。
+
+```
+https://clearbag-api-dev-{project_number}.{region}.run.app/api/ical/{token}
+```
+
+設定ページに表示される URL をそのままカレンダーアプリに登録してください。
 
 ### リリース（prod環境）
 
