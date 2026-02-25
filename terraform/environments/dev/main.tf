@@ -300,10 +300,9 @@ module "api_service" {
     ALLOWED_EMAILS          = var.allowed_emails
   }
 
-  secret_env_vars = {
-    SENDGRID_API_KEY = module.secret_sendgrid_api_key.secret_id
-    VAPID_PRIVATE_KEY = module.secret_vapid_private_key.secret_id
-  }
+  # SENDGRID_API_KEY / VAPID_PRIVATE_KEY は Secret Manager にまだ値が未登録のため
+  # 一旦無効化。登録後に secret_env_vars に戻す。
+  secret_env_vars = {}
 
   depends_on = [
     module.firestore,
