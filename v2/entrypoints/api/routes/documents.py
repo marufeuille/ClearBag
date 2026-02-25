@@ -90,9 +90,14 @@ async def upload_document(
     - Cloud Tasks に解析ジョブをキューイング
     """
     # ── 無料プランのレート制限チェック ──────────────────────────────────────
+    # DISABLE_RATE_LIMIT=true の場合はスキップ（開発環境用）
     user_settings = user_repo.get_user(uid)
     used = user_settings.get("documents_this_month", 0)
-    if user_settings.get("plan", "free") == "free" and used >= _FREE_PLAN_LIMIT:
+    if (
+        not os.environ.get("DISABLE_RATE_LIMIT")
+        and user_settings.get("plan", "free") == "free"
+        and used >= _FREE_PLAN_LIMIT
+    ):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail=f"無料プランの月間上限（{_FREE_PLAN_LIMIT}枚）に達しました。プレミアムプランへのアップグレードをご検討ください。",

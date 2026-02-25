@@ -40,8 +40,14 @@ def _get_firebase_app() -> firebase_admin.App:
             _firebase_app = firebase_admin.get_app()
         except ValueError:
             cred = fb_creds.ApplicationDefault()
-            _firebase_app = firebase_admin.initialize_app(cred)
-            logger.info("Firebase Admin initialized (deps)")
+            # FIREBASE_PROJECT_ID: Firebase プロジェクト ID（GCP プロジェクトと異なる場合に設定）
+            # 未設定時は PROJECT_ID にフォールバック
+            firebase_project_id = os.environ.get("FIREBASE_PROJECT_ID") or os.environ.get("PROJECT_ID")
+            _firebase_app = firebase_admin.initialize_app(
+                cred,
+                options={"projectId": firebase_project_id} if firebase_project_id else {},
+            )
+            logger.info("Firebase Admin initialized (deps) project=%s", firebase_project_id)
     return _firebase_app
 
 
@@ -56,22 +62,39 @@ async def get_current_uid(
     """
     Authorization: Bearer <id_token> ヘッダーを検証して uid を返す。
 
+    ALLOWED_EMAILS が設定されている場合、許可リスト外のメールアドレスは 403 を返す。
+    （開発環境でのアクセス制限用）
+
     Returns:
         Firebase Auth の uid（例: "abc123xyz"）
 
     Raises:
         HTTPException(401): トークンが無効な場合
+        HTTPException(403): 許可されていないメールアドレスの場合
     """
     _get_firebase_app()
     try:
         decoded = fb_auth.verify_id_token(creds.credentials)
-        return decoded["uid"]
     except Exception as e:
         logger.warning("Invalid Firebase ID token: %s", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired Firebase ID token",
         ) from e
+
+    # ── メールアドレス許可リストチェック（ALLOWED_EMAILS が設定されている場合のみ）
+    allowed_raw = os.environ.get("ALLOWED_EMAILS", "")
+    if allowed_raw:
+        allowed = {e.strip().lower() for e in allowed_raw.split(",") if e.strip()}
+        email = (decoded.get("email") or "").lower()
+        if email not in allowed:
+            logger.warning("Blocked login attempt: email=%s", email)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="このアカウントはアクセスが許可されていません。",
+            )
+
+    return decoded["uid"]
 
 
 # ── Firestore クライアント（シングルトン） ──────────────────────────────────────

@@ -35,7 +35,7 @@ export default function CalendarPage() {
     setLoading(true);
     getEvents({ from, to })
       .then(setEvents)
-      .catch(() => setError("イベントの取得に失敗しました"))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, [from, to]);
 

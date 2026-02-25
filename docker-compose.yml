@@ -13,12 +13,12 @@ services:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     command: >
       gcloud emulators firestore start
-      --host-port=0.0.0.0:8088
+      --host-port=0.0.0.0:8089
       --project=demo-clearbag
     ports:
-      - "8088:8088"
+      - "8089:8089"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8089/"]
       interval: 5s
       timeout: 3s
       retries: 10

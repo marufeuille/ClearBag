@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 from google.cloud import firestore
@@ -22,10 +23,21 @@ from v2.domain.models import (
     DocumentAnalysis,
     DocumentRecord,
     EventData,
-    TaskData,
     UserProfile,
 )
 from v2.domain.ports import DocumentRepository, UserConfigRepository
+
+
+@dataclass
+class StoredTaskData:
+    """Firestore に永続化されたタスク（id と completed を含む）"""
+
+    id: str
+    title: str
+    due_date: str
+    assignee: str
+    note: str
+    completed: bool
 
 logger = logging.getLogger(__name__)
 
@@ -134,12 +146,14 @@ class FirestoreDocumentRepository(DocumentRepository):
         )
 
         # events サブコレクションに保存
+        # user_uid は collection_group クエリのフィルター用（必須）
         events_col = doc_ref.collection(_EVENTS)
         for event in analysis.events:
             event_ref = events_col.document()
             batch.set(
                 event_ref,
                 {
+                    "user_uid": uid,
                     "document_id": document_id,
                     "summary": event.summary,
                     "start": event.start,
@@ -151,12 +165,14 @@ class FirestoreDocumentRepository(DocumentRepository):
             )
 
         # tasks サブコレクションに保存
+        # user_uid は collection_group クエリのフィルター用（必須）
         tasks_col = doc_ref.collection(_TASKS)
         for task in analysis.tasks:
             task_ref = tasks_col.document()
             batch.set(
                 task_ref,
                 {
+                    "user_uid": uid,
                     "document_id": document_id,
                     "title": task.title,
                     "due_date": task.due_date,
@@ -225,30 +241,34 @@ class FirestoreDocumentRepository(DocumentRepository):
 
         return [
             EventData(
-                summary=snap.get("summary", ""),
-                start=snap.get("start", ""),
-                end=snap.get("end", ""),
-                location=snap.get("location", ""),
-                description=snap.get("description", ""),
-                confidence=snap.get("confidence", "HIGH"),
+                summary=d.get("summary", ""),
+                start=d.get("start", ""),
+                end=d.get("end", ""),
+                location=d.get("location", ""),
+                description=d.get("description", ""),
+                confidence=d.get("confidence", "HIGH"),
             )
             for snap in query.stream()
+            for d in (snap.to_dict() or {},)
         ]
 
-    def list_tasks(self, uid: str, completed: bool | None = None) -> list[TaskData]:
-        """タスク一覧を取得"""
+    def list_tasks(self, uid: str, completed: bool | None = None) -> list[StoredTaskData]:
+        """タスク一覧を取得（id・completed を含む）"""
         query = self._db.collection_group(_TASKS).where("user_uid", "==", uid)
         if completed is not None:
             query = query.where("completed", "==", completed)
 
         return [
-            TaskData(
-                title=snap.get("title", ""),
-                due_date=snap.get("due_date", ""),
-                assignee=snap.get("assignee", "PARENT"),
-                note=snap.get("note", ""),
+            StoredTaskData(
+                id=snap.id,
+                title=d.get("title", ""),
+                due_date=d.get("due_date", ""),
+                assignee=d.get("assignee", "PARENT"),
+                note=d.get("note", ""),
+                completed=d.get("completed", False),
             )
             for snap in query.stream()
+            for d in (snap.to_dict() or {},)
         ]
 
     def update_task_completed(self, uid: str, task_id: str, completed: bool) -> None:
@@ -328,11 +348,12 @@ class FirestoreUserConfigRepository(UserConfigRepository):
         return [
             UserProfile(
                 id=snap.id,
-                name=snap.get("name", ""),
-                grade=snap.get("grade", ""),
-                keywords=snap.get("keywords", ""),
+                name=d.get("name", ""),
+                grade=d.get("grade", ""),
+                keywords=d.get("keywords", ""),
             )
             for snap in snaps
+            for d in (snap.to_dict() or {},)
         ]
 
     def create_profile(self, uid: str, profile: UserProfile) -> str:

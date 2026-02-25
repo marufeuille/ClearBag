@@ -16,10 +16,12 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 class TaskResponse(BaseModel):
+    id: str
     title: str
     due_date: str
     assignee: str
     note: str
+    completed: bool
 
 
 class TaskUpdateRequest(BaseModel):
@@ -45,10 +47,12 @@ async def list_tasks(
     tasks = doc_repo.list_tasks(uid, completed=completed)
     return [
         TaskResponse(
+            id=t.id,
             title=t.title,
             due_date=t.due_date,
             assignee=t.assignee,
             note=t.note,
+            completed=t.completed,
         )
         for t in tasks
     ]

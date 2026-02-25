@@ -29,10 +29,12 @@ export interface EventData {
 }
 
 export interface TaskData {
+  id: string;
   title: string;
   due_date: string;
   assignee: string;
   note: string;
+  completed: boolean;
 }
 
 export interface UserProfile {

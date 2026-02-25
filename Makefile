@@ -42,6 +42,10 @@ dev-frontend:
 		cp frontend/.env.local.example frontend/.env.local; \
 		echo "==> frontend/.env.local を編集して Firebase 設定を記入してください。"; \
 	fi
+	@if [ ! -d frontend/node_modules ]; then \
+		echo "==> node_modules が見つかりません。npm install を実行します..."; \
+		cd frontend && npm install; \
+	fi
 	@echo "==> Next.js フロントエンドを起動します (port 3000)..."
 	cd frontend && npm run dev
 

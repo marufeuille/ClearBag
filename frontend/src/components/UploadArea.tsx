@@ -24,7 +24,6 @@ export function UploadArea({ onUploaded, onError }: UploadAreaProps) {
   const handleFile = async (file: File) => {
     if (!file) return;
 
-    // 許可するファイル形式
     const allowed = [
       "application/pdf",
       "image/jpeg",
@@ -61,80 +60,91 @@ export function UploadArea({ onUploaded, onError }: UploadAreaProps) {
 
   return (
     <div
-      className={`relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-8 transition-colors ${
+      className={`relative rounded-2xl border-2 border-dashed p-8 transition-all cursor-pointer ${
         dragOver
-          ? "border-blue-400 bg-blue-50"
-          : "border-gray-300 bg-white hover:border-blue-300"
+          ? "border-blue-400 bg-blue-50 scale-[1.01]"
+          : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30"
       }`}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragOver(true);
-      }}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
+      onClick={() => !uploading && fileInputRef.current?.click()}
     >
       {uploading ? (
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-          <p className="text-sm text-gray-500">解析キューに登録中...</p>
+        <div className="flex flex-col items-center gap-3 py-4">
+          <div className="relative">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-100 border-t-blue-500" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-5 w-5 rounded-full bg-blue-50" />
+            </div>
+          </div>
+          <p className="text-sm font-medium text-blue-600">解析キューに登録中...</p>
+          <p className="text-xs text-gray-400">しばらくお待ちください</p>
         </div>
       ) : (
-        <>
-          <div className="text-4xl">📄</div>
-          <p className="text-center text-gray-600">
-            お便りをドラッグ&ドロップ
-            <br />
-            または下のボタンから選択
-          </p>
+        <div className="flex flex-col items-center gap-4">
+          {/* アップロードアイコン */}
+          <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center">
+            <svg className="w-7 h-7 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+          </div>
 
-          <div className="flex gap-3">
-            {/* カメラ撮影ボタン */}
+          <div className="text-center">
+            <p className="text-sm font-semibold text-gray-700">
+              お便りをドラッグ&ドロップ
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              または下のボタンからアップロード
+            </p>
+          </div>
+
+          {/* ボタン群 */}
+          <div className="flex gap-3" onClick={(e) => e.stopPropagation()}>
             <button
-              className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+              className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all"
               onClick={() => cameraInputRef.current?.click()}
             >
-              📷 カメラで撮影
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              カメラ
             </button>
 
-            {/* ファイル選択ボタン */}
             <button
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-95 transition-all"
               onClick={() => fileInputRef.current?.click()}
             >
-              📁 ファイルを選択
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+              ファイル
             </button>
           </div>
 
-          {/* カメラ入力（モバイル: 背面カメラ優先） */}
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-            }}
-          />
-
-          {/* ファイル選択入力 */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/pdf,image/jpeg,image/png,image/webp,image/heic"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-            }}
-          />
-
           <p className="text-xs text-gray-400">
-            対応形式: PDF / JPG / PNG / WebP / HEIC
+            PDF · JPG · PNG · WebP · HEIC
           </p>
-        </>
+        </div>
       )}
+
+      {/* hidden inputs */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf,image/jpeg,image/png,image/webp,image/heic"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+      />
     </div>
   );
 }
