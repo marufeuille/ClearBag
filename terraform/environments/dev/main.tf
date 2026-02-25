@@ -213,7 +213,7 @@ resource "google_project_service" "cloudtasks" {
 # 前回の apply で作成済みのため 409 が発生するのを防ぐ
 import {
   to = module.firestore.google_firestore_database.this
-  id = "projects/${var.project_id}/databases/(default)"
+  id = "projects/marufeuille-linebot/databases/(default)"
 }
 
 module "firestore" {
