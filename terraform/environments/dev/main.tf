@@ -253,11 +253,16 @@ module "api_service" {
   memory                = "1Gi"
 
   env_vars = {
-    PROJECT_ID        = var.project_id
-    GCS_BUCKET_NAME   = module.cloud_storage_uploads.bucket_name
-    CLOUD_TASKS_QUEUE = module.cloud_tasks_analysis.queue_id
-    VERTEX_AI_LOCATION = var.region
-    GEMINI_MODEL      = "gemini-2.5-pro"
+    PROJECT_ID              = var.project_id
+    FIREBASE_PROJECT_ID     = var.firebase_project_id
+    GCS_BUCKET_NAME         = module.cloud_storage_uploads.bucket_name
+    CLOUD_TASKS_QUEUE       = module.cloud_tasks_analysis.queue_id
+    CLOUD_TASKS_LOCATION    = var.region
+    VERTEX_AI_LOCATION      = var.region
+    GEMINI_MODEL            = "gemini-2.5-pro"
+    # Cloud Tasks が解析ワーカーを呼び出すURL（self-reference: apply後に確定）
+    WORKER_URL              = "https://clearbag-api-dev-${data.google_project.project.number}.${var.region}.run.app/worker/analyze"
+    SERVICE_ACCOUNT_EMAIL   = google_service_account.cloud_run.email
   }
 
   secret_env_vars = {

@@ -121,7 +121,8 @@ jobs:
             -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
             -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
             -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}" \
-            -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}"
+            -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}" \
+            -var="firebase_project_id=${{ secrets.FIREBASE_PROJECT_ID }}"
 
   deploy-frontend:
     needs: [deploy]
@@ -153,7 +154,10 @@ jobs:
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ env.PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
         run: npm run build
 
@@ -161,7 +165,7 @@ jobs:
         run: npm install -g firebase-tools
 
       - name: Deploy to Firebase Hosting
-        run: firebase deploy --only hosting --project ${{ env.PROJECT_ID }}
+        run: firebase deploy --only hosting --project ${{ secrets.FIREBASE_PROJECT_ID }}
 
   notify:
     needs: [lint, test, deploy, deploy-frontend]

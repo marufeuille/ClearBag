@@ -39,3 +39,9 @@ variable "notification_email" {
   description = "Cloud Monitoring アラート通知先メールアドレス"
   type        = string
 }
+
+variable "firebase_project_id" {
+  description = "Firebase プロジェクトID（GCPプロジェクトと異なる場合に設定）"
+  type        = string
+  default     = ""
+}
