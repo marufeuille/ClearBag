@@ -326,6 +326,8 @@ module "api_service" {
     CLOUD_TASKS_LOCATION    = var.region
     VERTEX_AI_LOCATION      = var.region
     GEMINI_MODEL            = "gemini-2.5-pro"
+    # iCal URL の組み立てに使用するベース URL（self-reference: apply後に確定）
+    API_BASE_URL            = "https://clearbag-api-dev-${data.google_project.project.number}.${var.region}.run.app"
     # Cloud Tasks が解析ワーカーを呼び出すURL（self-reference: apply後に確定）
     WORKER_URL              = "https://clearbag-api-dev-${data.google_project.project.number}.${var.region}.run.app/worker/analyze"
     SERVICE_ACCOUNT_EMAIL   = google_service_account.cloud_run.email

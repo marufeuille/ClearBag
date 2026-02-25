@@ -246,7 +246,12 @@ class FirestoreDocumentRepository(DocumentRepository):
     ) -> list[EventData]:
         """日付範囲でイベントを取得（全ドキュメントをまたいだビュー）"""
         # documents/{id}/events をコレクショングループクエリで横断検索
-        query = self._db.collection_group(_EVENTS).where("user_uid", "==", uid)
+        # order_by("start") により複合 COLLECTION_GROUP インデックス (user_uid, start) を使用
+        query = (
+            self._db.collection_group(_EVENTS)
+            .where("user_uid", "==", uid)
+            .order_by("start")
+        )
         if from_date:
             query = query.where("start", ">=", from_date)
         if to_date:
@@ -269,7 +274,12 @@ class FirestoreDocumentRepository(DocumentRepository):
         self, uid: str, completed: bool | None = None
     ) -> list[StoredTaskData]:
         """タスク一覧を取得（id・completed を含む）"""
-        query = self._db.collection_group(_TASKS).where("user_uid", "==", uid)
+        # order_by("completed") により複合 COLLECTION_GROUP インデックス (user_uid, completed) を使用
+        query = (
+            self._db.collection_group(_TASKS)
+            .where("user_uid", "==", uid)
+            .order_by("completed")
+        )
         if completed is not None:
             query = query.where("completed", "==", completed)
 
