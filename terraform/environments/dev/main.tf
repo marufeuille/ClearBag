@@ -324,6 +324,7 @@ module "morning_digest_scheduler" {
   time_zone             = "Asia/Tokyo"
   target_url            = "${module.api_service.service_url}/worker/morning-digest"
   service_account_email = google_service_account.cloud_run.email
+  use_oidc              = true  # Cloud Run Service (run.app) の呼び出しには OIDC が必要
 
   depends_on = [module.api_service]
 }

@@ -30,6 +30,12 @@ variable "target_url" {
 }
 
 variable "service_account_email" {
-  description = "OAuth トークン生成に使用するサービスアカウント"
+  description = "OAuth / OIDC トークン生成に使用するサービスアカウント"
   type        = string
+}
+
+variable "use_oidc" {
+  description = "true: OIDC トークン（Cloud Run Service の run.app URL 向け）/ false: OAuth トークン（googleapis.com API 向け）"
+  type        = bool
+  default     = false
 }
