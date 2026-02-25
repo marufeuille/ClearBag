@@ -1,4 +1,4 @@
-# School Agent v2 アーキテクチャ設計書
+# ClearBag アーキテクチャ設計書
 
 ## 目次
 1. [概要](#概要)
@@ -15,21 +15,13 @@
 
 ## 概要
 
-School Agent v2は、既存のモノリシックなコード（`src/`）をHexagonal Architecture（ヘキサゴナルアーキテクチャ）でリファクタリングしたものです。
+ClearBag バックエンド（`v2/`）は、Hexagonal Architecture（ヘキサゴナルアーキテクチャ）で実装された B2C SaaS バックエンドです。
+FastAPI on Cloud Run Service として動作し、Firebase Auth 認証・Firestore・GCS・Cloud Tasks・Vertex AI Gemini を外部アダプターとして統合します。
 
-### 目的
+### 設計目的
 - **テスト容易性**: 外部APIなしでビジネスロジックをテスト可能
-- **拡張容易性**: 通知先の変更（Slack→LINE等）がインターフェース差し替えで対応可能
+- **拡張容易性**: 通知先の変更（SendGrid→LINE等）がインターフェース差し替えで対応可能
 - **LLMとの協調**: テストベースの対話で開発可能な構造
-- **既存コードとの併存**: `src/` は一切変更せず `v2/` に新コードを配置
-
-### 既存コードの問題点
-- ✗ 外部APIに直接依存（Google Drive, Gemini, Calendar, Todoist, Slack）
-- ✗ テストが存在しない
-- ✗ 認証情報を毎回再生成
-- ✗ エラーハンドリングが弱い（`print` のみ）
-- ✗ core.py と main.py の重複
-- ✗ 冪等性がない
 
 ---
 
@@ -115,8 +107,8 @@ class EventData:
                                        ▼
 ┌─────────────────────────────────────────────────────────┐
 │                    Adapters Layer                        │
-│   (GoogleDrive, Gemini, Calendar, Todoist, Slack)        │
-│              (外部APIとの具体的な通信)                    │
+│   (Firestore, GCS, Cloud Tasks, Gemini, iCal, Email,    │
+│    WebPush)  ← 外部APIとの具体的な通信                   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -585,23 +577,28 @@ def mock_storage():
 
 **完了条件**: `pytest tests/` が全てpass（外部API不要）
 
-### Phase 3: アダプタ層（次回以降）
+### Phase 3: アダプタ層 ✅（実装済み）
 
-- `v2/adapters/credentials.py` - 認証シングルトン
-- `v2/adapters/google_drive.py` - Drive実装
-- `v2/adapters/google_sheets.py` - Sheets実装
-- `v2/adapters/gemini.py` - Gemini実装
-- `v2/adapters/todoist.py` - Todoist実装
-- `v2/adapters/slack.py` - Slack実装
-- `v2/adapters/google_calendar.py` - Calendar実装
+| ファイル | 内容 |
+|---------|------|
+| `v2/adapters/firestore_repository.py` | Firestore の DocumentRepository / UserConfigRepository 実装 |
+| `v2/adapters/cloud_storage.py` | GCS アップロード・署名 URL 生成 |
+| `v2/adapters/cloud_tasks_queue.py` | Cloud Tasks タスクエンキュー |
+| `v2/adapters/gemini.py` | Vertex AI Gemini 2.5 Pro 解析（tenacity リトライ付き）|
+| `v2/adapters/ical_renderer.py` | iCal（`.ics`）フォーマット生成 |
+| `v2/adapters/email_notifier.py` | SendGrid メール通知 |
+| `v2/adapters/webpush_notifier.py` | Web Push 通知 |
 
-### Phase 4: エントリポイントと統合（次回以降）
+### Phase 4: エントリポイントと統合 ✅（実装済み）
 
-- `v2/entrypoints/factory.py` - DI組み立て
-- `v2/entrypoints/cli.py` - CLI実行
-- `v2/entrypoints/cloud_function.py` - Cloud Functions
-- `tests/integration/` - 結合テスト
-- `tests/contract/` - LLM出力契約テスト
+| ファイル | 内容 |
+|---------|------|
+| `v2/entrypoints/api/app.py` | FastAPI アプリ・CORS・ルーター登録 |
+| `v2/entrypoints/api/deps.py` | Firebase Auth 検証・DI 依存関係 |
+| `v2/entrypoints/api/routes/` | documents / events / tasks / profiles / settings / ical |
+| `v2/entrypoints/worker.py` | Cloud Tasks ワーカー（`/worker/analyze`, `/worker/morning-digest`）|
+| `v2/entrypoints/cli.py` | Cloud Run Jobs 用バッチ CLI |
+| `tests/integration/` | Firestore エミュレーターを使った結合テスト |
 
 ---
 
@@ -665,6 +662,10 @@ LLM: "v2/adapters/line_notify.py を作成し、Notifier Protocolを実装しま
 
 ## まとめ
 
-School Agent v2は、テスト可能性と拡張容易性を最優先した設計です。Hexagonal Architectureにより、ビジネスロジックは外部APIから完全に独立し、LLMとの対話でテストベースの開発が可能になります。
+ClearBag バックエンド（`v2/`）は、Hexagonal Architecture によりビジネスロジックが外部 API から完全に独立しています。
+アダプターの差し替えだけで通知先・ストレージ・AI モデルを変更でき、テストはエミュレーターで完結します。
 
-**Phase 1-2の実装後、外部API実装なしでビジネスロジック全体のテストが通る状態**になります。
+```
+ローカル開発: Firestore エミュレーター + fake-gcs + LOCAL_MODE=true（Cloud Tasks をスキップ）
+本番環境:     Cloud Run Service + Firestore + GCS + Cloud Tasks + Vertex AI
+```
