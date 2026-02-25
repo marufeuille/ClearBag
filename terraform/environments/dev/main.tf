@@ -216,6 +216,12 @@ resource "google_project_service" "firebase" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "firebasehosting" {
+  project            = var.project_id
+  service            = "firebasehosting.googleapis.com"
+  disable_on_destroy = false
+}
+
 # 既存の Firestore (default) データベースを Terraform state に取り込む
 # 前回の apply で作成済みのため 409 が発生するのを防ぐ
 import {
