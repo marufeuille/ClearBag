@@ -209,6 +209,13 @@ resource "google_project_service" "cloudtasks" {
   disable_on_destroy = false
 }
 
+# 既存の Firestore (default) データベースを Terraform state に取り込む
+# 前回の apply で作成済みのため 409 が発生するのを防ぐ
+import {
+  to = module.firestore.google_firestore_database.this
+  id = "projects/marufeuille-linebot/databases/(default)"
+}
+
 module "firestore" {
   source = "../../modules/firestore"
 
