@@ -16,11 +16,12 @@ resource "google_project_iam_member" "firestore_user" {
 }
 
 # コレクショングループクエリ用の複合インデックス
-# users/{uid}/events の start フィールドで日付範囲クエリを可能にする
+# users/{uid}/documents/{docId}/events をまたいだ日付範囲クエリに必要
 resource "google_firestore_index" "events_by_start" {
-  project    = var.project_id
-  database   = google_firestore_database.this.name
-  collection = "events"
+  project     = var.project_id
+  database    = google_firestore_database.this.name
+  collection  = "events"
+  query_scope = "COLLECTION_GROUP"
 
   fields {
     field_path = "user_uid"
@@ -37,9 +38,10 @@ resource "google_firestore_index" "events_by_start" {
 
 # tasks の completed フィールドでフィルタークエリを可能にする
 resource "google_firestore_index" "tasks_by_completed" {
-  project    = var.project_id
-  database   = google_firestore_database.this.name
-  collection = "tasks"
+  project     = var.project_id
+  database    = google_firestore_database.this.name
+  collection  = "tasks"
+  query_scope = "COLLECTION_GROUP"
 
   fields {
     field_path = "user_uid"

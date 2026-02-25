@@ -39,10 +39,11 @@ resource "google_service_account_iam_member" "scheduler_token_creator" {
   member             = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
 }
 
-# Cloud Run SA が Cloud Tasks タスク作成時に自分自身の OIDC トークンを生成するために必要
-resource "google_service_account_iam_member" "cloud_run_self_token_creator" {
+# Cloud Run SA が Cloud Tasks タスク作成時に自分自身に actAs するために必要
+# （oidc_token.service_account_email に自 SA を指定するため serviceAccountUser が必要）
+resource "google_service_account_iam_member" "cloud_run_self_actas" {
   service_account_id = google_service_account.cloud_run.name
-  role               = "roles/iam.serviceAccountTokenCreator"
+  role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
@@ -234,6 +235,18 @@ resource "google_project_service" "firebasehosting" {
 import {
   to = module.firestore.google_firestore_database.this
   id = "projects/marufeuille-linebot/databases/(default)"
+}
+
+# 手動作成した COLLECTION_GROUP インデックスを Terraform state に取り込む
+# （スコープ修正前に gcloud で作成済み → apply 時の 409 を防ぐ）
+import {
+  to = module.firestore.google_firestore_index.events_by_start
+  id = "projects/marufeuille-linebot/databases/(default)/collectionGroups/events/indexes/CICAgJim14AK"
+}
+
+import {
+  to = module.firestore.google_firestore_index.tasks_by_completed
+  id = "projects/marufeuille-linebot/databases/(default)/collectionGroups/tasks/indexes/CICAgJjF9oIK"
 }
 
 module "firestore" {
