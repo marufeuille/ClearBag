@@ -182,6 +182,7 @@ locals {
     "roles/monitoring.admin",                # Cloud Monitoring アラートポリシー・通知チャンネル管理
     "roles/datastore.owner",                 # Firestore 管理 (B2C)
     "roles/cloudtasks.admin",                # Cloud Tasks キュー管理 (B2C)
+    "roles/firebasehosting.admin",           # Firebase Hosting デプロイ
   ]
 }
 
@@ -206,6 +207,12 @@ resource "google_project_service" "firestore" {
 resource "google_project_service" "cloudtasks" {
   project            = var.project_id
   service            = "cloudtasks.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "firebase" {
+  project            = var.project_id
+  service            = "firebase.googleapis.com"
   disable_on_destroy = false
 }
 
