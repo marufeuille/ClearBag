@@ -71,6 +71,32 @@ class DocumentAnalysis:
 
 
 @dataclass(frozen=True)
+class DocumentRecord:
+    """B2C用ドキュメントレコード（Firestoreに永続化）"""
+
+    id: str  # Firestore ドキュメントID
+    uid: str  # Firebase Auth ユーザーID
+    status: str  # "pending" | "processing" | "completed" | "error"
+    content_hash: str  # SHA-256 ── 冪等性チェックのキー
+    storage_path: str  # GCS: "uploads/{uid}/{documentId}.pdf"
+    original_filename: str
+    mime_type: str
+    summary: str = ""
+    category: str = ""  # "EVENT" | "TASK" | "INFO" | "IGNORE"
+    error_message: str | None = None
+
+
+@dataclass(frozen=True)
+class UserProfile:
+    """B2C用ユーザープロファイル（calendar_id不要）"""
+
+    id: str  # Firestore ドキュメントID
+    name: str  # 例: "太郎"
+    grade: str  # 例: "小3"
+    keywords: str  # 例: "サッカー,遠足"
+
+
+@dataclass(frozen=True)
 class FileInfo:
     """Google Driveファイル情報"""
 

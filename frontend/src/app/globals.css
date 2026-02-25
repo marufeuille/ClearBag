@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply text-gray-900 antialiased;
+  }
+
+  /* スクロールバーを細く・目立たなく */
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-200 rounded-full;
+  }
+}
+
+@layer utilities {
+  /* iOS Safari ホームバー対応 */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pb-nav {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}

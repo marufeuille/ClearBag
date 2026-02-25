@@ -1,6 +1,14 @@
 service_account.json
 token.pickle
 .env
+.env.local
+.coverage
+
+# Frontend
+frontend/.env.local
+frontend/.next/
+frontend/node_modules/
+frontend/out/
 
 __pycache__
 
@@ -16,4 +24,5 @@ terraform/.terraform/
 terraform/environments/**/.terraform/
 terraform/**/terraform.tfstate
 terraform/**/terraform.tfstate.backup
+terraform/**/terraform.tfstate.*.backup
 terraform/**/terraform.tfvars

@@ -53,6 +53,12 @@ variable "timeout" {
   default     = "3600s"
 }
 
+variable "command" {
+  description = "コンテナのエントリーポイントを上書きする（空リストの場合は Dockerfile の CMD を使用）"
+  type        = list(string)
+  default     = []
+}
+
 variable "env_vars" {
   description = "通常の環境変数マッピング（key: 環境変数名, value: 値）"
   type        = map(string)

@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "clearbag-dev",
+    "production": "clearbag-prod"
+  }
+}

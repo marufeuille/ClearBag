@@ -1,16 +1,32 @@
 [project]
-name = "school-ai-app"
+name = "clearbag"
 version = "0.1.0"
-description = "Add your description here"
+description = "学校配布物PDFをAIで解析しカレンダー・タスクに自動連携するサービス"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "functions-framework>=3.10.0",
+    # --- Google Cloud / AI ---
     "google-api-python-client>=2.187.0",
     "google-auth-httplib2>=0.2.1",
     "google-auth-oauthlib>=1.2.3",
     "google-cloud-aiplatform>=1.129.0",
-    "pandas>=2.3.3",
+    "google-cloud-firestore>=2.20.0",
+    "google-cloud-storage>=2.20.0",
+    "google-cloud-tasks>=2.20.0",
+    # --- Firebase / Auth ---
+    "firebase-admin>=6.0.0",
+    # --- API サーバー ---
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "python-multipart>=0.0.20",
+    # --- カレンダーフィード ---
+    "icalendar>=6.0.0",
+    # --- 通知 ---
+    "sendgrid>=6.11.0",
+    "pywebpush>=2.0.0",
+    # --- リトライ ---
+    "tenacity>=9.0.0",
+    # --- ユーティリティ ---
     "python-dotenv>=1.2.1",
     "slack-sdk>=3.39.0",
     "todoist-api-python>=3.1.0",
@@ -55,3 +71,7 @@ select = [
 ignore = [
     "E501", # 行長はformatterが管理するため、linterでは除外
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI の Depends() は引数デフォルト値での使用が公式パターン (B008)
+"v2/entrypoints/api/**" = ["B008"]

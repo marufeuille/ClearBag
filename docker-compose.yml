@@ -1,0 +1,46 @@
+# ClearBag ローカル開発インフラ
+#
+# 起動: docker compose up -d
+# 停止: docker compose down
+#
+# このファイルはエミュレーター/モックサービスのみ管理する。
+# バックエンド・フロントエンドは Makefile の make dev-* で起動する。
+
+services:
+
+  # ── Firestore エミュレーター ────────────────────────────────────────────────
+  firestore-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: >
+      gcloud emulators firestore start
+      --host-port=0.0.0.0:8089
+      --project=demo-clearbag
+    ports:
+      - "8089:8089"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  # ── GCS エミュレーター (fake-gcs-server) ──────────────────────────────────
+  fake-gcs:
+    image: fsouza/fake-gcs-server:latest
+    command:
+      - "-scheme"
+      - "http"
+      - "-port"
+      - "4443"
+      - "-backend"
+      - "memory"
+      - "-public-host"
+      - "localhost:4443"
+    ports:
+      - "4443:4443"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4443/storage/v1/b"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s

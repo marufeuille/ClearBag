@@ -5,6 +5,9 @@
 
 import logging
 
+import vertexai
+from vertexai.generative_models import GenerativeModel
+
 from v2.adapters.credentials import get_google_credentials
 from v2.adapters.gemini import GeminiDocumentAnalyzer
 from v2.adapters.google_calendar import GoogleCalendarService
@@ -55,12 +58,14 @@ def create_orchestrator(config: AppConfig | None = None) -> Orchestrator:
         archive_folder_id=config.archive_folder_id,
     )
 
-    analyzer = GeminiDocumentAnalyzer(
-        credentials=creds,
-        project_id=config.project_id,
+    # Vertex AI の初期化（プロセス内で1回のみ実行）
+    vertexai.init(
+        project=config.project_id,
         location=config.vertex_ai_location,
-        model_name=config.gemini_model,
+        credentials=creds,
     )
+    model = GenerativeModel(config.gemini_model)
+    analyzer = GeminiDocumentAnalyzer(model=model)
 
     calendar_service = GoogleCalendarService(credentials=creds)
 

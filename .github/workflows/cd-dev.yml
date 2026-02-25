@@ -70,6 +70,8 @@ jobs:
     concurrency:
       group: deploy-dev
       cancel-in-progress: false  # デプロイ途中でキャンセルしない
+    outputs:
+      api_service_url: ${{ steps.tf_output.outputs.api_service_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -85,12 +87,6 @@ jobs:
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Export requirements.txt
-        run: uv export -o requirements.txt --no-hashes
 
       - name: Build Docker image
         run: |
@@ -122,14 +118,66 @@ jobs:
         run: |
           terraform apply -auto-approve \
             -var="image_url=${IMAGE_URL}" \
+            -var="api_image_url=${IMAGE_URL}" \
             -var="project_id=${{ env.PROJECT_ID }}" \
             -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
             -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
             -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}" \
-            -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}"
+            -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}" \
+            -var="firebase_project_id=${{ secrets.FIREBASE_PROJECT_ID }}" \
+            -var="allowed_emails=${{ secrets.TF_VAR_ALLOWED_EMAILS }}"
+
+      - name: Get Terraform outputs
+        id: tf_output
+        working-directory: terraform/environments/dev
+        run: |
+          echo "api_service_url=$(terraform output -raw api_service_url)" >> $GITHUB_OUTPUT
+
+  deploy-frontend:
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build Next.js (static export)
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ needs.deploy.outputs.api_service_url }}
+        run: npm run build
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Deploy to Firebase Hosting
+        run: firebase deploy --only hosting --project ${{ secrets.FIREBASE_PROJECT_ID }}
 
   notify:
-    needs: [lint, test, deploy]
+    needs: [lint, test, deploy, deploy-frontend]
     if: always()
     uses: ./.github/workflows/_notify-slack.yml
     with:

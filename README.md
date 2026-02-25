@@ -1,147 +1,218 @@
 # ClearBag
 
-学校プリントを自動処理するAIエージェント。Google Drive の Inbox フォルダを監視し、Gemini 2.5 Pro で内容を解析してカレンダー・Todoist・Slack に自動連携する。
+学校配布物（プリント・PDF）をAIが自動解析し、カレンダーとタスクに一括登録するB2C SaaSアプリ。
+
+## 概要
+
+保護者がスマホでお便りを撮影・アップロードするだけで、Gemini 2.5 Pro が内容を解析し、予定・タスクを自動抽出。PWAとして動作し、ホーム画面に追加してネイティブアプリのように使える。
 
 ## 機能
 
-- **自動スキャン**: 特定の Google Drive フォルダ (`Inbox`) を監視
-- **AI解析**: Gemini 2.5 Pro で文書の内容・日付・アクションを理解
-- **カレンダー連携**: 家族メンバーごとの Google カレンダーに予定を追加
-- **タスク管理**: アクションが必要な項目を Todoist に登録
-- **通知**: 処理結果の要約を Slack に送信
-- **アーカイブ**: ファイルを `YYYYMMDD_タイトル` にリネームして `Archive` フォルダに移動
+| 機能 | 説明 |
+|---|---|
+| **ドキュメントアップロード** | PDF・画像（JPG/PNG/WebP/HEIC）をアップロード、または写真撮影 |
+| **AI解析** | Gemini 2.5 Pro が予定・タスク・サマリーを自動抽出 |
+| **カレンダー表示** | 抽出された予定を日付順で一覧 |
+| **タスク管理** | 期限付きタスクを一覧・完了チェック |
+| **家族プロファイル** | 子どもごとのプロファイルで解析精度を向上 |
+| **iCal連携** | カレンダーアプリへの購読URLを発行 |
+| **PWA対応** | ホーム画面追加・オフラインUI |
+| **無料プラン** | 月5枚まで無料解析 |
 
 ## アーキテクチャ
 
-- **言語**: Python 3.13
+```
+[PWA (Next.js)]  →  [FastAPI on Cloud Run Service]  →  [Cloud Tasks]
+      │                        │                              │
+  Firebase Hosting         Firebase Auth              [Worker Endpoint]
+                           Firestore                         │
+                           GCS (uploads)             [Vertex AI Gemini]
+```
+
+- **フロントエンド**: Next.js 15 (App Router) / Tailwind CSS / Firebase Hosting
+- **バックエンド**: FastAPI / Cloud Run Service
+- **非同期処理**: Cloud Tasks → Cloud Run Worker（ローカルは BackgroundTasks）
+- **認証**: Firebase Authentication (Google Sign-in)
+- **DB**: Firestore（ユーザー・ドキュメント・イベント・タスク）
+- **ストレージ**: GCS（アップロードファイル）
+- **AI**: Vertex AI Gemini 2.5 Pro
+- **インフラ**: Terraform（dev / prod 環境分離）
 - **設計**: Hexagonal Architecture (Ports & Adapters)
-- **AI**: Google Vertex AI (Gemini 2.5 Pro)
-- **ストレージ**: Google Drive
-- **設定管理**: Google Sheets
-- **連携**: Google Calendar, Todoist, Slack
-- **実行基盤**: Cloud Run Jobs（Cloud Scheduler で毎日 9:00 / 17:00 JST）
-- **インフラ**: Terraform（`dev` / `prod` 環境分離）
 
 ## ディレクトリ構成
 
 ```
 .
-├── v2/                    # アプリケーション本体（Hexagonal Architecture）
-│   ├── domain/           # ドメインモデル・ポート定義
-│   │   ├── models.py     # dataclass（Profile, Rule, EventData 等）
-│   │   ├── errors.py     # ドメイン固有の例外
-│   │   └── ports.py      # ABC ポート（ConfigSource, FileStorage 等）
-│   ├── services/         # ビジネスロジック
-│   │   ├── orchestrator.py       # メインワークフロー
-│   │   └── action_dispatcher.py  # 解析結果→アクション振り分け
-│   ├── adapters/         # 外部サービス実装
-│   │   ├── credentials.py
-│   │   ├── google_sheets.py
-│   │   ├── google_drive.py
-│   │   ├── google_calendar.py
-│   │   ├── gemini.py
-│   │   ├── todoist.py
-│   │   └── slack.py
-│   ├── entrypoints/      # エントリーポイント
-│   │   ├── factory.py    # DI 組み立て（Null Object Pattern 含む）
-│   │   └── cli.py        # CLI 実行
-│   └── config.py         # 環境変数からの設定読み込み
-├── terraform/             # インフラ定義
+├── v2/                        # バックエンド本体
+│   ├── domain/
+│   │   ├── models.py          # ドメインモデル（DocumentRecord, EventData 等）
+│   │   ├── ports.py           # ABCポート定義
+│   │   └── errors.py
+│   ├── services/
+│   │   └── document_processor.py  # AI解析コアロジック
+│   ├── adapters/
+│   │   ├── firestore_repository.py # Firestore実装
+│   │   ├── cloud_storage.py        # GCS実装
+│   │   ├── cloud_tasks_queue.py    # Cloud Tasks実装
+│   │   ├── gemini.py               # Vertex AI Gemini実装（tenacityリトライ付き）
+│   │   ├── ical_renderer.py        # iCal生成
+│   │   ├── email_notifier.py       # SendGrid通知
+│   │   └── webpush_notifier.py     # WebPush通知
+│   ├── entrypoints/
+│   │   ├── api/
+│   │   │   ├── app.py             # FastAPIアプリ定義
+│   │   │   ├── deps.py            # DI・認証（Firebase Auth検証）
+│   │   │   └── routes/            # APIルート（documents/events/tasks/profiles/settings/ical）
+│   │   ├── worker.py              # Cloud Tasksワーカー（解析実行）
+│   │   └── cli.py                 # バッチCLI（Cloud Run Jobs用）
+│   ├── config.py
+│   └── logging_config.py
+├── frontend/                  # PWAフロントエンド
+│   ├── src/
+│   │   ├── app/               # Next.js App Router ページ
+│   │   │   ├── page.tsx       # ランディング（ログイン）
+│   │   │   ├── dashboard/     # ドキュメント一覧・アップロード
+│   │   │   ├── calendar/      # カレンダー
+│   │   │   ├── tasks/         # タスク
+│   │   │   ├── profiles/      # 家族プロファイル管理
+│   │   │   └── settings/      # 設定・iCal URL
+│   │   ├── components/        # 共通コンポーネント
+│   │   │   ├── NavBar.tsx     # ヘッダー＋ボトムナビ
+│   │   │   ├── AuthGuard.tsx  # 認証ガード
+│   │   │   ├── UploadArea.tsx # ドラッグ&ドロップ・カメラ撮影
+│   │   │   └── DocumentList.tsx
+│   │   ├── hooks/
+│   │   │   └── useAuth.ts     # Firebase Auth フック
+│   │   └── lib/
+│   │       ├── api.ts         # バックエンドAPIクライアント
+│   │       └── firebase.ts    # Firebase初期化
+│   └── public/
+│       └── manifest.json      # PWAマニフェスト
+├── terraform/
 │   ├── environments/
-│   │   ├── dev/          # dev 環境
-│   │   └── prod/         # prod 環境
-│   └── modules/          # 共通モジュール
-│       ├── artifact_registry/
-│       ├── cloud_run_job/
-│       ├── cloud_scheduler/
-│       ├── secret_manager/
-│       └── workload_identity/
-├── .github/workflows/     # CI/CD
-│   ├── ci.yml            # Lint + Test（PR 時）
-│   ├── cd-dev.yml        # dev デプロイ（main push）
-│   ├── cd-prod-build.yml # prod Docker ビルド（v* タグ）
-│   └── cd-prod-terraform.yml # prod Terraform Apply（v* タグ）
+│   │   ├── dev/               # dev環境（Firestore/GCS/CloudTasks/CloudRun/Scheduler等）
+│   │   └── prod/
+│   └── modules/               # 共通モジュール
 ├── tests/
-│   ├── unit/             # ユニットテスト（37 tests）
-│   ├── integration/      # 統合テスト
-│   ├── e2e/              # End-to-End テスト
-│   └── manual/           # 手動実行用
-├── Dockerfile
-├── build_push.sh          # ローカルから Docker ビルド & push
-├── pyproject.toml
-├── ARCHITECTURE_V2.md
-└── SPECIFICATION.md
+│   ├── unit/
+│   └── integration/
+├── docker-compose.yml         # ローカルエミュレーター（Firestore + fake-gcs）
+├── Makefile                   # 開発コマンド
+├── Dockerfile                 # API/Workerコンテナ（uvマルチステージビルド）
+├── .env.local.example         # バックエンド環境変数テンプレート
+└── .github/workflows/         # CI/CD
 ```
 
-## セットアップ
+## ローカル開発
 
 ### 前提条件
 
-- Google Cloud Project（Drive / Sheets / Calendar / Vertex AI API 有効化）
-- 適切な権限を持つサービスアカウント
-- Todoist アカウント & API トークン（オプション）
-- Slack ワークスペース & Bot トークン（オプション）
+- Docker Desktop
+- uv（`brew install uv`）
+- Node.js 20+
+- Firebase プロジェクト（Google Sign-in 有効化済み）
+- GCP Application Default Credentials（`gcloud auth application-default login`）
 
-### インストール
+### セットアップ
 
 ```bash
-git clone <repository-url>
-cd ClearBag
+# 1. 依存関係インストール
 uv sync
+
+# 2. 環境変数ファイルを作成
+cp .env.local.example .env.local
+cp frontend/.env.local.example frontend/.env.local
+# → 各ファイルを編集して値を設定
 ```
 
-### 環境変数
-
-ルートディレクトリに `.env` ファイルを作成:
+#### `.env.local` の主な設定項目
 
 ```env
-# 必須
-PROJECT_ID=your-google-cloud-project-id
-SPREADSHEET_ID=your-config-sheet-id
-INBOX_FOLDER_ID=your-inbox-drive-folder-id
-ARCHIVE_FOLDER_ID=your-archive-drive-folder-id
-
-# オプション（未設定の場合はスキップ）
-TODOIST_API_TOKEN=your-todoist-token
-SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
-SLACK_CHANNEL_ID=your-slack-channel-id
-
-# デフォルト値あり
-VERTEX_AI_LOCATION=us-central1
+LOCAL_MODE=true                          # BackgroundTasksで解析実行（Cloud Tasks不要）
+DISABLE_RATE_LIMIT=true                  # 月間5枚制限をスキップ
+PROJECT_ID=your-gcp-project-id           # Vertex AI用GCPプロジェクト
+FIREBASE_PROJECT_ID=your-firebase-project-id  # Firebase認証プロジェクト（GCPと異なる場合）
+FIRESTORE_EMULATOR_HOST=localhost:8089   # Firestoreエミュレーター
+STORAGE_EMULATOR_HOST=http://localhost:4443  # GCSエミュレーター
+GCS_BUCKET_NAME=clearbag-local
+VERTEX_AI_LOCATION=asia-northeast1
 GEMINI_MODEL=gemini-2.5-pro
+ALLOWED_EMAILS=you@gmail.com             # ログイン制限（未設定で全員許可）
 ```
 
-認証情報:
+#### `frontend/.env.local` の主な設定項目
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_FIREBASE_API_KEY=...         # Firebase コンソール → プロジェクト設定 → ウェブアプリ
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+# 他 Firebase 設定値
+```
+
+### 起動
 
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+# Terminal 1: Firestoreエミュレーター + fake-gcs起動
+make dev-infra
+
+# Terminal 2: FastAPIバックエンド（port 8000、ホットリロード）
+make dev-backend
+
+# Terminal 3: Next.jsフロントエンド（port 3000）
+make dev-frontend
 ```
 
-## 使用方法
+| URL | 用途 |
+|---|---|
+| http://localhost:3000 | フロントエンド（PWA） |
+| http://localhost:8000 | バックエンドAPI |
+| http://localhost:8000/docs | Swagger UI |
+| http://localhost:8089 | Firestoreエミュレーター |
+| http://localhost:4443 | GCSエミュレーター（fake-gcs） |
 
-### CLI 実行
+### Makefile コマンド一覧
 
 ```bash
-uv run python -m v2.entrypoints.cli
-
-# デバッグ
-LOG_LEVEL=DEBUG uv run python -m v2.entrypoints.cli
+make dev-infra     # エミュレーター起動
+make dev-backend   # バックエンド起動
+make dev-frontend  # フロントエンド起動
+make stop          # エミュレーター停止
+make test          # Pythonテスト実行
+make lint          # リント実行
 ```
 
-### Cloud Run Jobs（本番）
+## API エンドポイント
 
-Terraform でデプロイ済み。Cloud Scheduler が毎日 9:00 / 17:00 JST に自動実行する。
+| Method | Path | 説明 |
+|---|---|---|
+| `POST` | `/api/documents/upload` | ファイルアップロード（202 Accepted） |
+| `GET` | `/api/documents` | ドキュメント一覧 |
+| `GET` | `/api/documents/{id}` | ドキュメント詳細 |
+| `DELETE` | `/api/documents/{id}` | ドキュメント削除 |
+| `GET` | `/api/events` | イベント一覧（日付範囲フィルター） |
+| `GET` | `/api/tasks` | タスク一覧 |
+| `PATCH` | `/api/tasks/{id}` | タスク完了状態更新 |
+| `GET` | `/api/profiles` | プロファイル一覧 |
+| `POST` | `/api/profiles` | プロファイル作成 |
+| `PUT` | `/api/profiles/{id}` | プロファイル更新 |
+| `DELETE` | `/api/profiles/{id}` | プロファイル削除 |
+| `GET` | `/api/settings` | ユーザー設定取得 |
+| `PATCH` | `/api/settings` | ユーザー設定更新 |
+| `GET` | `/api/ical/{token}` | iCalフィード（認証不要） |
+| `POST` | `/worker/analyze` | 解析ジョブ実行（Cloud Tasksから呼び出し） |
+| `GET` | `/health` | ヘルスチェック |
 
 ## CI/CD
 
 | トリガー | ワークフロー | 内容 |
-|----------|-------------|------|
-| PR | `ci.yml` | Lint (ruff) + Unit/Integration テスト |
-| `main` push | `cd-dev.yml` | Lint + テスト → Docker ビルド → Terraform Apply (dev) |
+|---|---|---|
+| PR | `ci.yml` | Lint (ruff) + テスト |
+| `main` push | `cd-dev.yml` | Lint → Docker ビルド → Terraform Apply (dev) → Firebase Hosting deploy |
 | `v*` タグ | `cd-prod-build.yml` | Docker ビルド & `latest-prod` タグ付与 |
 | `v*` タグ | `cd-prod-terraform.yml` | Terraform Apply (prod) |
 
-GCP 認証は Workload Identity Federation (OIDC) を使用。
+GCP 認証は Workload Identity Federation (OIDC) を使用（静的キー不使用）。
 
 ## テスト
 
@@ -150,27 +221,49 @@ GCP 認証は Workload Identity Federation (OIDC) を使用。
 uv run pytest tests/unit -v
 
 # カバレッジ付き
-uv run pytest tests/unit tests/integration -m "not manual" --cov=v2 --cov-report=term-missing
+uv run pytest tests/ --cov=v2 --cov-report=term-missing
 ```
 
-現在のテストカバレッジ: **100% (37 unit tests)**
+## デプロイ
 
-## 設計原則
+### 初回（dev環境）
 
-**Hexagonal Architecture**:
+```bash
+# 1. Terraformでインフラ構築
+cd terraform/environments/dev
+terraform init
+terraform apply
 
-- **Domain 層**: ビジネスロジックのみ。外部依存なし。
-- **Ports**: ABC で定義。型安全性を確保。
-- **Adapters**: 外部サービス実装。ポートに準拠。
-- **Entrypoints**: 依存性を組み立ててドメインを起動。
+# 2. Secret Managerにシークレットを登録
+gcloud secrets versions add sendgrid-api-key --data-file=- <<< "your-key"
 
-主な設計判断: ABC > Protocol（実装漏れをインスタンス化時に検出）、frozen dataclass（不変性保証）、Null Object Pattern（オプショナルサービスの優雅な処理）。
+# 3. GitHub Secretsを設定
+#    NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, ...
+
+# 4. main ブランチにpush → CI/CDが自動デプロイ
+```
+
+### リリース（prod環境）
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+# → prod Docker ビルド → Terraform Apply (prod) が自動実行
+```
+
+## セキュリティ
+
+- Firebase Authentication による JWT 検証（全 API エンドポイント）
+- `ALLOWED_EMAILS` 環境変数でログイン可能アカウントを制限（dev環境推奨）
+- Workload Identity Federation（サービスアカウントキー不使用）
+- Cloud Tasks Worker は OIDC トークンで保護
 
 ## ドキュメント
 
-- [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) - 設計詳細
+- [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) - アーキテクチャ詳細
 - [SPECIFICATION.md](SPECIFICATION.md) - システム仕様書
-- [docs/](docs/) - 各種計画・レビュードキュメント
+- [docs/plan/commercialization-mvp.md](docs/plan/commercialization-mvp.md) - B2C化実装プラン
+- [docs/review/nonfunctional-analysis-2026-02-23.md](docs/review/nonfunctional-analysis-2026-02-23.md) - 非機能要件分析
 
 ## ライセンス
 
