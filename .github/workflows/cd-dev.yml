@@ -183,6 +183,7 @@ jobs:
     with:
       environment: dev
       workflow_name: "CD (dev)"
-      result: ${{ needs.deploy.result }}
+      # deploy と deploy-frontend の両方が成功した場合のみ success
+      result: ${{ (needs.deploy.result == 'success' && needs.deploy-frontend.result == 'success') && 'success' || 'failure' }}
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
