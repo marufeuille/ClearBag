@@ -263,6 +263,8 @@ module "api_service" {
     # Cloud Tasks が解析ワーカーを呼び出すURL（self-reference: apply後に確定）
     WORKER_URL              = "https://clearbag-api-dev-${data.google_project.project.number}.${var.region}.run.app/worker/analyze"
     SERVICE_ACCOUNT_EMAIL   = google_service_account.cloud_run.email
+    # ログイン許可メールアドレス（カンマ区切り）。未設定の場合は全員許可
+    ALLOWED_EMAILS          = var.allowed_emails
   }
 
   secret_env_vars = {

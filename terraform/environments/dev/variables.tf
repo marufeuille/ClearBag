@@ -45,3 +45,9 @@ variable "firebase_project_id" {
   type        = string
   default     = ""
 }
+
+variable "allowed_emails" {
+  description = "ログイン許可メールアドレス（カンマ区切り）。未設定の場合は全員許可。dev環境アクセス制限用"
+  type        = string
+  default     = ""
+}

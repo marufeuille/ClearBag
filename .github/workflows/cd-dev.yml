@@ -124,7 +124,8 @@ jobs:
             -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
             -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}" \
             -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}" \
-            -var="firebase_project_id=${{ secrets.FIREBASE_PROJECT_ID }}"
+            -var="firebase_project_id=${{ secrets.FIREBASE_PROJECT_ID }}" \
+            -var="allowed_emails=${{ secrets.TF_VAR_ALLOWED_EMAILS }}"
 
       - name: Get Terraform outputs
         id: tf_output
