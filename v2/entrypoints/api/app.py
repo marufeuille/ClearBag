@@ -85,12 +85,15 @@ async def _on_startup() -> None:
         bucket_name = os.environ.get("GCS_BUCKET_NAME", "clearbag-local")
         try:
             from google.cloud import storage as gcs
+
             client = gcs.Client()
             if not client.bucket(bucket_name).exists():
                 client.create_bucket(bucket_name)
                 logger.info("LOCAL_MODE: created GCS bucket '%s'", bucket_name)
         except Exception:
-            logger.warning("LOCAL_MODE: could not auto-create GCS bucket (may already exist)")
+            logger.warning(
+                "LOCAL_MODE: could not auto-create GCS bucket (may already exist)"
+            )
 
 
 @app.get("/health")

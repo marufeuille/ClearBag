@@ -38,7 +38,9 @@ async def get_ical_feed(
     # icalToken で uid を検索
     uid = _find_uid_by_ical_token(doc_repo._db, token)
     if uid is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid iCal token")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid iCal token"
+        )
 
     events = doc_repo.list_events(uid)
     ical_content = renderer.render(events)

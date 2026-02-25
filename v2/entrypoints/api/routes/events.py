@@ -39,7 +39,9 @@ async def list_events(
         to_date: 終了日（YYYY-MM-DD）
         profile_id: プロファイルでフィルター（未実装: 将来拡張）
     """
-    events = doc_repo.list_events(uid, from_date=from_date, to_date=to_date, profile_id=profile_id)
+    events = doc_repo.list_events(
+        uid, from_date=from_date, to_date=to_date, profile_id=profile_id
+    )
     return [
         EventResponse(
             summary=e.summary,

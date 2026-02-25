@@ -42,12 +42,18 @@ def _get_firebase_app() -> firebase_admin.App:
             cred = fb_creds.ApplicationDefault()
             # FIREBASE_PROJECT_ID: Firebase プロジェクト ID（GCP プロジェクトと異なる場合に設定）
             # 未設定時は PROJECT_ID にフォールバック
-            firebase_project_id = os.environ.get("FIREBASE_PROJECT_ID") or os.environ.get("PROJECT_ID")
+            firebase_project_id = os.environ.get(
+                "FIREBASE_PROJECT_ID"
+            ) or os.environ.get("PROJECT_ID")
             _firebase_app = firebase_admin.initialize_app(
                 cred,
-                options={"projectId": firebase_project_id} if firebase_project_id else {},
+                options={"projectId": firebase_project_id}
+                if firebase_project_id
+                else {},
             )
-            logger.info("Firebase Admin initialized (deps) project=%s", firebase_project_id)
+            logger.info(
+                "Firebase Admin initialized (deps) project=%s", firebase_project_id
+            )
     return _firebase_app
 
 

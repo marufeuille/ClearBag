@@ -155,7 +155,9 @@ class DocumentRepository(ABC):
         pass
 
     @abstractmethod
-    def find_by_content_hash(self, uid: str, content_hash: str) -> DocumentRecord | None:
+    def find_by_content_hash(
+        self, uid: str, content_hash: str
+    ) -> DocumentRecord | None:
         """コンテンツハッシュで既存レコードを検索（冪等性チェック用）"""
         pass
 

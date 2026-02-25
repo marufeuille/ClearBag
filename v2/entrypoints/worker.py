@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 # ── 初期化（プロセス起動時に1回のみ実行） ────────────────────────────────────
 
+
 def _ensure_firebase_init() -> None:
     """Firebase Admin を初期化する（二重初期化を防ぐ）"""
     try:
@@ -65,7 +66,9 @@ def _build_processor() -> DocumentProcessor:
     return DocumentProcessor(analyzer=analyzer)
 
 
-def run_analysis_sync(uid: str, document_id: str, storage_path: str, mime_type: str) -> None:
+def run_analysis_sync(
+    uid: str, document_id: str, storage_path: str, mime_type: str
+) -> None:
     """
     ドキュメント解析のコアロジック。
 
@@ -95,7 +98,9 @@ def run_analysis_sync(uid: str, document_id: str, storage_path: str, mime_type: 
         doc_repo.save_analysis(uid, document_id, analysis)
         logger.info(
             "Analysis saved: uid=%s, doc_id=%s, category=%s",
-            uid, document_id, analysis.category.value,
+            uid,
+            document_id,
+            analysis.category.value,
         )
 
         _try_send_notification(uid, document_id, analysis, user_repo, db)
@@ -227,8 +232,16 @@ def _try_send_notification(uid, document_id, analysis, user_repo, db) -> None:
             from v2.adapters.email_notifier import EmailConfig, SendGridEmailNotifier
 
             notifier = SendGridEmailNotifier(EmailConfig(api_key=sendgrid_key))
-            doc_snap = db.collection("users").document(uid).collection("documents").document(document_id).get()
-            original_filename = doc_snap.get("original_filename") if doc_snap.exists else "document"
+            doc_snap = (
+                db.collection("users")
+                .document(uid)
+                .collection("documents")
+                .document(document_id)
+                .get()
+            )
+            original_filename = (
+                doc_snap.get("original_filename") if doc_snap.exists else "document"
+            )
             notifier.notify_analysis_complete(
                 to_email=user_email,
                 original_filename=original_filename,
@@ -262,9 +275,21 @@ def _try_send_notification(uid, document_id, analysis, user_repo, db) -> None:
                     endpoint=subscription_data["endpoint"],
                     keys=subscription_data["keys"],
                 )
-                doc_snap = db.collection("users").document(uid).collection("documents").document(document_id).get()
-                original_filename = doc_snap.get("original_filename") if doc_snap.exists else "document"
-                notifier_wp.notify_analysis_complete(sub, original_filename, document_id)
+                doc_snap = (
+                    db.collection("users")
+                    .document(uid)
+                    .collection("documents")
+                    .document(document_id)
+                    .get()
+                )
+                original_filename = (
+                    doc_snap.get("original_filename") if doc_snap.exists else "document"
+                )
+                notifier_wp.notify_analysis_complete(
+                    sub, original_filename, document_id
+                )
 
     except Exception:
-        logger.exception("Notification failed (non-critical): uid=%s, doc_id=%s", uid, document_id)
+        logger.exception(
+            "Notification failed (non-critical): uid=%s, doc_id=%s", uid, document_id
+        )

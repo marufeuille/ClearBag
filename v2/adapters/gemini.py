@@ -139,7 +139,9 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
             raise
 
     @retry(
-        retry=retry_if_exception_type((ResourceExhausted, ServiceUnavailable, InternalServerError)),
+        retry=retry_if_exception_type(
+            (ResourceExhausted, ServiceUnavailable, InternalServerError)
+        ),
         wait=wait_exponential(multiplier=1, min=4, max=60),
         stop=stop_after_attempt(4),
         reraise=True,

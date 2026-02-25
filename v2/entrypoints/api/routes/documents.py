@@ -71,7 +71,9 @@ def _to_response(record: DocumentRecord) -> DocumentResponse:
     )
 
 
-@router.post("/upload", status_code=status.HTTP_202_ACCEPTED, response_model=UploadResponse)
+@router.post(
+    "/upload", status_code=status.HTTP_202_ACCEPTED, response_model=UploadResponse
+)
 async def upload_document(
     file: UploadFile,
     background_tasks: BackgroundTasks,
@@ -109,7 +111,9 @@ async def upload_document(
     content_hash = hashlib.sha256(content).hexdigest()
     existing = doc_repo.find_by_content_hash(uid, content_hash)
     if existing:
-        logger.info("Duplicate upload detected: uid=%s, hash=%s", uid, content_hash[:16])
+        logger.info(
+            "Duplicate upload detected: uid=%s, hash=%s", uid, content_hash[:16]
+        )
         return UploadResponse(id=existing.id, status=existing.status)
 
     # ── GCS にファイルを保存 ─────────────────────────────────────────────────
@@ -141,8 +145,13 @@ async def upload_document(
     if os.environ.get("LOCAL_MODE"):
         # ローカル開発: Cloud Tasks を使わず同プロセスの BackgroundTasks で実行
         from v2.entrypoints.worker import run_analysis_sync
-        background_tasks.add_task(run_analysis_sync, uid, document_id, storage_path, mime_type)
-        logger.info("LOCAL_MODE: scheduled background analysis for doc_id=%s", document_id)
+
+        background_tasks.add_task(
+            run_analysis_sync, uid, document_id, storage_path, mime_type
+        )
+        logger.info(
+            "LOCAL_MODE: scheduled background analysis for doc_id=%s", document_id
+        )
     else:
         queue.enqueue(payload)
 
@@ -172,7 +181,9 @@ async def get_document(
     """指定ドキュメントの詳細を返す"""
     record = doc_repo.get(uid, document_id)
     if record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
     return _to_response(record)
 
 
@@ -186,7 +197,9 @@ async def delete_document(
     """ドキュメントと GCS ファイルを削除する"""
     record = doc_repo.get(uid, document_id)
     if record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
 
     storage.delete(record.storage_path)
     doc_repo.delete(uid, document_id)

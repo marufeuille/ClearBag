@@ -39,6 +39,7 @@ class StoredTaskData:
     note: str
     completed: bool
 
+
 logger = logging.getLogger(__name__)
 
 _USERS = "users"
@@ -67,7 +68,12 @@ class FirestoreDocumentRepository(DocumentRepository):
     def create(self, uid: str, record: DocumentRecord) -> str:
         """ドキュメントレコードを Firestore に作成。IDを返す"""
         doc_id = record.id or str(uuid.uuid4())
-        ref = self._db.collection(_USERS).document(uid).collection(_DOCUMENTS).document(doc_id)
+        ref = (
+            self._db.collection(_USERS)
+            .document(uid)
+            .collection(_DOCUMENTS)
+            .document(doc_id)
+        )
         ref.set(self._record_to_dict(record))
         logger.info("Created document: uid=%s, doc_id=%s", uid, doc_id)
         return doc_id
@@ -110,13 +116,20 @@ class FirestoreDocumentRepository(DocumentRepository):
             .collection(_DOCUMENTS)
             .document(document_id)
         )
-        update: dict[str, Any] = {"status": status, "updated_at": firestore.SERVER_TIMESTAMP}
+        update: dict[str, Any] = {
+            "status": status,
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        }
         if error_message is not None:
             update["error_message"] = error_message
         ref.update(update)
-        logger.info("Updated status: uid=%s, doc_id=%s, status=%s", uid, document_id, status)
+        logger.info(
+            "Updated status: uid=%s, doc_id=%s, status=%s", uid, document_id, status
+        )
 
-    def save_analysis(self, uid: str, document_id: str, analysis: DocumentAnalysis) -> None:
+    def save_analysis(
+        self, uid: str, document_id: str, analysis: DocumentAnalysis
+    ) -> None:
         """
         解析結果を Firestore に保存。
 
@@ -206,7 +219,9 @@ class FirestoreDocumentRepository(DocumentRepository):
         doc_ref.delete()
         logger.info("Deleted document: uid=%s, doc_id=%s", uid, document_id)
 
-    def find_by_content_hash(self, uid: str, content_hash: str) -> DocumentRecord | None:
+    def find_by_content_hash(
+        self, uid: str, content_hash: str
+    ) -> DocumentRecord | None:
         """コンテンツハッシュで検索（冪等性チェック）"""
         snaps = (
             self._db.collection(_USERS)
@@ -231,9 +246,7 @@ class FirestoreDocumentRepository(DocumentRepository):
     ) -> list[EventData]:
         """日付範囲でイベントを取得（全ドキュメントをまたいだビュー）"""
         # documents/{id}/events をコレクショングループクエリで横断検索
-        query = self._db.collection_group(_EVENTS).where(
-            "user_uid", "==", uid
-        )
+        query = self._db.collection_group(_EVENTS).where("user_uid", "==", uid)
         if from_date:
             query = query.where("start", ">=", from_date)
         if to_date:
@@ -252,7 +265,9 @@ class FirestoreDocumentRepository(DocumentRepository):
             for d in (snap.to_dict() or {},)
         ]
 
-    def list_tasks(self, uid: str, completed: bool | None = None) -> list[StoredTaskData]:
+    def list_tasks(
+        self, uid: str, completed: bool | None = None
+    ) -> list[StoredTaskData]:
         """タスク一覧を取得（id・completed を含む）"""
         query = self._db.collection_group(_TASKS).where("user_uid", "==", uid)
         if completed is not None:
@@ -274,15 +289,16 @@ class FirestoreDocumentRepository(DocumentRepository):
     def update_task_completed(self, uid: str, task_id: str, completed: bool) -> None:
         """タスクの完了状態を更新"""
         # tasks コレクショングループから task_id を探してアップデート
-        snaps = (
-            self._db.collection_group(_TASKS)
-            .where("user_uid", "==", uid)
-            .stream()
-        )
+        snaps = self._db.collection_group(_TASKS).where("user_uid", "==", uid).stream()
         for snap in snaps:
             if snap.id == task_id:
                 snap.reference.update({"completed": completed})
-                logger.info("Updated task: uid=%s, task_id=%s, completed=%s", uid, task_id, completed)
+                logger.info(
+                    "Updated task: uid=%s, task_id=%s, completed=%s",
+                    uid,
+                    task_id,
+                    completed,
+                )
                 return
         logger.warning("Task not found: uid=%s, task_id=%s", uid, task_id)
 
@@ -334,7 +350,11 @@ class FirestoreUserConfigRepository(UserConfigRepository):
         """ユーザー設定を取得。存在しない場合は空のデフォルト設定を返す"""
         snap = self._db.collection(_USERS).document(uid).get()
         if not snap.exists:
-            return {"plan": "free", "documents_this_month": 0, "ical_token": str(uuid.uuid4())}
+            return {
+                "plan": "free",
+                "documents_this_month": 0,
+                "ical_token": str(uuid.uuid4()),
+            }
         return snap.to_dict() or {}
 
     def update_user(self, uid: str, data: dict) -> None:
@@ -372,7 +392,9 @@ class FirestoreUserConfigRepository(UserConfigRepository):
 
     def update_profile(self, uid: str, profile_id: str, profile: UserProfile) -> None:
         """プロファイルを更新"""
-        self._db.collection(_USERS).document(uid).collection(_PROFILES).document(profile_id).update(
+        self._db.collection(_USERS).document(uid).collection(_PROFILES).document(
+            profile_id
+        ).update(
             {
                 "name": profile.name,
                 "grade": profile.grade,
@@ -384,5 +406,7 @@ class FirestoreUserConfigRepository(UserConfigRepository):
 
     def delete_profile(self, uid: str, profile_id: str) -> None:
         """プロファイルを削除"""
-        self._db.collection(_USERS).document(uid).collection(_PROFILES).document(profile_id).delete()
+        self._db.collection(_USERS).document(uid).collection(_PROFILES).document(
+            profile_id
+        ).delete()
         logger.info("Deleted profile: uid=%s, profile_id=%s", uid, profile_id)
