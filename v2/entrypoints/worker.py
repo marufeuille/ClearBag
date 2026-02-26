@@ -5,16 +5,17 @@ Cloud Tasks から HTTP POST を受け取り、ドキュメント解析を非同
 受け取るペイロード（JSON）:
   {
     "uid": "firebase-auth-uid",
+    "family_id": "family-uuid",
     "document_id": "uuid",
-    "storage_path": "uploads/{uid}/{document_id}.pdf",
+    "storage_path": "uploads/{family_id}/{document_id}.pdf",
     "mime_type": "application/pdf"
   }
 
 処理フロー:
   1. GCS からファイルをダウンロード
-  2. Firestore からユーザーのプロファイルを取得
+  2. Firestore からファミリーのプロファイルを取得
   3. DocumentProcessor で AI 解析
-  4. 解析結果を Firestore に保存
+  4. 解析結果を Firestore に保存（families/{family_id} 配下）
   5. メール/WebPush 通知（設定済みの場合）
 """
 
@@ -33,6 +34,7 @@ from vertexai.generative_models import GenerativeModel
 from v2.adapters.cloud_storage import GCSBlobStorage
 from v2.adapters.firestore_repository import (
     FirestoreDocumentRepository,
+    FirestoreFamilyRepository,
     FirestoreUserConfigRepository,
 )
 from v2.adapters.gemini import GeminiDocumentAnalyzer
@@ -67,47 +69,68 @@ def _build_processor() -> DocumentProcessor:
 
 
 def run_analysis_sync(
-    uid: str, document_id: str, storage_path: str, mime_type: str
+    uid: str,
+    family_id: str,
+    document_id: str,
+    storage_path: str,
+    mime_type: str,
 ) -> None:
     """
     ドキュメント解析のコアロジック。
 
     Cloud Tasks HTTP ハンドラーとローカル開発の BackgroundTasks の両方から
     呼び出される共通実装。
+
+    Args:
+        uid: アップロードした個人の Firebase Auth UID（通知送信に使用）
+        family_id: ファミリー ID（プロファイル取得・解析結果保存に使用）
+        document_id: ドキュメント ID
+        storage_path: GCS 上のファイルパス
+        mime_type: MIME タイプ
     """
     _ensure_firebase_init()
-    logger.info("Analysis started: uid=%s, doc_id=%s", uid, document_id)
+    logger.info(
+        "Analysis started: family_id=%s, uid=%s, doc_id=%s",
+        family_id,
+        uid,
+        document_id,
+    )
 
     db = firestore.Client()
     doc_repo = FirestoreDocumentRepository(db)
+    family_repo = FirestoreFamilyRepository(db)
     user_repo = FirestoreUserConfigRepository(db)
     blob_storage = GCSBlobStorage(bucket_name=os.environ["GCS_BUCKET_NAME"])
 
     try:
-        doc_repo.update_status(uid, document_id, "processing")
+        doc_repo.update_status(family_id, document_id, "processing")
 
         content = blob_storage.download(storage_path)
         logger.info("Downloaded: path=%s, size=%d bytes", storage_path, len(content))
 
-        user_profiles = user_repo.list_profiles(uid)
+        # ファミリーのプロファイルを取得して Gemini に渡す
+        user_profiles = family_repo.list_profiles(family_id)
         profiles = _convert_profiles(user_profiles)
 
         processor = _build_processor()
         analysis = processor.process(content, mime_type, profiles, rules=[])
 
-        doc_repo.save_analysis(uid, document_id, analysis)
+        doc_repo.save_analysis(family_id, document_id, analysis)
         logger.info(
-            "Analysis saved: uid=%s, doc_id=%s, category=%s",
-            uid,
+            "Analysis saved: family_id=%s, doc_id=%s, category=%s",
+            family_id,
             document_id,
             analysis.category.value,
         )
 
-        _try_send_notification(uid, document_id, analysis, user_repo, db)
+        # 通知はアップロードした個人の設定に従って送信
+        _try_send_notification(uid, family_id, document_id, analysis, user_repo, db)
 
     except Exception as e:
-        logger.exception("Worker failed: uid=%s, doc_id=%s", uid, document_id)
-        doc_repo.update_status(uid, document_id, "error", error_message=str(e))
+        logger.exception(
+            "Worker failed: family_id=%s, doc_id=%s", family_id, document_id
+        )
+        doc_repo.update_status(family_id, document_id, "error", error_message=str(e))
         raise
 
 
@@ -125,12 +148,13 @@ async def analyze_document(request: Request) -> dict:
     """
     payload = await request.json()
     uid: str = payload["uid"]
+    family_id: str = payload["family_id"]
     document_id: str = payload["document_id"]
     storage_path: str = payload["storage_path"]
     mime_type: str = payload["mime_type"]
 
     try:
-        run_analysis_sync(uid, document_id, storage_path, mime_type)
+        run_analysis_sync(uid, family_id, document_id, storage_path, mime_type)
         return {"status": "completed", "document_id": document_id}
     except Exception as e:
         raise HTTPException(
@@ -162,8 +186,8 @@ async def morning_digest(request: Request) -> dict:
     """
     朝のダイジェストメール送信エンドポイント（Cloud Scheduler から呼び出し）。
 
-    登録済みの全ユーザーに対して今後7日間の予定・未完了タスクをメールで送信する。
-    Cloud Scheduler の OIDC トークンで保護する想定。
+    全ファミリーメンバーに対して今後7日間の予定・未完了タスクをメールで送信する。
+    Cloud Scheduler の OIDC トークンで保護される想定。
     """
     _ensure_firebase_init()
 
@@ -188,20 +212,24 @@ async def morning_digest(request: Request) -> dict:
     sent = 0
     errors = 0
 
-    # 全ユーザーを走査（本番では Firestore のページネーションを考慮すること）
+    # 全ユーザーを走査し、family_id からファミリーのイベント/タスクを取得
     users_ref = db.collection("users").stream()
     for user_doc in users_ref:
         uid = user_doc.id
         user_data = user_doc.to_dict() or {}
         prefs = user_data.get("notification_preferences", {})
         user_email = user_data.get("email", "")
+        family_id = user_data.get("family_id")
 
-        if not prefs.get("email", False) or not user_email:
+        if not prefs.get("email", False) or not user_email or not family_id:
             continue
 
         try:
-            events = doc_repo.list_events(uid, from_date=from_date, to_date=to_date)
-            tasks = doc_repo.list_tasks(uid, completed=False)
+            # ファミリー単位でイベント/タスクを取得
+            events = doc_repo.list_events(
+                family_id, from_date=from_date, to_date=to_date
+            )
+            tasks = doc_repo.list_tasks(family_id, completed=False)
             notifier.send_morning_digest(
                 to_email=user_email,
                 upcoming_events=events,
@@ -216,10 +244,18 @@ async def morning_digest(request: Request) -> dict:
     return {"status": "ok", "sent": sent, "errors": errors}
 
 
-def _try_send_notification(uid, document_id, analysis, user_repo, db) -> None:
+def _try_send_notification(
+    uid: str,
+    family_id: str,
+    document_id: str,
+    analysis,
+    user_repo: FirestoreUserConfigRepository,
+    db: firestore.Client,
+) -> None:
     """
     通知設定に基づいてメール/WebPush 通知を試みる。
     通知の失敗は無視してメインフローを継続する。
+    通知設定は個人単位（uid）で管理する。
     """
     try:
         user = user_repo.get_user(uid)
@@ -232,9 +268,10 @@ def _try_send_notification(uid, document_id, analysis, user_repo, db) -> None:
             from v2.adapters.email_notifier import EmailConfig, SendGridEmailNotifier
 
             notifier = SendGridEmailNotifier(EmailConfig(api_key=sendgrid_key))
+            # families/{family_id}/documents/{document_id} からファイル名を取得
             doc_snap = (
-                db.collection("users")
-                .document(uid)
+                db.collection("families")
+                .document(family_id)
                 .collection("documents")
                 .document(document_id)
                 .get()
@@ -276,8 +313,8 @@ def _try_send_notification(uid, document_id, analysis, user_repo, db) -> None:
                     keys=subscription_data["keys"],
                 )
                 doc_snap = (
-                    db.collection("users")
-                    .document(uid)
+                    db.collection("families")
+                    .document(family_id)
                     .collection("documents")
                     .document(document_id)
                     .get()

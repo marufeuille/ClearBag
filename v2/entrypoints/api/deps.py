@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
+from dataclasses import dataclass
 
 import firebase_admin
 import firebase_admin.auth as fb_auth
@@ -21,6 +23,7 @@ from v2.adapters.cloud_storage import GCSBlobStorage
 from v2.adapters.cloud_tasks_queue import CloudTasksQueue
 from v2.adapters.firestore_repository import (
     FirestoreDocumentRepository,
+    FirestoreFamilyRepository,
     FirestoreUserConfigRepository,
 )
 from v2.adapters.ical_renderer import ICalRenderer
@@ -103,6 +106,82 @@ async def get_current_uid(
     return decoded["uid"]
 
 
+# ── ファミリーコンテキスト ────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class FamilyContext:
+    """認証済みユーザーのファミリーコンテキスト"""
+
+    uid: str
+    family_id: str
+    role: str  # "owner" | "member"
+
+
+async def get_family_context(
+    uid: str = Depends(get_current_uid),
+) -> FamilyContext:
+    """
+    uid からファミリーコンテキストを解決する。
+
+    users/{uid} に family_id が未設定の場合、自動的に1人ファミリーを作成する。
+    これにより新規ユーザーのオンボーディングが自動化され、ソロ/ファミリー分岐が不要になる。
+
+    Returns:
+        FamilyContext（uid, family_id, role）
+
+    Raises:
+        HTTPException(401): Firebase Auth トークンが無効な場合（get_current_uid で発生）
+    """
+    db = _get_firestore_client()
+    user_repo = FirestoreUserConfigRepository(db)
+    family_repo = FirestoreFamilyRepository(db)
+
+    user_data = user_repo.get_user(uid)
+    family_id = user_data.get("family_id")
+
+    if not family_id:
+        # 初回アクセス時: 1人ファミリーを自動作成
+        family_id = str(uuid.uuid4())
+        email = user_data.get("email", "")
+        display_name = user_data.get("display_name", email or uid)
+
+        family_repo.create_family(
+            family_id=family_id,
+            owner_uid=uid,
+            name="マイファミリー",
+        )
+        family_repo.add_member(
+            family_id=family_id,
+            uid=uid,
+            role="owner",
+            display_name=display_name,
+            email=email,
+        )
+        user_repo.update_user(uid, {"family_id": family_id})
+        logger.info("Auto-created family: uid=%s, family_id=%s", uid, family_id)
+
+    role = family_repo.get_member_role(family_id, uid) or "member"
+    return FamilyContext(uid=uid, family_id=family_id, role=role)
+
+
+async def require_owner(
+    ctx: FamilyContext = Depends(get_family_context),
+) -> FamilyContext:
+    """
+    オーナー権限を要求する依存関数。
+
+    Raises:
+        HTTPException(403): ロールが "owner" でない場合
+    """
+    if ctx.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="この操作にはオーナー権限が必要です。",
+        )
+    return ctx
+
+
 # ── Firestore クライアント（シングルトン） ──────────────────────────────────────
 
 _firestore_client: firestore.Client | None = None
@@ -127,6 +206,11 @@ def get_document_repo() -> FirestoreDocumentRepository:
 def get_user_config_repo() -> FirestoreUserConfigRepository:
     """UserConfigRepository を返す依存関数"""
     return FirestoreUserConfigRepository(_get_firestore_client())
+
+
+def get_family_repo() -> FirestoreFamilyRepository:
+    """FamilyRepository を返す依存関数"""
+    return FirestoreFamilyRepository(_get_firestore_client())
 
 
 def get_blob_storage() -> GCSBlobStorage:

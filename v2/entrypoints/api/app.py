@@ -32,6 +32,7 @@ from v2.entrypoints import worker
 from v2.entrypoints.api.routes import (
     documents,
     events,
+    families,
     ical,
     profiles,
     settings,
@@ -73,6 +74,7 @@ app.include_router(documents.router, prefix=_PREFIX)
 app.include_router(events.router, prefix=_PREFIX)
 app.include_router(tasks.router, prefix=_PREFIX)
 app.include_router(profiles.router, prefix=_PREFIX)
+app.include_router(families.router, prefix=_PREFIX)
 app.include_router(ical.router, prefix=_PREFIX)
 app.include_router(settings.router, prefix=_PREFIX)
 

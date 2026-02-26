@@ -1,13 +1,17 @@
 """Firestore Repository Adapter
 
-DocumentRepository と UserConfigRepository の Firestore 実装。
+DocumentRepository, UserConfigRepository, FamilyRepository の Firestore 実装。
 
 Firestore コレクション構造:
-  users/{uid}                               ← ユーザー設定
-  users/{uid}/profiles/{profileId}          ← プロファイル
-  users/{uid}/documents/{documentId}        ← ドキュメントレコード
-  users/{uid}/events/{eventId}              ← 非正規化イベント（日付範囲クエリ用）
-  users/{uid}/tasks/{taskId}                ← 非正規化タスク
+  families/{familyId}                              ← ファミリー設定
+  families/{familyId}/members/{uid}                ← メンバー
+  families/{familyId}/invitations/{invitationId}   ← 招待
+  families/{familyId}/profiles/{profileId}         ← プロファイル（子ども情報）
+  families/{familyId}/documents/{documentId}       ← ドキュメントレコード
+  families/{familyId}/documents/{docId}/events/    ← 非正規化イベント（日付範囲クエリ用）
+  families/{familyId}/documents/{docId}/tasks/     ← 非正規化タスク
+
+  users/{uid}                                      ← ユーザー個人設定
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ from v2.domain.models import (
     EventData,
     UserProfile,
 )
-from v2.domain.ports import DocumentRepository, UserConfigRepository
+from v2.domain.ports import DocumentRepository, FamilyRepository, UserConfigRepository
 
 
 @dataclass
@@ -42,25 +46,24 @@ class StoredTaskData:
 
 logger = logging.getLogger(__name__)
 
-_USERS = "users"
+_FAMILIES = "families"
+_MEMBERS = "members"
+_INVITATIONS = "invitations"
 _PROFILES = "profiles"
 _DOCUMENTS = "documents"
 _EVENTS = "events"
 _TASKS = "tasks"
+_USERS = "users"
 
 
 class FirestoreDocumentRepository(DocumentRepository):
     """
     Firestore を使った DocumentRepository 実装。
 
-    users/{uid}/documents, events, tasks の各サブコレクションを管理する。
+    families/{familyId}/documents, events, tasks の各サブコレクションを管理する。
     """
 
     def __init__(self, db: firestore.Client) -> None:
-        """
-        Args:
-            db: 初期化済みの Firestore クライアント
-        """
         self._db = db
 
     # ── DocumentRecord CRUD ──────────────────────────────────────────────────
@@ -69,19 +72,19 @@ class FirestoreDocumentRepository(DocumentRepository):
         """ドキュメントレコードを Firestore に作成。IDを返す"""
         doc_id = record.id or str(uuid.uuid4())
         ref = (
-            self._db.collection(_USERS)
+            self._db.collection(_FAMILIES)
             .document(uid)
             .collection(_DOCUMENTS)
             .document(doc_id)
         )
         ref.set(self._record_to_dict(record))
-        logger.info("Created document: uid=%s, doc_id=%s", uid, doc_id)
+        logger.info("Created document: family_id=%s, doc_id=%s", uid, doc_id)
         return doc_id
 
     def get(self, uid: str, document_id: str) -> DocumentRecord | None:
         """ドキュメントレコードを取得。存在しない場合は None を返す"""
         snap = (
-            self._db.collection(_USERS)
+            self._db.collection(_FAMILIES)
             .document(uid)
             .collection(_DOCUMENTS)
             .document(document_id)
@@ -92,9 +95,9 @@ class FirestoreDocumentRepository(DocumentRepository):
         return self._dict_to_record(document_id, uid, snap.to_dict())
 
     def list(self, uid: str) -> list[DocumentRecord]:
-        """ユーザーのドキュメント一覧を新しい順で取得"""
+        """ファミリーのドキュメント一覧を新しい順で取得"""
         snaps = (
-            self._db.collection(_USERS)
+            self._db.collection(_FAMILIES)
             .document(uid)
             .collection(_DOCUMENTS)
             .order_by("created_at", direction=firestore.Query.DESCENDING)
@@ -111,7 +114,7 @@ class FirestoreDocumentRepository(DocumentRepository):
     ) -> None:
         """ドキュメントのステータスを更新"""
         ref = (
-            self._db.collection(_USERS)
+            self._db.collection(_FAMILIES)
             .document(uid)
             .collection(_DOCUMENTS)
             .document(document_id)
@@ -124,7 +127,10 @@ class FirestoreDocumentRepository(DocumentRepository):
             update["error_message"] = error_message
         ref.update(update)
         logger.info(
-            "Updated status: uid=%s, doc_id=%s, status=%s", uid, document_id, status
+            "Updated status: family_id=%s, doc_id=%s, status=%s",
+            uid,
+            document_id,
+            status,
         )
 
     def save_analysis(
@@ -138,7 +144,7 @@ class FirestoreDocumentRepository(DocumentRepository):
         - tasks サブコレクションに TaskData を書き込み
         """
         doc_ref = (
-            self._db.collection(_USERS)
+            self._db.collection(_FAMILIES)
             .document(uid)
             .collection(_DOCUMENTS)
             .document(document_id)
@@ -159,14 +165,14 @@ class FirestoreDocumentRepository(DocumentRepository):
         )
 
         # events サブコレクションに保存
-        # user_uid は collection_group クエリのフィルター用（必須）
+        # family_id は collection_group クエリのフィルター用（必須）
         events_col = doc_ref.collection(_EVENTS)
         for event in analysis.events:
             event_ref = events_col.document()
             batch.set(
                 event_ref,
                 {
-                    "user_uid": uid,
+                    "family_id": uid,
                     "document_id": document_id,
                     "summary": event.summary,
                     "start": event.start,
@@ -178,14 +184,14 @@ class FirestoreDocumentRepository(DocumentRepository):
             )
 
         # tasks サブコレクションに保存
-        # user_uid は collection_group クエリのフィルター用（必須）
+        # family_id は collection_group クエリのフィルター用（必須）
         tasks_col = doc_ref.collection(_TASKS)
         for task in analysis.tasks:
             task_ref = tasks_col.document()
             batch.set(
                 task_ref,
                 {
-                    "user_uid": uid,
+                    "family_id": uid,
                     "document_id": document_id,
                     "title": task.title,
                     "due_date": task.due_date,
@@ -197,7 +203,7 @@ class FirestoreDocumentRepository(DocumentRepository):
 
         batch.commit()
         logger.info(
-            "Saved analysis: uid=%s, doc_id=%s, events=%d, tasks=%d",
+            "Saved analysis: family_id=%s, doc_id=%s, events=%d, tasks=%d",
             uid,
             document_id,
             len(analysis.events),
@@ -207,7 +213,7 @@ class FirestoreDocumentRepository(DocumentRepository):
     def delete(self, uid: str, document_id: str) -> None:
         """ドキュメントと関連する events/tasks を削除"""
         doc_ref = (
-            self._db.collection(_USERS)
+            self._db.collection(_FAMILIES)
             .document(uid)
             .collection(_DOCUMENTS)
             .document(document_id)
@@ -217,14 +223,14 @@ class FirestoreDocumentRepository(DocumentRepository):
             for snap in sub.stream():
                 snap.reference.delete()
         doc_ref.delete()
-        logger.info("Deleted document: uid=%s, doc_id=%s", uid, document_id)
+        logger.info("Deleted document: family_id=%s, doc_id=%s", uid, document_id)
 
     def find_by_content_hash(
         self, uid: str, content_hash: str
     ) -> DocumentRecord | None:
         """コンテンツハッシュで検索（冪等性チェック）"""
         snaps = (
-            self._db.collection(_USERS)
+            self._db.collection(_FAMILIES)
             .document(uid)
             .collection(_DOCUMENTS)
             .where("content_hash", "==", content_hash)
@@ -246,10 +252,10 @@ class FirestoreDocumentRepository(DocumentRepository):
     ) -> list[EventData]:
         """日付範囲でイベントを取得（全ドキュメントをまたいだビュー）"""
         # documents/{id}/events をコレクショングループクエリで横断検索
-        # order_by("start") により複合 COLLECTION_GROUP インデックス (user_uid, start) を使用
+        # order_by("start") により複合 COLLECTION_GROUP インデックス (family_id, start) を使用
         query = (
             self._db.collection_group(_EVENTS)
-            .where("user_uid", "==", uid)
+            .where("family_id", "==", uid)
             .order_by("start")
         )
         if from_date:
@@ -274,10 +280,10 @@ class FirestoreDocumentRepository(DocumentRepository):
         self, uid: str, completed: bool | None = None
     ) -> list[StoredTaskData]:
         """タスク一覧を取得（id・completed を含む）"""
-        # order_by("completed") により複合 COLLECTION_GROUP インデックス (user_uid, completed) を使用
+        # order_by("completed") により複合 COLLECTION_GROUP インデックス (family_id, completed) を使用
         query = (
             self._db.collection_group(_TASKS)
-            .where("user_uid", "==", uid)
+            .where("family_id", "==", uid)
             .order_by("completed")
         )
         if completed is not None:
@@ -298,19 +304,18 @@ class FirestoreDocumentRepository(DocumentRepository):
 
     def update_task_completed(self, uid: str, task_id: str, completed: bool) -> None:
         """タスクの完了状態を更新"""
-        # tasks コレクショングループから task_id を探してアップデート
-        snaps = self._db.collection_group(_TASKS).where("user_uid", "==", uid).stream()
+        snaps = self._db.collection_group(_TASKS).where("family_id", "==", uid).stream()
         for snap in snaps:
             if snap.id == task_id:
                 snap.reference.update({"completed": completed})
                 logger.info(
-                    "Updated task: uid=%s, task_id=%s, completed=%s",
+                    "Updated task: family_id=%s, task_id=%s, completed=%s",
                     uid,
                     task_id,
                     completed,
                 )
                 return
-        logger.warning("Task not found: uid=%s, task_id=%s", uid, task_id)
+        logger.warning("Task not found: family_id=%s, task_id=%s", uid, task_id)
 
     # ── 変換ヘルパー ──────────────────────────────────────────────────────────
 
@@ -350,7 +355,8 @@ class FirestoreUserConfigRepository(UserConfigRepository):
     """
     Firestore を使った UserConfigRepository 実装。
 
-    users/{uid} と users/{uid}/profiles/{profileId} を管理する。
+    users/{uid} の個人設定（ical_token, notification_preferences）のみを管理する。
+    ファミリー共有データ（profiles, plan等）は FirestoreFamilyRepository を使用。
     """
 
     def __init__(self, db: firestore.Client) -> None:
@@ -361,8 +367,6 @@ class FirestoreUserConfigRepository(UserConfigRepository):
         snap = self._db.collection(_USERS).document(uid).get()
         if not snap.exists:
             return {
-                "plan": "free",
-                "documents_this_month": 0,
                 "ical_token": str(uuid.uuid4()),
             }
         return snap.to_dict() or {}
@@ -372,9 +376,156 @@ class FirestoreUserConfigRepository(UserConfigRepository):
         self._db.collection(_USERS).document(uid).set(data, merge=True)
         logger.info("Updated user settings: uid=%s", uid)
 
-    def list_profiles(self, uid: str) -> list[UserProfile]:
+
+class FirestoreFamilyRepository(FamilyRepository):
+    """
+    Firestore を使った FamilyRepository 実装。
+
+    families/{familyId}, members, invitations, profiles を管理する。
+    """
+
+    def __init__(self, db: firestore.Client) -> None:
+        self._db = db
+
+    # ── ファミリー CRUD ────────────────────────────────────────────────────────
+
+    def create_family(self, family_id: str, owner_uid: str, name: str) -> None:
+        """ファミリーを作成"""
+        self._db.collection(_FAMILIES).document(family_id).set(
+            {
+                "owner_uid": owner_uid,
+                "name": name,
+                "plan": "free",
+                "documents_this_month": 0,
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            }
+        )
+        logger.info("Created family: family_id=%s, owner=%s", family_id, owner_uid)
+
+    def get_family(self, family_id: str) -> dict | None:
+        """ファミリー設定を取得"""
+        snap = self._db.collection(_FAMILIES).document(family_id).get()
+        if not snap.exists:
+            return None
+        return snap.to_dict() or {}
+
+    def update_family(self, family_id: str, data: dict) -> None:
+        """ファミリー設定を更新（部分更新）"""
+        data["updated_at"] = firestore.SERVER_TIMESTAMP
+        self._db.collection(_FAMILIES).document(family_id).set(data, merge=True)
+        logger.info("Updated family: family_id=%s", family_id)
+
+    # ── メンバー管理 ──────────────────────────────────────────────────────────
+
+    def add_member(
+        self, family_id: str, uid: str, role: str, display_name: str, email: str
+    ) -> None:
+        """ファミリーにメンバーを追加"""
+        self._db.collection(_FAMILIES).document(family_id).collection(
+            _MEMBERS
+        ).document(uid).set(
+            {
+                "role": role,
+                "display_name": display_name,
+                "email": email,
+                "joined_at": firestore.SERVER_TIMESTAMP,
+            }
+        )
+        logger.info("Added member: family_id=%s, uid=%s, role=%s", family_id, uid, role)
+
+    def remove_member(self, family_id: str, uid: str) -> None:
+        """ファミリーからメンバーを削除"""
+        self._db.collection(_FAMILIES).document(family_id).collection(
+            _MEMBERS
+        ).document(uid).delete()
+        logger.info("Removed member: family_id=%s, uid=%s", family_id, uid)
+
+    def list_members(self, family_id: str) -> list[dict]:
+        """メンバー一覧を取得"""
+        snaps = (
+            self._db.collection(_FAMILIES)
+            .document(family_id)
+            .collection(_MEMBERS)
+            .stream()
+        )
+        return [{"uid": snap.id, **(snap.to_dict() or {})} for snap in snaps]
+
+    def get_member_role(self, family_id: str, uid: str) -> str | None:
+        """メンバーのロールを取得。未参加の場合はNoneを返す"""
+        snap = (
+            self._db.collection(_FAMILIES)
+            .document(family_id)
+            .collection(_MEMBERS)
+            .document(uid)
+            .get()
+        )
+        if not snap.exists:
+            return None
+        return (snap.to_dict() or {}).get("role")
+
+    # ── 招待管理 ──────────────────────────────────────────────────────────────
+
+    def create_invitation(
+        self, family_id: str, email: str, invited_by_uid: str, token: str
+    ) -> str:
+        """招待を作成。生成されたIDを返す"""
+        import datetime
+
+        ref = (
+            self._db.collection(_FAMILIES)
+            .document(family_id)
+            .collection(_INVITATIONS)
+            .document()
+        )
+        expires_at = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=7)
+        ref.set(
+            {
+                "email": email,
+                "invited_by_uid": invited_by_uid,
+                "token": token,
+                "status": "pending",
+                "family_id": family_id,
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "expires_at": expires_at,
+            }
+        )
+        logger.info("Created invitation: family_id=%s, email=%s", family_id, email)
+        return ref.id
+
+    def get_invitation_by_token(self, token: str) -> dict | None:
+        """招待トークンで招待情報を取得"""
+        snaps = (
+            self._db.collection_group(_INVITATIONS)
+            .where("token", "==", token)
+            .limit(1)
+            .stream()
+        )
+        for snap in snaps:
+            return {"id": snap.id, **(snap.to_dict() or {})}
+        return None
+
+    def accept_invitation(self, invitation_id: str, family_id: str) -> None:
+        """招待ステータスを accepted に更新"""
+        self._db.collection(_FAMILIES).document(family_id).collection(
+            _INVITATIONS
+        ).document(invitation_id).update({"status": "accepted"})
+        logger.info(
+            "Accepted invitation: family_id=%s, invitation_id=%s",
+            family_id,
+            invitation_id,
+        )
+
+    # ── プロファイル管理 ──────────────────────────────────────────────────────
+
+    def list_profiles(self, family_id: str) -> list[UserProfile]:
         """プロファイル一覧を取得"""
-        snaps = self._db.collection(_USERS).document(uid).collection(_PROFILES).stream()
+        snaps = (
+            self._db.collection(_FAMILIES)
+            .document(family_id)
+            .collection(_PROFILES)
+            .stream()
+        )
         return [
             UserProfile(
                 id=snap.id,
@@ -386,9 +537,9 @@ class FirestoreUserConfigRepository(UserConfigRepository):
             for d in (snap.to_dict() or {},)
         ]
 
-    def create_profile(self, uid: str, profile: UserProfile) -> str:
+    def create_profile(self, family_id: str, profile: UserProfile) -> str:
         """プロファイルを作成。生成されたIDを返す"""
-        col = self._db.collection(_USERS).document(uid).collection(_PROFILES)
+        col = self._db.collection(_FAMILIES).document(family_id).collection(_PROFILES)
         ref = col.add(
             {
                 "name": profile.name,
@@ -397,14 +548,16 @@ class FirestoreUserConfigRepository(UserConfigRepository):
                 "created_at": firestore.SERVER_TIMESTAMP,
             }
         )[1]
-        logger.info("Created profile: uid=%s, profile_id=%s", uid, ref.id)
+        logger.info("Created profile: family_id=%s, profile_id=%s", family_id, ref.id)
         return ref.id
 
-    def update_profile(self, uid: str, profile_id: str, profile: UserProfile) -> None:
+    def update_profile(
+        self, family_id: str, profile_id: str, profile: UserProfile
+    ) -> None:
         """プロファイルを更新"""
-        self._db.collection(_USERS).document(uid).collection(_PROFILES).document(
-            profile_id
-        ).update(
+        self._db.collection(_FAMILIES).document(family_id).collection(
+            _PROFILES
+        ).document(profile_id).update(
             {
                 "name": profile.name,
                 "grade": profile.grade,
@@ -412,11 +565,15 @@ class FirestoreUserConfigRepository(UserConfigRepository):
                 "updated_at": firestore.SERVER_TIMESTAMP,
             }
         )
-        logger.info("Updated profile: uid=%s, profile_id=%s", uid, profile_id)
+        logger.info(
+            "Updated profile: family_id=%s, profile_id=%s", family_id, profile_id
+        )
 
-    def delete_profile(self, uid: str, profile_id: str) -> None:
+    def delete_profile(self, family_id: str, profile_id: str) -> None:
         """プロファイルを削除"""
-        self._db.collection(_USERS).document(uid).collection(_PROFILES).document(
-            profile_id
-        ).delete()
-        logger.info("Deleted profile: uid=%s, profile_id=%s", uid, profile_id)
+        self._db.collection(_FAMILIES).document(family_id).collection(
+            _PROFILES
+        ).document(profile_id).delete()
+        logger.info(
+            "Deleted profile: family_id=%s, profile_id=%s", family_id, profile_id
+        )

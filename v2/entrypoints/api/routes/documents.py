@@ -27,15 +27,16 @@ from v2.adapters.cloud_storage import GCSBlobStorage
 from v2.adapters.cloud_tasks_queue import CloudTasksQueue
 from v2.adapters.firestore_repository import (
     FirestoreDocumentRepository,
-    FirestoreUserConfigRepository,
+    FirestoreFamilyRepository,
 )
 from v2.domain.models import DocumentRecord
 from v2.entrypoints.api.deps import (
+    FamilyContext,
     get_blob_storage,
-    get_current_uid,
     get_document_repo,
+    get_family_context,
+    get_family_repo,
     get_task_queue,
-    get_user_config_repo,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,27 +78,27 @@ def _to_response(record: DocumentRecord) -> DocumentResponse:
 async def upload_document(
     file: UploadFile,
     background_tasks: BackgroundTasks,
-    uid: str = Depends(get_current_uid),
+    ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
-    user_repo: FirestoreUserConfigRepository = Depends(get_user_config_repo),
+    family_repo: FirestoreFamilyRepository = Depends(get_family_repo),
     storage: GCSBlobStorage = Depends(get_blob_storage),
     queue: CloudTasksQueue = Depends(get_task_queue),
 ) -> UploadResponse:
     """
     PDF / 画像ファイルをアップロードし、非同期解析をキューに追加する。
 
-    - 無料プランは月 5 枚まで
+    - 無料プランは月 5 枚まで（ファミリー単位でカウント）
     - コンテンツハッシュによる重複アップロードを検出（冪等性）
     - GCS にファイルを保存し、Firestore にステータスを記録
     - Cloud Tasks に解析ジョブをキューイング
     """
     # ── 無料プランのレート制限チェック ──────────────────────────────────────
     # DISABLE_RATE_LIMIT=true の場合はスキップ（開発環境用）
-    user_settings = user_repo.get_user(uid)
-    used = user_settings.get("documents_this_month", 0)
+    family = family_repo.get_family(ctx.family_id) or {}
+    used = family.get("documents_this_month", 0)
     if (
         not os.environ.get("DISABLE_RATE_LIMIT")
-        and user_settings.get("plan", "free") == "free"
+        and family.get("plan", "free") == "free"
         and used >= _FREE_PLAN_LIMIT
     ):
         raise HTTPException(
@@ -109,10 +110,12 @@ async def upload_document(
 
     # ── 冪等性チェック（SHA-256 による重複排除） ────────────────────────────
     content_hash = hashlib.sha256(content).hexdigest()
-    existing = doc_repo.find_by_content_hash(uid, content_hash)
+    existing = doc_repo.find_by_content_hash(ctx.family_id, content_hash)
     if existing:
         logger.info(
-            "Duplicate upload detected: uid=%s, hash=%s", uid, content_hash[:16]
+            "Duplicate upload detected: family_id=%s, hash=%s",
+            ctx.family_id,
+            content_hash[:16],
         )
         return UploadResponse(id=existing.id, status=existing.status)
 
@@ -120,24 +123,25 @@ async def upload_document(
     document_id = str(uuid.uuid4())
     mime_type = file.content_type or "application/octet-stream"
     ext = _ext_from_mime(mime_type)
-    storage_path = f"uploads/{uid}/{document_id}{ext}"
+    storage_path = f"uploads/{ctx.family_id}/{document_id}{ext}"
     storage.upload(storage_path, content, mime_type)
 
     # ── Firestore にドキュメントレコードを作成（status=pending） ────────────
     record = DocumentRecord(
         id=document_id,
-        uid=uid,
+        uid=ctx.uid,  # アップロードした個人のuid（誰がアップロードしたかを記録）
         status="pending",
         content_hash=content_hash,
         storage_path=storage_path,
         original_filename=file.filename or "unknown",
         mime_type=mime_type,
     )
-    doc_repo.create(uid, record)
+    doc_repo.create(ctx.family_id, record)
 
     # ── 解析ジョブをディスパッチ ──────────────────────────────────────────────
     payload = {
-        "uid": uid,
+        "uid": ctx.uid,
+        "family_id": ctx.family_id,
         "document_id": document_id,
         "storage_path": storage_path,
         "mime_type": mime_type,
@@ -147,7 +151,12 @@ async def upload_document(
         from v2.entrypoints.worker import run_analysis_sync
 
         background_tasks.add_task(
-            run_analysis_sync, uid, document_id, storage_path, mime_type
+            run_analysis_sync,
+            ctx.uid,
+            ctx.family_id,
+            document_id,
+            storage_path,
+            mime_type,
         )
         logger.info(
             "LOCAL_MODE: scheduled background analysis for doc_id=%s", document_id
@@ -155,31 +164,36 @@ async def upload_document(
     else:
         queue.enqueue(payload)
 
-    # ── 月間利用枚数をインクリメント ──────────────────────────────────────────
-    user_repo.update_user(uid, {"documents_this_month": used + 1})
+    # ── 月間利用枚数をインクリメント（ファミリー単位） ────────────────────────
+    family_repo.update_family(ctx.family_id, {"documents_this_month": used + 1})
 
-    logger.info("Document uploaded: uid=%s, doc_id=%s", uid, document_id)
+    logger.info(
+        "Document uploaded: family_id=%s, uid=%s, doc_id=%s",
+        ctx.family_id,
+        ctx.uid,
+        document_id,
+    )
     return UploadResponse(id=document_id, status="pending")
 
 
 @router.get("", response_model=list[DocumentResponse])
 async def list_documents(
-    uid: str = Depends(get_current_uid),
+    ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
 ) -> list[DocumentResponse]:
-    """ユーザーのドキュメント一覧を返す（新しい順）"""
-    records = doc_repo.list(uid)
+    """ファミリーのドキュメント一覧を返す（新しい順）"""
+    records = doc_repo.list(ctx.family_id)
     return [_to_response(r) for r in records]
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: str,
-    uid: str = Depends(get_current_uid),
+    ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
 ) -> DocumentResponse:
     """指定ドキュメントの詳細を返す"""
-    record = doc_repo.get(uid, document_id)
+    record = doc_repo.get(ctx.family_id, document_id)
     if record is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
@@ -190,20 +204,20 @@ async def get_document(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: str,
-    uid: str = Depends(get_current_uid),
+    ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
     storage: GCSBlobStorage = Depends(get_blob_storage),
 ) -> None:
     """ドキュメントと GCS ファイルを削除する"""
-    record = doc_repo.get(uid, document_id)
+    record = doc_repo.get(ctx.family_id, document_id)
     if record is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
 
     storage.delete(record.storage_path)
-    doc_repo.delete(uid, document_id)
-    logger.info("Document deleted: uid=%s, doc_id=%s", uid, document_id)
+    doc_repo.delete(ctx.family_id, document_id)
+    logger.info("Document deleted: family_id=%s, doc_id=%s", ctx.family_id, document_id)
 
 
 def _ext_from_mime(mime_type: str) -> str:

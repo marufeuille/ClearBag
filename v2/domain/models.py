@@ -97,6 +97,27 @@ class UserProfile:
 
 
 @dataclass(frozen=True)
+class FamilyMember:
+    """ファミリーメンバー"""
+
+    uid: str  # Firebase Auth UID
+    role: str  # "owner" | "member"
+    display_name: str
+    email: str
+
+
+@dataclass(frozen=True)
+class Invitation:
+    """ファミリー招待"""
+
+    id: str  # Firestore ドキュメントID
+    email: str  # 招待先メールアドレス
+    token: str  # UUID v4（URLに埋め込む）
+    status: str  # "pending" | "accepted" | "expired"
+    invited_by_uid: str
+
+
+@dataclass(frozen=True)
 class FileInfo:
     """Google Driveファイル情報"""
 

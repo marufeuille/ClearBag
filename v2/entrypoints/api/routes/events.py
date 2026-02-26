@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from v2.adapters.firestore_repository import FirestoreDocumentRepository
-from v2.entrypoints.api.deps import get_current_uid, get_document_repo
+from v2.entrypoints.api.deps import FamilyContext, get_document_repo, get_family_context
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -28,7 +28,7 @@ async def list_events(
     from_date: str | None = None,
     to_date: str | None = None,
     profile_id: str | None = None,
-    uid: str = Depends(get_current_uid),
+    ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
 ) -> list[EventResponse]:
     """
@@ -40,7 +40,7 @@ async def list_events(
         profile_id: プロファイルでフィルター（未実装: 将来拡張）
     """
     events = doc_repo.list_events(
-        uid, from_date=from_date, to_date=to_date, profile_id=profile_id
+        ctx.family_id, from_date=from_date, to_date=to_date, profile_id=profile_id
     )
     return [
         EventResponse(

@@ -32,17 +32,18 @@ async def get_ical_feed(
     iCal フィードを返す（認証不要、トークンベース）。
 
     1. icalToken で users コレクションからユーザーを特定
-    2. そのユーザーの全イベントを取得
-    3. iCal 形式の文字列をレスポンス
+    2. そのユーザーの family_id を取得
+    3. ファミリーの全イベントを取得（家族全員で共有）
+    4. iCal 形式の文字列をレスポンス
     """
-    # icalToken で uid を検索
-    uid = _find_uid_by_ical_token(doc_repo._db, token)
-    if uid is None:
+    # icalToken で family_id を検索
+    family_id = _find_family_id_by_ical_token(doc_repo._db, token)
+    if family_id is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invalid iCal token"
         )
 
-    events = doc_repo.list_events(uid)
+    events = doc_repo.list_events(family_id)
     ical_content = renderer.render(events)
 
     return PlainTextResponse(
@@ -52,9 +53,10 @@ async def get_ical_feed(
     )
 
 
-def _find_uid_by_ical_token(db: firestore.Client, token: str) -> str | None:
-    """icalToken フィールドでユーザーを検索して uid を返す"""
+def _find_family_id_by_ical_token(db: firestore.Client, token: str) -> str | None:
+    """icalToken フィールドでユーザーを検索し、そのユーザーの family_id を返す"""
     snaps = db.collection("users").where("ical_token", "==", token).limit(1).stream()
     for snap in snaps:
-        return snap.id
+        user_data = snap.to_dict() or {}
+        return user_data.get("family_id")
     return None

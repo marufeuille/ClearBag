@@ -24,7 +24,7 @@ resource "google_firestore_index" "events_by_start" {
   query_scope = "COLLECTION_GROUP"
 
   fields {
-    field_path = "user_uid"
+    field_path = "family_id"
     order      = "ASCENDING"
   }
 
@@ -44,12 +44,32 @@ resource "google_firestore_index" "tasks_by_completed" {
   query_scope = "COLLECTION_GROUP"
 
   fields {
-    field_path = "user_uid"
+    field_path = "family_id"
     order      = "ASCENDING"
   }
 
   fields {
     field_path = "completed"
+    order      = "ASCENDING"
+  }
+
+  depends_on = [google_firestore_database.this]
+}
+
+# 招待トークンで招待情報を検索するための collection_group インデックス
+resource "google_firestore_index" "invitations_by_token" {
+  project     = var.project_id
+  database    = google_firestore_database.this.name
+  collection  = "invitations"
+  query_scope = "COLLECTION_GROUP"
+
+  fields {
+    field_path = "token"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "__name__"
     order      = "ASCENDING"
   }
 

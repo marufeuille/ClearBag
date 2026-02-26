@@ -237,17 +237,6 @@ import {
   id = "projects/marufeuille-linebot/databases/(default)"
 }
 
-# 手動作成した COLLECTION_GROUP インデックスを Terraform state に取り込む
-# （スコープ修正前に gcloud で作成済み → apply 時の 409 を防ぐ）
-import {
-  to = module.firestore.google_firestore_index.events_by_start
-  id = "projects/marufeuille-linebot/databases/(default)/collectionGroups/events/indexes/CICAgJim14AK"
-}
-
-import {
-  to = module.firestore.google_firestore_index.tasks_by_completed
-  id = "projects/marufeuille-linebot/databases/(default)/collectionGroups/tasks/indexes/CICAgJjF9oIK"
-}
 
 module "firestore" {
   source = "../../modules/firestore"
