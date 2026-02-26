@@ -446,6 +446,12 @@ class FirestoreFamilyRepository(FamilyRepository):
         )
         logger.info("Added member: family_id=%s, uid=%s, role=%s", family_id, uid, role)
 
+    def update_member(self, family_id: str, uid: str, updates: dict) -> None:
+        """メンバーの属性を部分更新"""
+        self._db.collection(_FAMILIES).document(family_id).collection(
+            _MEMBERS
+        ).document(uid).update(updates)
+
     def remove_member(self, family_id: str, uid: str) -> None:
         """ファミリーからメンバーを削除"""
         self._db.collection(_FAMILIES).document(family_id).collection(
