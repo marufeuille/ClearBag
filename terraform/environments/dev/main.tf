@@ -326,6 +326,7 @@ module "api_service" {
     DISABLE_RATE_LIMIT      = "true"
     # Firebase Hosting のオリジン（カンマ区切り）
     CORS_ORIGINS            = "https://${var.firebase_project_id}.web.app,https://${var.firebase_project_id}.firebaseapp.com"
+    FRONTEND_BASE_URL       = "https://${var.firebase_project_id}.web.app"
   }
 
   # SENDGRID_API_KEY / VAPID_PRIVATE_KEY は Secret Manager にまだ値が未登録のため

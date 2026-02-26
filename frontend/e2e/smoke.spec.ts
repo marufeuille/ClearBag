@@ -33,6 +33,33 @@ async function mockAllApis(page: Page) {
       }),
     })
   );
+  await page.route("**/api/families/me", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "family-1",
+        name: "テストファミリー",
+        plan: "free",
+        documents_this_month: 0,
+        role: "owner",
+      }),
+    })
+  );
+  await page.route("**/api/families/members", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          uid: "e2e-test-user",
+          role: "owner",
+          display_name: "テストユーザー",
+          email: "test@example.com",
+        },
+      ]),
+    })
+  );
 }
 
 test.describe("スモークテスト: 各ページでエラーが出ない", () => {
@@ -80,5 +107,7 @@ test.describe("スモークテスト: 各ページでエラーが出ない", () 
 
     await expect(page.getByRole("heading", { name: "設定" })).toBeVisible();
     await expect(page.getByText("無料プラン")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "ファミリー" })).toBeVisible();
+    await expect(page.locator('input').first()).toHaveValue("テストファミリー");
   });
 });
