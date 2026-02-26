@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from google.cloud import firestore
 from v2.entrypoints.api import deps
 from v2.entrypoints.api.app import app
+from v2.entrypoints.api.deps import AuthInfo
 
 # test_v2_full_pipeline.py はモジュールレベルで実際の API を呼ぶため、
 # E2E テスト実行時のコレクション対象から除外する
@@ -65,7 +66,7 @@ def _delete_document_recursive(client: firestore.Client, doc_ref) -> None:
 def e2e_client(firestore_client):
     """認証バイパス + 実 Firestore の TestClient。
 
-    - get_current_uid: TEST_UID を固定返却（Firebase Auth をバイパス）
+    - get_auth_info: AuthInfo(TEST_UID) を固定返却（Firebase Auth をバイパス）
     - get_blob_storage: MagicMock（GCS を使わない）
     - get_task_queue: None（BackgroundTasks で代替）
     - Firestore: Emulator に接続した実 Client を使用
@@ -75,7 +76,9 @@ def e2e_client(firestore_client):
     mock_blob = MagicMock()
     mock_blob.upload.return_value = "uploads/test.pdf"
 
-    app.dependency_overrides[deps.get_current_uid] = lambda: TEST_UID
+    app.dependency_overrides[deps.get_auth_info] = lambda: AuthInfo(
+        uid=TEST_UID, email="e2e@example.com", display_name="E2E Test User"
+    )
     app.dependency_overrides[deps.get_blob_storage] = lambda: mock_blob
     app.dependency_overrides[deps.get_task_queue] = lambda: None
 
