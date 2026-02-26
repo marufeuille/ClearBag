@@ -56,21 +56,28 @@ resource "google_firestore_index" "tasks_by_completed" {
   depends_on = [google_firestore_database.this]
 }
 
-# 招待トークンで招待情報を検索するための collection_group インデックス
-resource "google_firestore_index" "invitations_by_token" {
-  project     = var.project_id
-  database    = google_firestore_database.this.name
-  collection  = "invitations"
-  query_scope = "COLLECTION_GROUP"
+# 招待トークンで invitations collection_group を検索するための単一フィールドインデックス
+# collection_group クエリには複合インデックスではなく google_firestore_field が必要
+resource "google_firestore_field" "invitations_token" {
+  project    = var.project_id
+  database   = google_firestore_database.this.name
+  collection = "invitations"
+  field      = "token"
 
-  fields {
-    field_path = "token"
-    order      = "ASCENDING"
-  }
-
-  fields {
-    field_path = "__name__"
-    order      = "ASCENDING"
+  # index_config を明示する場合はデフォルト（COLLECTION ASC/DESC）も含める必要がある
+  index_config {
+    indexes {
+      order       = "ASCENDING"
+      query_scope = "COLLECTION"
+    }
+    indexes {
+      order       = "DESCENDING"
+      query_scope = "COLLECTION"
+    }
+    indexes {
+      order       = "ASCENDING"
+      query_scope = "COLLECTION_GROUP"
+    }
   }
 
   depends_on = [google_firestore_database.this]
