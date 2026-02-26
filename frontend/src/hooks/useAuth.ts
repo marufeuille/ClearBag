@@ -17,16 +17,23 @@ interface AuthState {
   loading: boolean;
 }
 
+// E2E テスト時は Firebase Auth をバイパスしてモックユーザーを使用
+const IS_E2E = process.env.NEXT_PUBLIC_E2E === "true";
+const E2E_USER = IS_E2E
+  ? ({ uid: "e2e-test-user" } as unknown as User)
+  : null;
+
 export function useAuth(): AuthState & {
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 } {
   const [state, setState] = useState<AuthState>({
-    user: null,
-    loading: true,
+    user: E2E_USER,
+    loading: !IS_E2E,
   });
 
   useEffect(() => {
+    if (IS_E2E) return;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setState({ user, loading: false });
     });

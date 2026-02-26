@@ -372,8 +372,20 @@ class FirestoreUserConfigRepository(UserConfigRepository):
         return snap.to_dict() or {}
 
     def update_user(self, uid: str, data: dict) -> None:
-        """ユーザー設定を更新（部分更新）"""
-        self._db.collection(_USERS).document(uid).set(data, merge=True)
+        """ユーザー設定を更新（部分更新）
+
+        dot-notation キー（例: "notification_preferences.email"）が含まれる場合は
+        update() を使用してネストフィールドを部分更新する。
+        set(merge=True) は dot-notation を文字通りのフィールド名として扱うため不可。
+        top-level キーのみの場合は set(merge=True) でドキュメント新規作成も兼ねる。
+        """
+        doc_ref = self._db.collection(_USERS).document(uid)
+        if any("." in key for key in data):
+            # update() はドキュメントが存在する前提だが、update_user の呼び出し元は
+            # 常に get_family_context 経由でドキュメントが作成済みのフロー
+            doc_ref.update(data)
+        else:
+            doc_ref.set(data, merge=True)
         logger.info("Updated user settings: uid=%s", uid)
 
 

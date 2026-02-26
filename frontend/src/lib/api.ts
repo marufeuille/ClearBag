@@ -9,6 +9,9 @@ import { getIdToken } from "./firebase";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
+// E2E テスト時は Firebase ID トークン取得をスキップ
+const IS_E2E = process.env.NEXT_PUBLIC_E2E === "true";
+
 export interface DocumentRecord {
   id: string;
   status: "pending" | "processing" | "completed" | "error";
@@ -53,7 +56,7 @@ export interface Settings {
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
-  const token = await getIdToken();
+  const token = IS_E2E ? "e2e-test-token" : await getIdToken();
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -101,7 +104,7 @@ async function del(path: string): Promise<void> {
 export async function uploadDocument(
   file: File
 ): Promise<{ id: string; status: string }> {
-  const token = await getIdToken();
+  const token = IS_E2E ? "e2e-test-token" : await getIdToken();
   const formData = new FormData();
   formData.append("file", file);
 
