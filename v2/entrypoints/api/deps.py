@@ -193,12 +193,21 @@ async def get_family_context(
         user_repo.update_user(uid, {"family_id": family_id})
         logger.info("Auto-created family: uid=%s, family_id=%s", uid, family_id)
 
-    role = family_repo.get_member_role(family_id, uid) or "member"
+    member_data = family_repo.get_member(family_id, uid)
+    role = (member_data or {}).get("role") or "member"
 
-    # JWT から同期した email/display_name をメンバーエントリにも反映
-    # （招待参加時に users/{uid} が空だった既存メンバーの display_name/email を補完）
-    if updates:
-        family_repo.update_member(family_id, uid, updates)
+    # member エントリの email/display_name が空なら user_data の値で補完
+    # users/{uid} が先に同期済みでも member エントリが空のケースをカバー
+    if member_data:
+        email = user_data.get("email", "")
+        display_name = user_data.get("display_name", "")
+        member_updates: dict = {}
+        if not member_data.get("email") and email:
+            member_updates["email"] = email
+        if not member_data.get("display_name") and display_name:
+            member_updates["display_name"] = display_name
+        if member_updates:
+            family_repo.update_member(family_id, uid, member_updates)
 
     return FamilyContext(uid=uid, family_id=family_id, role=role)
 

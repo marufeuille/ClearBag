@@ -469,8 +469,8 @@ class FirestoreFamilyRepository(FamilyRepository):
         )
         return [{"uid": snap.id, **(snap.to_dict() or {})} for snap in snaps]
 
-    def get_member_role(self, family_id: str, uid: str) -> str | None:
-        """メンバーのロールを取得。未参加の場合はNoneを返す"""
+    def get_member(self, family_id: str, uid: str) -> dict | None:
+        """メンバーの全データを取得。未参加の場合はNoneを返す"""
         snap = (
             self._db.collection(_FAMILIES)
             .document(family_id)
@@ -480,7 +480,14 @@ class FirestoreFamilyRepository(FamilyRepository):
         )
         if not snap.exists:
             return None
-        return (snap.to_dict() or {}).get("role")
+        return snap.to_dict() or {}
+
+    def get_member_role(self, family_id: str, uid: str) -> str | None:
+        """メンバーのロールを取得。未参加の場合はNoneを返す"""
+        member = self.get_member(family_id, uid)
+        if member is None:
+            return None
+        return member.get("role")
 
     # ── 招待管理 ──────────────────────────────────────────────────────────────
 
