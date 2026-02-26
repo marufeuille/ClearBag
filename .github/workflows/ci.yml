@@ -57,3 +57,48 @@ jobs:
           -m "not manual"
           --cov=v2
           --cov-report=term-missing
+
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      FIRESTORE_EMULATOR_HOST: localhost:8080
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: "cloud-firestore-emulator"
+
+      - name: Start Firestore Emulator
+        run: |
+          gcloud emulators firestore start --host-port=0.0.0.0:8080 &
+          # エミュレーターの起動を待機（最大 30 秒）
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/ 2>/dev/null; then
+              echo "Firestore Emulator is ready"
+              exit 0
+            fi
+            echo "Waiting for emulator... ($i/30)"
+            sleep 1
+          done
+          echo "ERROR: Firestore Emulator did not start within 30 seconds"
+          exit 1
+
+      - name: Run E2E tests
+        run: uv run pytest tests/e2e/ -m e2e -v

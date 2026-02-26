@@ -52,6 +52,7 @@ addopts = [
 ]
 markers = [
     "manual: 手動実行のみ（実際のAPI呼び出しを行う）",
+    "e2e: E2Eテスト（Firestore Emulatorが必要: FIRESTORE_EMULATOR_HOST=localhost:8080）",
 ]
 
 [tool.ruff]
