@@ -92,7 +92,7 @@ export default function SettingsPage() {
     <AuthGuard>
       <div className="min-h-screen bg-gray-50">
         <NavBar />
-        <main className="max-w-2xl mx-auto px-4 py-6">
+        <main className="max-w-2xl mx-auto px-4 py-6 pb-nav">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">設定</h2>
 
           {loading && <p className="text-gray-400 text-sm">読み込み中...</p>}
@@ -163,6 +163,7 @@ export default function SettingsPage() {
                               {m.display_name || m.email || m.uid}
                             </p>
                             <p className="text-xs text-gray-400">
+                              {m.email && m.display_name ? m.email + " · " : ""}
                               {m.role === "owner" ? "オーナー" : "メンバー"}
                             </p>
                           </div>
@@ -171,7 +172,7 @@ export default function SettingsPage() {
                               onClick={() =>
                                 handleRemoveMember(
                                   m.uid,
-                                  m.display_name || m.email || m.uid
+                                  m.display_name || m.email || m.uid,
                                 )
                               }
                               className="text-xs text-red-400 hover:text-red-600"
