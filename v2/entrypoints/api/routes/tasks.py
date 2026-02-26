@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from v2.adapters.firestore_repository import FirestoreDocumentRepository
-from v2.entrypoints.api.deps import get_current_uid, get_document_repo
+from v2.entrypoints.api.deps import FamilyContext, get_document_repo, get_family_context
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -35,7 +35,7 @@ class TaskUpdateResponse(BaseModel):
 @router.get("", response_model=list[TaskResponse])
 async def list_tasks(
     completed: bool | None = None,
-    uid: str = Depends(get_current_uid),
+    ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
 ) -> list[TaskResponse]:
     """
@@ -44,7 +44,7 @@ async def list_tasks(
     クエリパラメータ:
         completed: true/false でフィルター（省略時は全件）
     """
-    tasks = doc_repo.list_tasks(uid, completed=completed)
+    tasks = doc_repo.list_tasks(ctx.family_id, completed=completed)
     return [
         TaskResponse(
             id=t.id,
@@ -62,9 +62,9 @@ async def list_tasks(
 async def update_task(
     task_id: str,
     body: TaskUpdateRequest,
-    uid: str = Depends(get_current_uid),
+    ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
 ) -> TaskUpdateResponse:
     """タスクの完了状態を更新する"""
-    doc_repo.update_task_completed(uid, task_id, body.completed)
+    doc_repo.update_task_completed(ctx.family_id, task_id, body.completed)
     return TaskUpdateResponse(completed=body.completed)

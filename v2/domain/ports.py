@@ -184,11 +184,11 @@ class DocumentRepository(ABC):
 
 
 class UserConfigRepository(ABC):
-    """ユーザー設定・プロファイルの永続化（Firestore等）"""
+    """ユーザー個人設定の永続化（Firestore等）"""
 
     @abstractmethod
     def get_user(self, uid: str) -> dict:
-        """ユーザー設定を取得（plan, documentsThisMonth, icalToken等）"""
+        """ユーザー設定を取得（icalToken, notification_preferences等）"""
         pass
 
     @abstractmethod
@@ -196,23 +196,83 @@ class UserConfigRepository(ABC):
         """ユーザー設定を更新"""
         pass
 
+
+class FamilyRepository(ABC):
+    """ファミリー・プロファイルの永続化（Firestore等）"""
+
     @abstractmethod
-    def list_profiles(self, uid: str) -> list[UserProfile]:
-        """ユーザーのプロファイル一覧を取得"""
+    def create_family(self, family_id: str, owner_uid: str, name: str) -> None:
+        """ファミリーを作成"""
         pass
 
     @abstractmethod
-    def create_profile(self, uid: str, profile: UserProfile) -> str:
+    def get_family(self, family_id: str) -> dict | None:
+        """ファミリー設定を取得（plan, documents_this_month等）"""
+        pass
+
+    @abstractmethod
+    def update_family(self, family_id: str, data: dict) -> None:
+        """ファミリー設定を更新"""
+        pass
+
+    @abstractmethod
+    def add_member(
+        self, family_id: str, uid: str, role: str, display_name: str, email: str
+    ) -> None:
+        """ファミリーにメンバーを追加"""
+        pass
+
+    @abstractmethod
+    def remove_member(self, family_id: str, uid: str) -> None:
+        """ファミリーからメンバーを削除"""
+        pass
+
+    @abstractmethod
+    def list_members(self, family_id: str) -> list[dict]:
+        """メンバー一覧を取得"""
+        pass
+
+    @abstractmethod
+    def get_member_role(self, family_id: str, uid: str) -> str | None:
+        """メンバーのロールを取得。未参加の場合はNoneを返す"""
+        pass
+
+    @abstractmethod
+    def create_invitation(
+        self, family_id: str, email: str, invited_by_uid: str, token: str
+    ) -> str:
+        """招待を作成。生成されたIDを返す"""
+        pass
+
+    @abstractmethod
+    def get_invitation_by_token(self, token: str) -> dict | None:
+        """招待トークンで招待情報を取得"""
+        pass
+
+    @abstractmethod
+    def accept_invitation(self, invitation_id: str, family_id: str) -> None:
+        """招待ステータスを accepted に更新"""
+        pass
+
+    @abstractmethod
+    def list_profiles(self, family_id: str) -> list[UserProfile]:
+        """ファミリーのプロファイル一覧を取得"""
+        pass
+
+    @abstractmethod
+    def create_profile(self, family_id: str, profile: UserProfile) -> str:
         """プロファイルを作成。生成されたIDを返す"""
         pass
 
     @abstractmethod
-    def update_profile(self, uid: str, profile_id: str, profile: UserProfile) -> None:
+    def update_profile(
+        self, family_id: str, profile_id: str, profile: UserProfile
+    ) -> None:
         """プロファイルを更新"""
         pass
 
     @abstractmethod
-    def delete_profile(self, uid: str, profile_id: str) -> None:
+    def delete_profile(self, family_id: str, profile_id: str) -> None:
         """プロファイルを削除"""
         pass
 
