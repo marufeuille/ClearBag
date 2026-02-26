@@ -173,3 +173,38 @@ export const getSettings = () => get<Settings>("/api/settings");
 
 export const updateSettings = (data: Partial<Settings>) =>
   patch<Settings>("/api/settings", data);
+
+// ── ファミリー ────────────────────────────────────────────────────────────────
+
+export interface FamilyInfo {
+  id: string;
+  name: string;
+  plan: "free" | "premium";
+  documents_this_month: number;
+  role: "owner" | "member";
+}
+
+export interface FamilyMember {
+  uid: string;
+  role: "owner" | "member";
+  display_name: string;
+  email: string;
+}
+
+export interface InviteResult {
+  invitation_id: string;
+  invite_url: string;
+}
+
+export interface JoinResult {
+  family_id: string;
+  name: string;
+  role: string;
+}
+
+export const getFamily = () => get<FamilyInfo>("/api/families/me");
+export const getFamilyMembers = () => get<FamilyMember[]>("/api/families/members");
+export const updateFamilyName = (name: string) => post<FamilyInfo>("/api/families", { name });
+export const inviteMember = (email: string) => post<InviteResult>("/api/families/invite", { email });
+export const joinFamily = (token: string) => post<JoinResult>("/api/families/join", { token });
+export const removeMember = (uid: string) => del(`/api/families/members/${uid}`);

@@ -3,17 +3,32 @@
 import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { NavBar } from "@/components/NavBar";
-import { Settings, getSettings, updateSettings } from "@/lib/api";
+import {
+  Settings, getSettings, updateSettings,
+  FamilyInfo, FamilyMember,
+  getFamily, getFamilyMembers, updateFamilyName, inviteMember, removeMember,
+} from "@/lib/api";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [family, setFamily] = useState<FamilyInfo | null>(null);
+  const [members, setMembers] = useState<FamilyMember[]>([]);
+  const [familyNameInput, setFamilyNameInput] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
-    getSettings()
-      .then(setSettings)
+    Promise.all([getSettings(), getFamily(), getFamilyMembers()])
+      .then(([s, f, m]) => {
+        setSettings(s);
+        setFamily(f);
+        setFamilyNameInput(f.name);
+        setMembers(m);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -31,6 +46,41 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleFamilyNameSave = async () => {
+    if (!family) return;
+    setSaving(true);
+    try {
+      const updated = await updateFamilyName(familyNameInput);
+      setFamily(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleInvite = async () => {
+    if (!inviteEmail) return;
+    setInviting(true);
+    try {
+      const result = await inviteMember(inviteEmail);
+      setInviteUrl(result.invite_url);
+      setInviteEmail("");
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRemoveMember = async (uid: string, displayName: string) => {
+    if (!confirm(`${displayName} をファミリーから削除しますか？`)) return;
+    await removeMember(uid);
+    setMembers((prev) => prev.filter((m) => m.uid !== uid));
+  };
+
+  const copyInviteUrl = () => {
+    navigator.clipboard.writeText(inviteUrl);
   };
 
   const copyIcal = () => {
@@ -73,6 +123,110 @@ export default function SettingsPage() {
                   )}
                 </div>
               </div>
+
+              {/* ファミリー管理 */}
+              {family && (
+                <div className="bg-white rounded-2xl shadow-sm p-4">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-3">ファミリー</h3>
+
+                  {/* ファミリー名 */}
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-1">ファミリー名</p>
+                    {family.role === "owner" ? (
+                      <div className="flex gap-2">
+                        <input
+                          value={familyNameInput}
+                          onChange={(e) => setFamilyNameInput(e.target.value)}
+                          className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2"
+                        />
+                        <button
+                          onClick={handleFamilyNameSave}
+                          disabled={saving}
+                          className="text-xs bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          保存
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-800">{family.name}</p>
+                    )}
+                  </div>
+
+                  {/* メンバー一覧 */}
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-2">メンバー</p>
+                    <div className="flex flex-col gap-2">
+                      {members.map((m) => (
+                        <div key={m.uid} className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-800">
+                              {m.display_name || m.email || m.uid}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {m.role === "owner" ? "オーナー" : "メンバー"}
+                            </p>
+                          </div>
+                          {family.role === "owner" && m.role !== "owner" && (
+                            <button
+                              onClick={() =>
+                                handleRemoveMember(
+                                  m.uid,
+                                  m.display_name || m.email || m.uid
+                                )
+                              }
+                              className="text-xs text-red-400 hover:text-red-600"
+                            >
+                              削除
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 招待（オーナーのみ） */}
+                  {family.role === "owner" && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">メンバーを招待</p>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="email"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          placeholder="メールアドレス"
+                          className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2"
+                        />
+                        <button
+                          onClick={handleInvite}
+                          disabled={inviting || !inviteEmail}
+                          className="text-xs bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 disabled:opacity-50"
+                        >
+                          招待
+                        </button>
+                      </div>
+                      {inviteUrl && (
+                        <div className="flex gap-2">
+                          <input
+                            readOnly
+                            value={inviteUrl}
+                            className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-500"
+                          />
+                          <button
+                            onClick={copyInviteUrl}
+                            className="text-xs bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200"
+                          >
+                            コピー
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {saved && (
+                    <p className="text-xs text-green-500 mt-2">保存しました</p>
+                  )}
+                </div>
+              )}
 
               {/* iCal フィード */}
               <div className="bg-white rounded-2xl shadow-sm p-4">

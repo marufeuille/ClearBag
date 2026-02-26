@@ -5,6 +5,7 @@ GET    /api/families/me        → 200 { id, name, plan, ... }
 GET    /api/families/members   → 200 [{ uid, role, display_name, email }...]
 POST   /api/families/invite    → 201 { invitation_id, invite_url } （Phase 2）
 POST   /api/families/join      → 200 { family_id, name, role }   （Phase 2）
+DELETE /api/families/members/{uid} → 204          （Phase 3）
 """
 
 from __future__ import annotations
@@ -162,8 +163,8 @@ async def invite_member(
         token=token,
     )
 
-    api_base_url = os.environ.get("API_BASE_URL", "")
-    invite_url = f"{api_base_url}/invite?token={token}"
+    frontend_base_url = os.environ.get("FRONTEND_BASE_URL", "")
+    invite_url = f"{frontend_base_url}/invite?token={token}"
 
     logger.info(
         "Invitation created: family_id=%s, email=%s, invitation_id=%s",
@@ -239,3 +240,35 @@ async def join_family(
         name=new_family.get("name", "マイファミリー"),
         role="member",
     )
+
+
+@router.delete("/members/{member_uid}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_member(
+    member_uid: str,
+    ctx: FamilyContext = Depends(require_owner),
+    family_repo: FirestoreFamilyRepository = Depends(get_family_repo),
+    user_repo: FirestoreUserConfigRepository = Depends(get_user_config_repo),
+) -> None:
+    """
+    メンバーをファミリーから削除する（オーナーのみ）。
+
+    オーナー自身の削除は禁止。
+    削除後は users/{uid} の family_id を空にする。
+    """
+    if member_uid == ctx.uid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="オーナー自身を削除することはできません。",
+        )
+
+    members = family_repo.list_members(ctx.family_id)
+    member_uids = [m.get("uid") for m in members]
+    if member_uid not in member_uids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="指定されたメンバーが見つかりません。",
+        )
+
+    family_repo.remove_member(ctx.family_id, member_uid)
+    user_repo.update_user(member_uid, {"family_id": ""})
+    logger.info("Member removed: family_id=%s, uid=%s", ctx.family_id, member_uid)

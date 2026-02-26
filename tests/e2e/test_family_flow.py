@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 from v2.entrypoints.api import deps
 from v2.entrypoints.api.app import app
+from v2.entrypoints.api.deps import AuthInfo
 
 from tests.e2e.conftest import TEST_UID, TEST_UID_2
 
@@ -72,14 +73,18 @@ class TestInvitationFlow:
         token = invite_url.split("token=")[1]
 
         # User2 に切り替えて招待トークンで参加
-        app.dependency_overrides[deps.get_current_uid] = lambda: TEST_UID_2
+        app.dependency_overrides[deps.get_auth_info] = lambda: AuthInfo(
+            uid=TEST_UID_2, email="e2e2@example.com", display_name="E2E User 2"
+        )
         r = e2e_client.post("/api/families/join", json={"token": token})
         assert r.status_code == 200
         join_data = r.json()
         assert join_data["role"] == "member"
 
         # User1 に戻してメンバー数を確認（2 人になっているはず）
-        app.dependency_overrides[deps.get_current_uid] = lambda: TEST_UID
+        app.dependency_overrides[deps.get_auth_info] = lambda: AuthInfo(
+            uid=TEST_UID, email="e2e@example.com", display_name="E2E Test User"
+        )
         r = e2e_client.get("/api/families/members")
         assert r.status_code == 200
         members = r.json()
@@ -99,7 +104,9 @@ class TestInvitationFlow:
         token = r.json()["invite_url"].split("token=")[1]
 
         # User2: 初回参加（成功）
-        app.dependency_overrides[deps.get_current_uid] = lambda: TEST_UID_2
+        app.dependency_overrides[deps.get_auth_info] = lambda: AuthInfo(
+            uid=TEST_UID_2, email="e2e2@example.com", display_name="E2E User 2"
+        )
         r = e2e_client.post("/api/families/join", json={"token": token})
         assert r.status_code == 200
 
@@ -118,7 +125,9 @@ class TestInvitationFlow:
         token = r.json()["invite_url"].split("token=")[1]
 
         # User2: 参加
-        app.dependency_overrides[deps.get_current_uid] = lambda: TEST_UID_2
+        app.dependency_overrides[deps.get_auth_info] = lambda: AuthInfo(
+            uid=TEST_UID_2, email="e2e2@example.com", display_name="E2E User 2"
+        )
         e2e_client.post("/api/families/join", json={"token": token})
 
         # User2 がメンバーとして招待しようとする → 403

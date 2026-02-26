@@ -62,20 +62,29 @@ def _get_firebase_app() -> firebase_admin.App:
 
 # ── 認証 ────────────────────────────────────────────────────────────────────────
 
+
+@dataclass(frozen=True)
+class AuthInfo:
+    """Firebase Auth JWT から取得した認証情報"""
+
+    uid: str
+    email: str
+    display_name: str
+
+
 _bearer = HTTPBearer()
 
 
-async def get_current_uid(
+async def get_auth_info(
     creds: HTTPAuthorizationCredentials = Depends(_bearer),
-) -> str:
+) -> AuthInfo:
     """
-    Authorization: Bearer <id_token> ヘッダーを検証して uid を返す。
+    Authorization: Bearer <id_token> ヘッダーを検証して AuthInfo を返す。
 
     ALLOWED_EMAILS が設定されている場合、許可リスト外のメールアドレスは 403 を返す。
-    （開発環境でのアクセス制限用）
 
     Returns:
-        Firebase Auth の uid（例: "abc123xyz"）
+        AuthInfo（uid, email, display_name）
 
     Raises:
         HTTPException(401): トークンが無効な場合
@@ -91,7 +100,6 @@ async def get_current_uid(
             detail="Invalid or expired Firebase ID token",
         ) from e
 
-    # ── メールアドレス許可リストチェック（ALLOWED_EMAILS が設定されている場合のみ）
     allowed_raw = os.environ.get("ALLOWED_EMAILS", "")
     if allowed_raw:
         allowed = {e.strip().lower() for e in allowed_raw.split(",") if e.strip()}
@@ -103,7 +111,21 @@ async def get_current_uid(
                 detail="このアカウントはアクセスが許可されていません。",
             )
 
-    return decoded["uid"]
+    return AuthInfo(
+        uid=decoded["uid"],
+        email=decoded.get("email", ""),
+        display_name=decoded.get("name", ""),
+    )
+
+
+async def get_current_uid(
+    auth_info: AuthInfo = Depends(get_auth_info),
+) -> str:
+    """
+    get_auth_info() の後方互換ラッパー。uid のみを返す。
+    既存のルートが Depends(get_current_uid) で uid を取得している場合に使用。
+    """
+    return auth_info.uid
 
 
 # ── ファミリーコンテキスト ────────────────────────────────────────────────────
@@ -119,20 +141,18 @@ class FamilyContext:
 
 
 async def get_family_context(
-    uid: str = Depends(get_current_uid),
+    auth_info: AuthInfo = Depends(get_auth_info),
 ) -> FamilyContext:
     """
     uid からファミリーコンテキストを解決する。
 
     users/{uid} に family_id が未設定の場合、自動的に1人ファミリーを作成する。
-    これにより新規ユーザーのオンボーディングが自動化され、ソロ/ファミリー分岐が不要になる。
+    また users/{uid} に email/display_name が未設定の場合、JWT claims から同期する。
 
     Returns:
         FamilyContext（uid, family_id, role）
-
-    Raises:
-        HTTPException(401): Firebase Auth トークンが無効な場合（get_current_uid で発生）
     """
+    uid = auth_info.uid
     db = _get_firestore_client()
     user_repo = FirestoreUserConfigRepository(db)
     family_repo = FirestoreFamilyRepository(db)
@@ -140,11 +160,23 @@ async def get_family_context(
     user_data = user_repo.get_user(uid)
     family_id = user_data.get("family_id")
 
+    # JWT から display_name/email を同期（空の場合のみ）
+    updates: dict = {}
+    if not user_data.get("email") and auth_info.email:
+        updates["email"] = auth_info.email
+    if not user_data.get("display_name") and auth_info.display_name:
+        updates["display_name"] = auth_info.display_name
+    if updates:
+        user_repo.update_user(uid, updates)
+        user_data = {**user_data, **updates}
+
     if not family_id:
         # 初回アクセス時: 1人ファミリーを自動作成
         family_id = str(uuid.uuid4())
-        email = user_data.get("email", "")
-        display_name = user_data.get("display_name", email or uid)
+        email = user_data.get("email", auth_info.email)
+        display_name = user_data.get(
+            "display_name", auth_info.display_name or email or uid
+        )
 
         family_repo.create_family(
             family_id=family_id,
