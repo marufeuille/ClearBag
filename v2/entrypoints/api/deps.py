@@ -174,7 +174,9 @@ async def get_family_context(
         # 初回アクセス時: 1人ファミリーを自動作成
         family_id = str(uuid.uuid4())
         email = user_data.get("email", auth_info.email)
-        display_name = user_data.get("display_name", auth_info.display_name or email or uid)
+        display_name = user_data.get(
+            "display_name", auth_info.display_name or email or uid
+        )
 
         family_repo.create_family(
             family_id=family_id,
