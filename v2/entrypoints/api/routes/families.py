@@ -239,17 +239,22 @@ async def join_family(
         family_id=new_family_id,
         uid=auth_info.uid,
         role="member",
-        display_name=auth_info.display_name or user.get("display_name", user.get("email", auth_info.uid)),
+        display_name=auth_info.display_name
+        or user.get("display_name", user.get("email", auth_info.uid)),
         email=auth_info.email or user.get("email", ""),
     )
 
     # users/{uid} の family_id と is_activated を更新
-    user_repo.update_user(auth_info.uid, {"family_id": new_family_id, "is_activated": True})
+    user_repo.update_user(
+        auth_info.uid, {"family_id": new_family_id, "is_activated": True}
+    )
 
     # 招待を accepted に更新
     family_repo.accept_invitation(invitation["id"], new_family_id)
 
-    logger.info("User joined family: uid=%s, family_id=%s", auth_info.uid, new_family_id)
+    logger.info(
+        "User joined family: uid=%s, family_id=%s", auth_info.uid, new_family_id
+    )
     return JoinResponse(
         family_id=new_family_id,
         name=new_family.get("name", "マイファミリー"),
