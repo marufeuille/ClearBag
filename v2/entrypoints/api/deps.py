@@ -158,6 +158,23 @@ async def get_family_context(
     family_repo = FirestoreFamilyRepository(db)
 
     user_data = user_repo.get_user(uid)
+
+    # ── アクティベーションチェック ──────────────────────────────────────────
+    is_activated = user_data.get("is_activated", False)
+    if not is_activated:
+        # ALLOWED_EMAILS に含まれるユーザーは自動アクティベート（シードユーザー）
+        allowed_raw = os.environ.get("ALLOWED_EMAILS", "")
+        if allowed_raw:
+            allowed = {e.strip().lower() for e in allowed_raw.split(",") if e.strip()}
+            if auth_info.email.lower() in allowed:
+                user_repo.update_user(uid, {"is_activated": True})
+                is_activated = True
+        if not is_activated:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="ACTIVATION_REQUIRED",
+            )
+
     family_id = user_data.get("family_id")
 
     # JWT から display_name/email を同期（空の場合のみ）

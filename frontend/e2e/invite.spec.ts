@@ -69,4 +69,21 @@ test.describe("/invite ページ", () => {
       page.getByText("この招待は使用済みまたは期限切れです")
     ).toBeVisible();
   });
+
+  test("email 不一致 (403 EMAIL_MISMATCH) でエラーメッセージが表示される", async ({
+    page,
+  }) => {
+    await page.route("**/api/families/join", (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "EMAIL_MISMATCH" }),
+      })
+    );
+
+    await page.goto("/invite?token=mismatch-token");
+    await expect(
+      page.getByText("招待先のメールアドレスとログイン中のアカウントが一致しません")
+    ).toBeVisible();
+  });
 });

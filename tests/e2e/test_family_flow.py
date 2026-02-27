@@ -63,10 +63,10 @@ class TestInvitationFlow:
         r = e2e_client.get("/api/families/me")
         assert r.status_code == 200
 
-        # User1: 招待 URL 生成
+        # User1: 招待 URL 生成（User2 の email と一致させる）
         r = e2e_client.post(
             "/api/families/invite",
-            json={"email": "user2@example.com"},
+            json={"email": "e2e2@example.com"},
         )
         assert r.status_code == 201
         invite_url = r.json()["invite_url"]
@@ -99,7 +99,7 @@ class TestInvitationFlow:
         e2e_client.get("/api/families/me")
         r = e2e_client.post(
             "/api/families/invite",
-            json={"email": "user2@example.com"},
+            json={"email": "e2e2@example.com"},
         )
         token = r.json()["invite_url"].split("token=")[1]
 
@@ -120,7 +120,7 @@ class TestInvitationFlow:
         e2e_client.get("/api/families/me")
         r = e2e_client.post(
             "/api/families/invite",
-            json={"email": "user2@example.com"},
+            json={"email": "e2e2@example.com"},
         )
         token = r.json()["invite_url"].split("token=")[1]
 

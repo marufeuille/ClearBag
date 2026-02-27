@@ -21,7 +21,9 @@ from v2.adapters.firestore_repository import (
     FirestoreUserConfigRepository,
 )
 from v2.entrypoints.api.deps import (
+    AuthInfo,
     FamilyContext,
+    get_auth_info,
     get_family_context,
     get_family_repo,
     get_user_config_repo,
@@ -178,7 +180,7 @@ async def invite_member(
 @router.post("/join", response_model=JoinResponse)
 async def join_family(
     body: JoinRequest,
-    ctx: FamilyContext = Depends(get_family_context),
+    auth_info: AuthInfo = Depends(get_auth_info),
     family_repo: FirestoreFamilyRepository = Depends(get_family_repo),
     user_repo: FirestoreUserConfigRepository = Depends(get_user_config_repo),
 ) -> JoinResponse:
@@ -187,8 +189,12 @@ async def join_family(
 
     1. トークンで招待情報を取得
     2. 有効な招待（pending かつ期限内）であることを確認
-    3. 現在のファミリーを離れて新しいファミリーに参加
-    4. users/{uid} の family_id を更新
+    3. 招待 email とログイン email が一致することを確認
+    4. 現在のファミリーを離れて新しいファミリーに参加
+    5. users/{uid} の family_id と is_activated を更新
+
+    注意: get_auth_info を使用（get_family_context は不使用）。
+    未アクティベートユーザーが join フローを通じてアクティベートできるようにするため。
     """
     import datetime
 
@@ -211,6 +217,15 @@ async def join_family(
             detail="招待の有効期限が切れています。",
         )
 
+    # 招待 email とログイン email の照合
+    invited_email = (invitation.get("email") or "").strip().lower()
+    login_email = (auth_info.email or "").strip().lower()
+    if invited_email and login_email and invited_email != login_email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="EMAIL_MISMATCH",
+        )
+
     new_family_id = invitation["family_id"]
     new_family = family_repo.get_family(new_family_id)
     if new_family is None:
@@ -219,22 +234,27 @@ async def join_family(
         )
 
     # メンバーとして追加
-    user = user_repo.get_user(ctx.uid)
+    user = user_repo.get_user(auth_info.uid)
     family_repo.add_member(
         family_id=new_family_id,
-        uid=ctx.uid,
+        uid=auth_info.uid,
         role="member",
-        display_name=user.get("display_name", user.get("email", ctx.uid)),
-        email=user.get("email", ""),
+        display_name=auth_info.display_name
+        or user.get("display_name", user.get("email", auth_info.uid)),
+        email=auth_info.email or user.get("email", ""),
     )
 
-    # users/{uid} の family_id を更新
-    user_repo.update_user(ctx.uid, {"family_id": new_family_id})
+    # users/{uid} の family_id と is_activated を更新
+    user_repo.update_user(
+        auth_info.uid, {"family_id": new_family_id, "is_activated": True}
+    )
 
     # 招待を accepted に更新
     family_repo.accept_invitation(invitation["id"], new_family_id)
 
-    logger.info("User joined family: uid=%s, family_id=%s", ctx.uid, new_family_id)
+    logger.info(
+        "User joined family: uid=%s, family_id=%s", auth_info.uid, new_family_id
+    )
     return JoinResponse(
         family_id=new_family_id,
         name=new_family.get("name", "マイファミリー"),
