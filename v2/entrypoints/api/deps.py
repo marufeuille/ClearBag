@@ -160,20 +160,16 @@ async def get_family_context(
     user_data = user_repo.get_user(uid)
 
     # ── アクティベーションチェック ──────────────────────────────────────────
-    is_activated = user_data.get("is_activated", False)
-    if not is_activated:
-        # ALLOWED_EMAILS に含まれるユーザーは自動アクティベート（シードユーザー）
-        allowed_raw = os.environ.get("ALLOWED_EMAILS", "")
-        if allowed_raw:
-            allowed = {e.strip().lower() for e in allowed_raw.split(",") if e.strip()}
-            if auth_info.email.lower() in allowed:
-                user_repo.update_user(uid, {"is_activated": True})
-                is_activated = True
-        if not is_activated:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="ACTIVATION_REQUIRED",
-            )
+    # is_activated: True のユーザーのみサービスを利用できる。
+    # アクティベーション方法:
+    #   1. 招待リンク経由の join (POST /api/families/join)
+    #   2. Firestore Console から users/{uid}/is_activated を true に設定
+    #   3. scripts/activate_existing_users.py で一括設定
+    if not user_data.get("is_activated", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ACTIVATION_REQUIRED",
+        )
 
     family_id = user_data.get("family_id")
 

@@ -48,9 +48,7 @@ def activate_user(
     logger.info("ACTIVATE uid=%s (dry_run=%s)", uid, dry_run)
 
     if not dry_run:
-        db.collection(_USERS).document(uid).set(
-            {"is_activated": True}, merge=True
-        )
+        db.collection(_USERS).document(uid).set({"is_activated": True}, merge=True)
 
     return True
 
