@@ -70,8 +70,14 @@ def e2e_client(firestore_client):
     - get_blob_storage: MagicMock（GCS を使わない）
     - get_task_queue: None（BackgroundTasks で代替）
     - Firestore: Emulator に接続した実 Client を使用
+    - TEST_UID に is_activated: True を事前設定（アクティベーションチェックを通過）
     """
     deps._firestore_client = firestore_client
+
+    # TEST_UID をアクティベート済みにする（is_activated チェックを通過させる）
+    firestore_client.collection("users").document(TEST_UID).set(
+        {"is_activated": True}, merge=True
+    )
 
     mock_blob = MagicMock()
     mock_blob.upload.return_value = "uploads/test.pdf"

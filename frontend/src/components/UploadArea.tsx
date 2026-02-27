@@ -8,7 +8,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { uploadDocument } from "@/lib/api";
+import { uploadDocument, ApiError } from "@/lib/api";
 
 interface UploadAreaProps {
   onUploaded?: (documentId: string) => void;
@@ -42,7 +42,7 @@ export function UploadArea({ onUploaded, onError }: UploadAreaProps) {
       onUploaded?.(result.id);
     } catch (e) {
       const msg =
-        e instanceof Error && e.message === "FREE_LIMIT_EXCEEDED"
+        e instanceof ApiError && e.status === 402
           ? "無料プランの月間上限（5枚）に達しました。プレミアムプランへのアップグレードをご検討ください。"
           : "アップロードに失敗しました。もう一度お試しください。";
       onError?.(msg);

@@ -12,6 +12,32 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 // E2E テスト時は Firebase ID トークン取得をスキップ
 const IS_E2E = process.env.NEXT_PUBLIC_E2E === "true";
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly detail: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+async function handleResponse<T>(res: Response, method: string, path: string): Promise<T> {
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const body = await res.json();
+      detail = body.detail ?? "";
+    } catch { /* JSON でない場合は空文字 */ }
+    throw new ApiError(res.status, detail, `${method} ${path} failed: ${res.status}`);
+  }
+  if (res.status === 204) {
+    return undefined as unknown as T;
+  }
+  return res.json() as Promise<T>;
+}
+
 export interface DocumentRecord {
   id: string;
   status: "pending" | "processing" | "completed" | "error";
@@ -67,8 +93,7 @@ async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: await authHeaders(),
   });
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
-  return res.json() as Promise<T>;
+  return handleResponse<T>(res, "GET", path);
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
@@ -77,8 +102,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
     headers: await authHeaders(),
     body: body != null ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
-  return res.json() as Promise<T>;
+  return handleResponse<T>(res, "POST", path);
 }
 
 async function patch<T>(path: string, body: unknown): Promise<T> {
@@ -87,8 +111,7 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
     headers: await authHeaders(),
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status}`);
-  return res.json() as Promise<T>;
+  return handleResponse<T>(res, "PATCH", path);
 }
 
 async function del(path: string): Promise<void> {
@@ -96,7 +119,7 @@ async function del(path: string): Promise<void> {
     method: "DELETE",
     headers: await authHeaders(),
   });
-  if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`);
+  await handleResponse<void>(res, "DELETE", path);
 }
 
 // ── ドキュメント ──────────────────────────────────────────────────────────────
@@ -113,11 +136,7 @@ export async function uploadDocument(
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
-  if (res.status === 402) {
-    throw new Error("FREE_LIMIT_EXCEEDED");
-  }
-  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-  return res.json();
+  return handleResponse<{ id: string; status: string }>(res, "POST", "/api/documents/upload");
 }
 
 export const getDocuments = () => get<DocumentRecord[]>("/api/documents");

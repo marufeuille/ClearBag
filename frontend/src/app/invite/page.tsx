@@ -3,9 +3,9 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { joinFamily } from "@/lib/api";
+import { joinFamily, ApiError } from "@/lib/api";
 
-type JoinStatus = "idle" | "joining" | "success" | "invalid_token" | "expired" | "error";
+type JoinStatus = "idle" | "joining" | "success" | "invalid_token" | "expired" | "email_mismatch" | "error";
 
 function InviteContent() {
   const searchParams = useSearchParams();
@@ -24,11 +24,15 @@ function InviteContent() {
         setStatus("success");
         setTimeout(() => router.push("/dashboard"), 2000);
       })
-      .catch((err: Error) => {
-        const msg = err.message;
-        if (msg.includes("404")) setStatus("invalid_token");
-        else if (msg.includes("400")) setStatus("expired");
-        else setStatus("error");
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) {
+          if (err.status === 404) setStatus("invalid_token");
+          else if (err.status === 400) setStatus("expired");
+          else if (err.status === 403 && err.detail === "EMAIL_MISMATCH") setStatus("email_mismatch");
+          else setStatus("error");
+        } else {
+          setStatus("error");
+        }
       });
   }, [user, token, status, router]);
 
@@ -83,6 +87,14 @@ function InviteContent() {
     return (
       <p className="text-red-500 text-sm text-center">
         この招待は使用済みまたは期限切れです。
+      </p>
+    );
+  }
+
+  if (status === "email_mismatch") {
+    return (
+      <p className="text-red-500 text-sm text-center">
+        招待先のメールアドレスとログイン中のアカウントが一致しません。
       </p>
     );
   }
