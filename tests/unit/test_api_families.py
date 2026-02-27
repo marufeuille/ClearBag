@@ -22,7 +22,9 @@ _UID = "test-owner-uid"
 _FAMILY_ID = "test-family-id"
 _OWNER_CONTEXT = FamilyContext(uid=_UID, family_id=_FAMILY_ID, role="owner")
 _MEMBER_CONTEXT = FamilyContext(uid="member-uid", family_id=_FAMILY_ID, role="member")
-_JOIN_AUTH_INFO = AuthInfo(uid="join-uid", email="joiner@example.com", display_name="Joiner")
+_JOIN_AUTH_INFO = AuthInfo(
+    uid="join-uid", email="joiner@example.com", display_name="Joiner"
+)
 
 
 @pytest.fixture
@@ -210,7 +212,9 @@ class TestJoinFamily:
         assert response.status_code == 403
         assert response.json()["detail"] == "EMAIL_MISMATCH"
 
-    def test_successful_join_activates_user(self, join_client, mock_family_repo, mock_user_repo):
+    def test_successful_join_activates_user(
+        self, join_client, mock_family_repo, mock_user_repo
+    ):
         """正常な join で is_activated: True がセットされる"""
         mock_family_repo.get_invitation_by_token.return_value = {
             "id": "inv-id",

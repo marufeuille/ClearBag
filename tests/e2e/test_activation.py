@@ -15,7 +15,7 @@ from v2.entrypoints.api import deps
 from v2.entrypoints.api.app import app
 from v2.entrypoints.api.deps import AuthInfo
 
-from tests.e2e.conftest import TEST_UID, TEST_UID_2
+from tests.e2e.conftest import TEST_UID
 
 pytestmark = pytest.mark.e2e
 
