@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   title: "ClearBag - 学校配布物AIアシスタント",
   description: "学校のお便りをAIが自動解析。カレンダー・タスクに一括登録。",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
