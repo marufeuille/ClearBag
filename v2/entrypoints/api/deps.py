@@ -81,14 +81,11 @@ async def get_auth_info(
     """
     Authorization: Bearer <id_token> ヘッダーを検証して AuthInfo を返す。
 
-    ALLOWED_EMAILS が設定されている場合、許可リスト外のメールアドレスは 403 を返す。
-
     Returns:
         AuthInfo（uid, email, display_name）
 
     Raises:
         HTTPException(401): トークンが無効な場合
-        HTTPException(403): 許可されていないメールアドレスの場合
     """
     _get_firebase_app()
     try:
@@ -99,17 +96,6 @@ async def get_auth_info(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired Firebase ID token",
         ) from e
-
-    allowed_raw = os.environ.get("ALLOWED_EMAILS", "")
-    if allowed_raw:
-        allowed = {e.strip().lower() for e in allowed_raw.split(",") if e.strip()}
-        email = (decoded.get("email") or "").lower()
-        if email not in allowed:
-            logger.warning("Blocked login attempt: email=%s", email)
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="このアカウントはアクセスが許可されていません。",
-            )
 
     return AuthInfo(
         uid=decoded["uid"],
