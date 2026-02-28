@@ -40,6 +40,7 @@ from v2.entrypoints.api.deps import (
     get_family_repo,
     get_task_queue,
 )
+from v2.entrypoints.api.usage import ensure_monthly_reset
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -100,6 +101,7 @@ async def upload_document(
     # ── 無料プランのレート制限チェック ──────────────────────────────────────
     # DISABLE_RATE_LIMIT=true の場合はスキップ（開発環境用）
     family = family_repo.get_family(ctx.family_id) or {}
+    family = ensure_monthly_reset(family_repo, ctx.family_id, family)
     used = family.get("documents_this_month", 0)
     if (
         not os.environ.get("DISABLE_RATE_LIMIT")

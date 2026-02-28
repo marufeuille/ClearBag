@@ -409,6 +409,7 @@ class FirestoreFamilyRepository(FamilyRepository):
                 "name": name,
                 "plan": "free",
                 "documents_this_month": 0,
+                "last_reset_at": firestore.SERVER_TIMESTAMP,
                 "created_at": firestore.SERVER_TIMESTAMP,
                 "updated_at": firestore.SERVER_TIMESTAMP,
             }

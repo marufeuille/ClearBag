@@ -214,6 +214,42 @@ class TestUploadDocument:
         )
         assert response.status_code == 202
 
+    def test_upload_resets_counter_when_month_changed(self, client, mock_family_repo):
+        """月変わりで上限到達していても Lazy Reset されて 202 を返す（402 にならない）"""
+        import datetime
+
+        old_date = datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)
+        mock_family_repo.get_family.return_value = {
+            "plan": "free",
+            "documents_this_month": 5,
+            "last_reset_at": old_date,
+        }
+        response = client.post(
+            "/api/documents/upload",
+            files={"file": ("test.pdf", _make_pdf(), "application/pdf")},
+        )
+        assert response.status_code == 202
+
+    def test_upload_after_reset_calls_update_family_twice(
+        self, client, mock_family_repo
+    ):
+        """月変わりリセット後のアップロード: update_family が2回呼ばれる（リセット + インクリメント）"""
+        import datetime
+
+        old_date = datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)
+        mock_family_repo.get_family.return_value = {
+            "plan": "free",
+            "documents_this_month": 5,
+            "last_reset_at": old_date,
+        }
+        client.post(
+            "/api/documents/upload",
+            files={"file": ("test.pdf", _make_pdf(), "application/pdf")},
+        )
+        # 1回目: Lazy Reset (documents_this_month=0, last_reset_at=now)
+        # 2回目: インクリメント (documents_this_month=1)
+        assert mock_family_repo.update_family.call_count == 2
+
 
 class TestListDocuments:
     """GET /api/documents のテスト"""

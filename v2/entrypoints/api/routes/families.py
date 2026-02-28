@@ -29,6 +29,7 @@ from v2.entrypoints.api.deps import (
     get_user_config_repo,
     require_owner,
 )
+from v2.entrypoints.api.usage import ensure_monthly_reset
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/families", tags=["families"])
@@ -94,6 +95,7 @@ async def create_family(
     logger.info("Family name updated: family_id=%s, name=%s", ctx.family_id, body.name)
 
     family = family_repo.get_family(ctx.family_id) or {}
+    family = ensure_monthly_reset(family_repo, ctx.family_id, family)
     return FamilyResponse(
         id=ctx.family_id,
         name=family.get("name", body.name),
@@ -114,6 +116,7 @@ async def get_my_family(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Family not found"
         )
+    family = ensure_monthly_reset(family_repo, ctx.family_id, family)
     return FamilyResponse(
         id=ctx.family_id,
         name=family.get("name", "マイファミリー"),
