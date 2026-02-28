@@ -288,14 +288,6 @@ module "cloud_tasks_analysis" {
   ]
 }
 
-module "secret_sendgrid_api_key" {
-  source = "../../modules/secret_manager"
-
-  project_id            = var.project_id
-  secret_id             = "clearbag-sendgrid-api-key-dev"
-  service_account_email = google_service_account.cloud_run.email
-}
-
 module "secret_vapid_private_key" {
   source = "../../modules/secret_manager"
 
@@ -335,17 +327,18 @@ module "api_service" {
     # Firebase Hosting のオリジン（カンマ区切り）。GCP プロジェクト = Firebase プロジェクトなので project_id をそのまま使用
     CORS_ORIGINS            = "https://${var.project_id}.web.app,https://${var.project_id}.firebaseapp.com"
     FRONTEND_BASE_URL       = "https://${var.project_id}.web.app"
+    # Web Push VAPID クレームに使用する連絡先メールアドレス（非機密）
+    VAPID_CLAIMS_EMAIL      = var.vapid_claims_email
   }
 
-  # SENDGRID_API_KEY / VAPID_PRIVATE_KEY は Secret Manager にまだ値が未登録のため
-  # 一旦無効化。登録後に secret_env_vars に戻す。
-  secret_env_vars = {}
+  secret_env_vars = {
+    VAPID_PRIVATE_KEY = module.secret_vapid_private_key.secret_id
+  }
 
   depends_on = [
     module.firestore,
     module.cloud_storage_uploads,
     module.cloud_tasks_analysis,
-    module.secret_sendgrid_api_key,
     module.secret_vapid_private_key,
   ]
 }
@@ -387,7 +380,7 @@ module "billing_budget" {
   ]
 }
 
-# 朝のダイジェストメール: 毎朝 7:30 JST に /worker/morning-digest を呼び出す
+# 朝のダイジェスト: 毎朝 7:30 JST に /worker/morning-digest を呼び出す
 module "morning_digest_scheduler" {
   source = "../../modules/cloud_scheduler"
 
@@ -399,6 +392,22 @@ module "morning_digest_scheduler" {
   target_url            = "${module.api_service.service_url}/worker/morning-digest"
   service_account_email = google_service_account.cloud_run.email
   use_oidc              = true  # Cloud Run Service (run.app) の呼び出しには OIDC が必要
+
+  depends_on = [module.api_service]
+}
+
+# イベントリマインダー: 毎晩 20:00 JST に /worker/event-reminder を呼び出す（翌日予定の前日通知）
+module "event_reminder_scheduler" {
+  source = "../../modules/cloud_scheduler"
+
+  project_id            = var.project_id
+  region                = var.region
+  job_name              = "clearbag-event-reminder-dev"
+  schedule              = "0 20 * * *"
+  time_zone             = "Asia/Tokyo"
+  target_url            = "${module.api_service.service_url}/worker/event-reminder"
+  service_account_email = google_service_account.cloud_run.email
+  use_oidc              = true
 
   depends_on = [module.api_service]
 }
