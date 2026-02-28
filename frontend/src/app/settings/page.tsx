@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
   const [pushSupported, setPushSupported] = useState(true);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
     setPushSupported(isPushSupported());
@@ -45,6 +46,7 @@ export default function SettingsPage() {
   const handlePushToggle = async () => {
     if (!settings) return;
     setSaving(true);
+    setPushError(null);
     try {
       if (!settings.notification_web_push) {
         // ON: Push 許可取得 → バックエンド登録 → 設定更新
@@ -66,6 +68,8 @@ export default function SettingsPage() {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
+    } catch (e) {
+      setPushError(e instanceof Error ? e.message : "通知の設定に失敗しました");
     } finally {
       setSaving(false);
     }
@@ -299,6 +303,9 @@ export default function SettingsPage() {
                         <p className="text-xs text-orange-500 mt-0.5">
                           ブラウザの設定から通知を許可してください
                         </p>
+                      )}
+                      {pushError && (
+                        <p className="text-xs text-red-500 mt-0.5">{pushError}</p>
                       )}
                     </div>
                     <button
