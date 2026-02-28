@@ -1,10 +1,11 @@
 name: terraform plan prod
 
 on:
-  pull_request:
-    paths:
-      - "terraform/environments/prod/**"
-      - "terraform/modules/**"
+  # prod プロジェクト未作成のため一時無効化
+  # pull_request:
+  #   paths:
+  #     - "terraform/environments/prod/**"
+  #     - "terraform/modules/**"
   workflow_dispatch:
 
 permissions:
