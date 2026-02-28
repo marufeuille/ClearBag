@@ -21,6 +21,12 @@ variable "alert_thresholds" {
   default     = [0.5, 0.8, 1.0, 1.5]
 }
 
+variable "currency_code" {
+  description = "予算通貨コード（請求アカウントの通貨と一致させること）"
+  type        = string
+  default     = "USD"
+}
+
 variable "notification_channel_name" {
   description = "Cloud Monitoring 通知チャンネルのリソース名"
   type        = string
