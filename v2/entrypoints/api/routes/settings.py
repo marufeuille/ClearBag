@@ -23,6 +23,7 @@ from v2.entrypoints.api.deps import (
     get_family_repo,
     get_user_config_repo,
 )
+from v2.entrypoints.api.usage import ensure_monthly_reset
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -52,6 +53,7 @@ async def get_settings(
     """ユーザー設定を返す"""
     user = user_repo.get_user(ctx.uid)
     family = family_repo.get_family(ctx.family_id) or {}
+    family = ensure_monthly_reset(family_repo, ctx.family_id, family)
 
     # icalToken が未設定の場合は初期化（個人単位）
     ical_token = user.get("ical_token")
