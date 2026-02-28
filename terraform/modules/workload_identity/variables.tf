@@ -19,3 +19,9 @@ variable "sa_account_id" {
   type        = string
   default     = "github-actions-deploy"
 }
+
+variable "ref_condition" {
+  description = "WIF attribute_condition に使用する ref 制限の条件式（assertion.ref に対する条件）"
+  type        = string
+  default     = "assertion.ref == 'refs/heads/main'"
+}

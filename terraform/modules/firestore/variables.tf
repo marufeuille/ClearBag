@@ -13,3 +13,9 @@ variable "service_account_email" {
   type        = string
   description = "Firestore への読み書き権限を付与するサービスアカウント"
 }
+
+variable "deletion_policy" {
+  type        = string
+  description = "Firestore DB の削除ポリシー。prod は ABANDON、dev は DELETE"
+  default     = "DELETE"
+}

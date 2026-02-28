@@ -5,7 +5,7 @@ resource "google_firestore_database" "this" {
   type        = "FIRESTORE_NATIVE"
 
   # 誤削除防止
-  deletion_policy = "DELETE"
+  deletion_policy = var.deletion_policy
 }
 
 # Cloud Run Service / Worker SA に Firestore の読み書き権限を付与
