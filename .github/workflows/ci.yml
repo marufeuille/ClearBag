@@ -8,6 +8,8 @@ on:
       - "tests/**"
       - "pyproject.toml"
       - "uv.lock"
+      - "firestore.rules"
+      - "firebase.json"
       - ".github/workflows/ci.yml"
 
 jobs:
@@ -102,3 +104,40 @@ jobs:
 
       - name: Run E2E tests
         run: uv run pytest tests/e2e/ -m e2e -v
+
+  firestore-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Start Firestore Emulator
+        run: |
+          firebase emulators:start --only firestore --project rules-test &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8080/ 2>/dev/null; then
+              echo "Firestore Emulator is ready"
+              exit 0
+            fi
+            echo "Waiting for emulator... ($i/30)"
+            sleep 1
+          done
+          echo "ERROR: Firestore Emulator did not start within 30 seconds"
+          exit 1
+
+      - name: Run Firestore rules tests
+        env:
+          FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080"
+          PROJECT_ID: "rules-test"
+        run: bash scripts/test_firestore_rules.sh
