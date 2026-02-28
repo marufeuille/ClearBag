@@ -63,3 +63,9 @@ variable "currency_code" {
   type        = string
   default     = "JPY"
 }
+
+variable "vapid_claims_email" {
+  description = "Web Push VAPID クレームの連絡先メールアドレス（mailto: に使用）"
+  type        = string
+  default     = ""
+}
