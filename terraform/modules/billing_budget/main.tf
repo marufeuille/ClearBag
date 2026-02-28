@@ -2,12 +2,17 @@
 # GCP 予算アラート
 # ---------------------------------------------------------------------------
 
+# budget_filter.projects は "projects/{PROJECT_NUMBER}" 形式が必要
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 resource "google_billing_budget" "this" {
   billing_account = var.billing_account_id
   display_name    = "Monthly Budget - ${var.project_id}"
 
   budget_filter {
-    projects = ["projects/${var.project_id}"]
+    projects = ["projects/${data.google_project.this.number}"]
   }
 
   amount {
