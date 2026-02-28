@@ -10,25 +10,57 @@
     # 本番実行（全ユーザー）
     python scripts/activate_existing_users.py
 
-    # 特定ユーザーのみ
+    # 特定ユーザーのみ（UID 指定）
     python scripts/activate_existing_users.py --uid <uid>
+
+    # メールアドレスで指定（未ログインユーザーも事前有効化可能）
+    python scripts/activate_existing_users.py --email user@example.com
+    python scripts/activate_existing_users.py --email user@example.com --dry-run
 
 処理内容:
     users/{uid} に is_activated: True を set(merge=True) で書き込む。
     既に is_activated: True の場合はスキップ（冪等）。
+    --email 指定時は Firebase Auth でメール→UID を解決してから書き込む。
+    Firestore ドキュメントが未作成でも set(merge=True) で新規作成される。
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 
+import firebase_admin
+from firebase_admin import auth as fb_auth
+from firebase_admin import credentials as fb_creds
 from google.cloud import firestore
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 _USERS = "users"
+
+
+def _init_firebase() -> None:
+    """Firebase Admin SDK を初期化（未初期化の場合のみ）。"""
+    if not firebase_admin._apps:
+        project_id = os.environ.get("PROJECT_ID")
+        cred = fb_creds.ApplicationDefault()
+        firebase_admin.initialize_app(
+            cred,
+            options={"projectId": project_id} if project_id else {},
+        )
+
+
+def resolve_uid_by_email(email: str) -> str:
+    """Firebase Auth でメールアドレスから UID を取得する。"""
+    _init_firebase()
+    try:
+        user = fb_auth.get_user_by_email(email)
+        logger.info("Resolved uid=%s for email=%s", user.uid, email)
+        return user.uid
+    except fb_auth.UserNotFoundError:
+        raise SystemExit(f"Firebase Auth にユーザーが見つかりません: {email}")
 
 
 def activate_user(
@@ -68,11 +100,27 @@ def main() -> None:
         default=None,
         help="Activate only this specific uid (optional)",
     )
+    parser.add_argument(
+        "--email",
+        type=str,
+        default=None,
+        help="Firebase Auth のメールアドレスで UID を解決してアクティベート (optional)",
+    )
     args = parser.parse_args()
 
-    db = firestore.Client()
+    if args.uid and args.email:
+        raise SystemExit("--uid と --email は同時に指定できません")
 
-    if args.uid:
+    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    db = firestore.Client(project=project_id)
+    logger.info("Firestore client initialized project=%s", project_id)
+
+    if args.email:
+        uid = resolve_uid_by_email(args.email)
+        snap = db.collection(_USERS).document(uid).get()
+        # Firestore ドキュメント未作成でも set(merge=True) で新規作成する
+        activate_user(db, uid, snap.to_dict() or {}, dry_run=args.dry_run)
+    elif args.uid:
         snap = db.collection(_USERS).document(args.uid).get()
         if not snap.exists:
             logger.error("User not found: uid=%s", args.uid)
