@@ -11,6 +11,9 @@ on:
       - "frontend/package-lock.json"
       - ".github/workflows/ci-frontend.yml"
 
+permissions:
+  contents: read
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
@@ -18,9 +21,9 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: "20"
           cache: "npm"
@@ -29,8 +32,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Security audit (npm audit)
+        # next-pwa の transitive dep (serialize-javascript) に既知の high CVE があり
+        # npm audit fix --force で破壊的変更が必要なため critical のみチェック
+        # 詳細: https://github.com/marufeuille/ClearBag/issues/92
+        run: npm audit --audit-level=critical
+
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}

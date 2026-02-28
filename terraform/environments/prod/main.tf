@@ -173,6 +173,7 @@ module "workload_identity" {
   github_repo   = "marufeuille/ClearBag"
   pool_id       = "github-actions-prod"
   sa_account_id = "github-actions-deploy-prod"
+  ref_condition = "assertion.ref == 'refs/heads/main' || assertion.ref.matches('refs/tags/v.*')"
 }
 
 # GitHub Actions prod SA に付与する IAM ロール

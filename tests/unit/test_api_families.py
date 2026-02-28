@@ -212,6 +212,24 @@ class TestJoinFamily:
         assert response.status_code == 403
         assert response.json()["detail"] == "EMAIL_MISMATCH"
 
+    def test_empty_login_email_returns_400(self, mock_family_repo, mock_user_repo):
+        """ログインユーザーのメールが空の場合 400 を返す"""
+        no_email_auth = AuthInfo(uid="no-email-uid", email=None, display_name="NoEmail")
+        app.dependency_overrides[get_auth_info] = lambda: no_email_auth
+        app.dependency_overrides[get_family_repo] = lambda: mock_family_repo
+        app.dependency_overrides[get_user_config_repo] = lambda: mock_user_repo
+        mock_family_repo.get_invitation_by_token.return_value = {
+            "id": "inv-id",
+            "family_id": _FAMILY_ID,
+            "status": "pending",
+            "email": "invited@example.com",
+            "token": "valid-token",
+        }
+        with TestClient(app) as c:
+            response = c.post("/api/families/join", json={"token": "valid-token"})
+        app.dependency_overrides.clear()
+        assert response.status_code == 400
+
     def test_successful_join_activates_user(
         self, join_client, mock_family_repo, mock_user_repo
     ):
@@ -238,3 +256,27 @@ class TestJoinFamily:
             _JOIN_AUTH_INFO.uid,
             {"family_id": _FAMILY_ID, "is_activated": True},
         )
+
+
+class TestRemoveMember:
+    """DELETE /api/families/members/{uid} のテスト"""
+
+    def test_removes_member_and_clears_activation(
+        self, owner_client, mock_family_repo, mock_user_repo
+    ):
+        """メンバー削除時に is_activated: False が設定される"""
+        member_uid = "member-to-remove"
+        mock_family_repo.list_members.return_value = [
+            {"uid": _UID, "role": "owner"},
+            {"uid": member_uid, "role": "member"},
+        ]
+        response = owner_client.delete(f"/api/families/members/{member_uid}")
+        assert response.status_code == 204
+        mock_user_repo.update_user.assert_called_once_with(
+            member_uid, {"family_id": "", "is_activated": False}
+        )
+
+    def test_cannot_remove_self(self, owner_client):
+        """オーナー自身は削除できない（400）"""
+        response = owner_client.delete(f"/api/families/members/{_UID}")
+        assert response.status_code == 400

@@ -220,7 +220,12 @@ async def join_family(
     # 招待 email とログイン email の照合
     invited_email = (invitation.get("email") or "").strip().lower()
     login_email = (auth_info.email or "").strip().lower()
-    if invited_email and login_email and invited_email != login_email:
+    if not login_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="メールアドレスが確認できません",
+        )
+    if invited_email and invited_email != login_email:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="EMAIL_MISMATCH",
@@ -290,5 +295,5 @@ async def remove_member(
         )
 
     family_repo.remove_member(ctx.family_id, member_uid)
-    user_repo.update_user(member_uid, {"family_id": ""})
+    user_repo.update_user(member_uid, {"family_id": "", "is_activated": False})
     logger.info("Member removed: family_id=%s, uid=%s", ctx.family_id, member_uid)
