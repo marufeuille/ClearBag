@@ -64,7 +64,7 @@ jobs:
           --cov-report=term-missing
 
       - name: Security audit (pip-audit)
-        run: uv run pip-audit
+        run: uv export --no-hashes | uvx pip-audit -r /dev/stdin
 
   e2e:
     runs-on: ubuntu-latest
