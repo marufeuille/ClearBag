@@ -1,7 +1,5 @@
 """v2/adapters/credentials.py のユニットテスト"""
 
-import pytest
-
 from v2.adapters.credentials import _is_cloud_environment, get_google_credentials
 
 
@@ -49,7 +47,9 @@ class TestGetGoogleCredentials:
         import unittest.mock as mock
 
         mock_creds = mock.MagicMock()
-        with mock.patch("google.auth.default", return_value=(mock_creds, "project-id")) as mock_adc:
+        with mock.patch(
+            "google.auth.default", return_value=(mock_creds, "project-id")
+        ) as mock_adc:
             result = get_google_credentials()
             mock_adc.assert_called_once()
             assert result is mock_creds
@@ -61,7 +61,9 @@ class TestGetGoogleCredentials:
         import unittest.mock as mock
 
         mock_creds = mock.MagicMock()
-        with mock.patch("google.auth.default", return_value=(mock_creds, "project-id")) as mock_adc:
+        with mock.patch(
+            "google.auth.default", return_value=(mock_creds, "project-id")
+        ) as mock_adc:
             result = get_google_credentials()
             mock_adc.assert_called_once()
             assert result is mock_creds

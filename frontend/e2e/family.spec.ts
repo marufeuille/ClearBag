@@ -17,7 +17,6 @@ async function mockFamilyApis(
         plan: "free",
         documents_this_month: 0,
         ical_url: "",
-        notification_email: false,
         notification_web_push: false,
       }),
     })

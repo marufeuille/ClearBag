@@ -35,12 +35,10 @@ class SettingsResponse(BaseModel):
     plan: str
     documents_this_month: int
     ical_url: str
-    notification_email: bool
     notification_web_push: bool
 
 
 class SettingsUpdateRequest(BaseModel):
-    notification_email: bool | None = None
     notification_web_push: bool | None = None
 
 
@@ -69,7 +67,6 @@ async def get_settings(
         plan=family.get("plan", "free"),
         documents_this_month=family.get("documents_this_month", 0),
         ical_url=ical_url,
-        notification_email=prefs.get("email", True),
         notification_web_push=prefs.get("web_push", False),
     )
 
@@ -83,8 +80,6 @@ async def update_settings(
 ) -> SettingsResponse:
     """設定を部分更新する"""
     update: dict = {}
-    if body.notification_email is not None:
-        update["notification_preferences.email"] = body.notification_email
     if body.notification_web_push is not None:
         update["notification_preferences.web_push"] = body.notification_web_push
 

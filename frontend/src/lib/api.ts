@@ -77,7 +77,6 @@ export interface Settings {
   plan: "free" | "premium";
   documents_this_month: number;
   ical_url: string;
-  notification_email: boolean;
   notification_web_push: boolean;
 }
 
@@ -220,6 +219,26 @@ export interface JoinResult {
   name: string;
   role: string;
 }
+
+// ── Push サブスクリプション ───────────────────────────────────────────────────
+
+export interface PushSubscriptionKeys {
+  auth: string;
+  p256dh: string;
+}
+
+export async function registerPushSubscription(
+  endpoint: string,
+  keys: PushSubscriptionKeys,
+): Promise<void> {
+  await post<void>("/api/push-subscriptions", { endpoint, keys });
+}
+
+export async function deletePushSubscription(): Promise<void> {
+  await post<void>("/api/push-subscriptions/unsubscribe");
+}
+
+// ── ファミリー ────────────────────────────────────────────────────────────────
 
 export const getFamily = () => get<FamilyInfo>("/api/families/me");
 export const getFamilyMembers = () => get<FamilyMember[]>("/api/families/members");

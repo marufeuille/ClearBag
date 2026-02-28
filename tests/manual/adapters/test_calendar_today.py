@@ -4,6 +4,7 @@
 """
 
 from datetime import datetime, timedelta
+
 from dotenv import load_dotenv
 from v2.adapters.credentials import get_google_credentials
 from v2.adapters.google_calendar import GoogleCalendarService

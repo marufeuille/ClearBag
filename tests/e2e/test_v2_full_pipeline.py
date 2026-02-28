@@ -14,6 +14,7 @@ v2アーキテクチャの統合テスト（End-to-End）
 """
 
 import logging
+
 from v2.entrypoints.factory import create_orchestrator
 
 # ログレベル設定（詳細表示）
@@ -59,7 +60,9 @@ else:
 
         print(f"    📝 Summary: {result.analysis.summary}")
         print(f"    📂 Category: {result.analysis.category.value}")
-        print(f"    👥 Related Profiles: {', '.join(result.analysis.related_profile_ids) or 'None'}")
+        print(
+            f"    👥 Related Profiles: {', '.join(result.analysis.related_profile_ids) or 'None'}"
+        )
 
         print(f"\n    📅 Events Created: {result.events_created}")
         for j, event in enumerate(result.analysis.events, 1):
@@ -73,7 +76,9 @@ else:
             print(f"          Due: {task.due_date}")
             print(f"          Assignee: {task.assignee}")
 
-        print(f"\n    📢 Notification Sent: {'Yes' if result.notification_sent else 'No'}")
+        print(
+            f"\n    📢 Notification Sent: {'Yes' if result.notification_sent else 'No'}"
+        )
         print(f"    📦 Archived: {'Yes' if result.archived else 'No'}")
         if result.archived:
             print(f"    📦 Archive Name: {result.analysis.archive_filename}")

@@ -7,28 +7,29 @@
 - Protocol時代と同じ書き方でOK
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 from v2.domain.models import (
     Category,
+    DocumentAnalysis,
+    EventData,
+    FileInfo,
     Profile,
     Rule,
-    EventData,
     TaskData,
-    DocumentAnalysis,
-    FileInfo,
 )
 from v2.domain.ports import (
-    ConfigSource,
-    FileStorage,
-    DocumentAnalyzer,
     CalendarService,
-    TaskService,
+    ConfigSource,
+    DocumentAnalyzer,
+    FileStorage,
     Notifier,
+    TaskService,
 )
 
-
 # ========== サンプルデータ ==========
+
 
 @pytest.fixture
 def sample_profile_child1() -> Profile:
@@ -121,7 +122,9 @@ def sample_task() -> TaskData:
 
 
 @pytest.fixture
-def sample_analysis(sample_event_high, sample_event_low, sample_task) -> DocumentAnalysis:
+def sample_analysis(
+    sample_event_high, sample_event_low, sample_task
+) -> DocumentAnalysis:
     """サンプル解析結果"""
     return DocumentAnalysis(
         summary="遠足のお知らせです。4月25日に動物園へ行きます。",
@@ -134,6 +137,7 @@ def sample_analysis(sample_event_high, sample_event_low, sample_task) -> Documen
 
 
 # ========== モックフィクスチャ ==========
+
 
 @pytest.fixture
 def mock_config(sample_profiles, sample_rule) -> MagicMock:

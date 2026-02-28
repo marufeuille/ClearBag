@@ -22,7 +22,6 @@ dependencies = [
     # --- カレンダーフィード ---
     "icalendar>=6.0.0",
     # --- 通知 ---
-    "sendgrid>=6.11.0",
     "pywebpush>=2.0.0",
     # --- リトライ ---
     "tenacity>=9.0.0",

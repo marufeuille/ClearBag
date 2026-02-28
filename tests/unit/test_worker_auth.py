@@ -55,6 +55,7 @@ def test_no_auth_header_returns_401():
 
 def test_invalid_token_returns_401():
     """検証に失敗するトークンは 401 を返す"""
+
     def _raise(token, request, audience):  # noqa: ARG001
         raise ValueError("invalid token")
 
@@ -79,6 +80,7 @@ def test_invalid_token_returns_401():
 
 def test_email_mismatch_returns_401():
     """有効なトークンでも email が一致しない場合は 401 を返す"""
+
     def _wrong_email(token, request, audience):  # noqa: ARG001
         return {"email": "attacker@evil.iam.gserviceaccount.com"}
 
@@ -165,7 +167,11 @@ def test_morning_digest_also_protected():
 
 def test_missing_env_var_returns_401():
     """WORKER_SERVICE_ACCOUNT_EMAIL 未設定時は fail-closed で 401 を返す"""
-    env = {k: v for k, v in __import__("os").environ.items() if k != "WORKER_SERVICE_ACCOUNT_EMAIL"}
+    env = {
+        k: v
+        for k, v in __import__("os").environ.items()
+        if k != "WORKER_SERVICE_ACCOUNT_EMAIL"
+    }
 
     with patch.dict("os.environ", env, clear=True):
         client = TestClient(app, raise_server_exceptions=False)

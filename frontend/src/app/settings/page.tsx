@@ -8,6 +8,12 @@ import {
   FamilyInfo, FamilyMember,
   getFamily, getFamilyMembers, updateFamilyName, inviteMember, removeMember,
 } from "@/lib/api";
+import {
+  isPushSupported,
+  getPermissionState,
+  subscribePush,
+  unsubscribePush,
+} from "@/lib/pushSubscription";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -20,8 +26,12 @@ export default function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
   const [inviting, setInviting] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
+  const [pushSupported, setPushSupported] = useState(true);
 
   useEffect(() => {
+    setPushSupported(isPushSupported());
+    setPushPermission(getPermissionState());
     Promise.all([getSettings(), getFamily(), getFamilyMembers()])
       .then(([s, f, m]) => {
         setSettings(s);
@@ -32,17 +42,30 @@ export default function SettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleToggle = async (
-    key: "notification_email" | "notification_web_push"
-  ) => {
+  const handlePushToggle = async () => {
     if (!settings) return;
-    const updated = { ...settings, [key]: !settings[key] };
-    setSettings(updated);
     setSaving(true);
     try {
-      await updateSettings({ [key]: updated[key] });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      if (!settings.notification_web_push) {
+        // ON: Push 許可取得 → バックエンド登録 → 設定更新
+        const granted = await subscribePush();
+        if (granted) {
+          const updated = await updateSettings({ notification_web_push: true });
+          setSettings(updated);
+          setPushPermission(getPermissionState());
+          setSaved(true);
+          setTimeout(() => setSaved(false), 2000);
+        } else {
+          setPushPermission(getPermissionState());
+        }
+      } else {
+        // OFF: Push 解除 → バックエンド削除 → 設定更新
+        await unsubscribePush();
+        const updated = await updateSettings({ notification_web_push: false });
+        setSettings(updated);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
     } finally {
       setSaving(false);
     }
@@ -264,37 +287,28 @@ export default function SettingsPage() {
                   通知
                 </h3>
                 <div className="flex flex-col gap-3">
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-gray-700">メール通知</span>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm text-gray-700">プッシュ通知</span>
+                      {!pushSupported && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          このブラウザはプッシュ通知に対応していません
+                        </p>
+                      )}
+                      {pushSupported && pushPermission === "denied" && (
+                        <p className="text-xs text-orange-500 mt-0.5">
+                          ブラウザの設定から通知を許可してください
+                        </p>
+                      )}
+                    </div>
                     <button
-                      onClick={() => handleToggle("notification_email")}
-                      disabled={saving}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        settings.notification_email
-                          ? "bg-blue-500"
-                          : "bg-gray-200"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                          settings.notification_email
-                            ? "translate-x-6"
-                            : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                  </label>
-
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-gray-700">プッシュ通知</span>
-                    <button
-                      onClick={() => handleToggle("notification_web_push")}
-                      disabled={saving}
+                      onClick={handlePushToggle}
+                      disabled={saving || !pushSupported || pushPermission === "denied"}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         settings.notification_web_push
                           ? "bg-blue-500"
                           : "bg-gray-200"
-                      }`}
+                      } disabled:opacity-40`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
@@ -304,7 +318,7 @@ export default function SettingsPage() {
                         }`}
                       />
                     </button>
-                  </label>
+                  </div>
                 </div>
 
                 {saved && (

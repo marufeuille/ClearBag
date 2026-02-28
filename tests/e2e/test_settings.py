@@ -23,34 +23,14 @@ class TestSettings:
         assert data["documents_this_month"] == 0
         assert "ical_url" in data
         assert data["ical_url"]  # 空でない URL が返る
-        assert data["notification_email"] is True  # デフォルト on
+        assert "notification_email" not in data  # メール通知は廃止
         assert data["notification_web_push"] is False  # デフォルト off
-
-    def test_update_notification_email(self, e2e_client):
-        """メール通知を無効化できる"""
-        r = e2e_client.patch("/api/settings", json={"notification_email": False})
-        assert r.status_code == 200
-        data = r.json()
-        assert data["notification_email"] is False
-        assert data["notification_web_push"] is False  # 変更なし
 
     def test_update_notification_web_push(self, e2e_client):
         """Web Push 通知を有効化できる"""
         r = e2e_client.patch("/api/settings", json={"notification_web_push": True})
         assert r.status_code == 200
         data = r.json()
-        assert data["notification_email"] is True  # 変更なし
-        assert data["notification_web_push"] is True
-
-    def test_update_both_notifications(self, e2e_client):
-        """両方の通知設定を同時に更新できる"""
-        r = e2e_client.patch(
-            "/api/settings",
-            json={"notification_email": False, "notification_web_push": True},
-        )
-        assert r.status_code == 200
-        data = r.json()
-        assert data["notification_email"] is False
         assert data["notification_web_push"] is True
 
     def test_ical_url_is_stable_across_requests(self, e2e_client):
@@ -66,4 +46,7 @@ class TestSettings:
         r_before = e2e_client.get("/api/settings")
         r = e2e_client.patch("/api/settings", json={})
         assert r.status_code == 200
-        assert r.json()["notification_email"] == r_before.json()["notification_email"]
+        assert (
+            r.json()["notification_web_push"]
+            == r_before.json()["notification_web_push"]
+        )

@@ -113,3 +113,61 @@ class WebPushNotifier:
             body=f"「{filename}」の解析が完了しました",
             url=f"/documents/{document_id}",
         )
+
+    def notify_morning_digest(
+        self,
+        subscription: PushSubscription,
+        event_count: int,
+        task_count: int,
+    ) -> None:
+        """
+        朝のダイジェストプッシュ通知を送信する。
+
+        イベント・タスクが0件の場合は送信をスキップする。
+
+        Args:
+            subscription: 送信先のプッシュサブスクリプション
+            event_count: 今後7日間のイベント件数
+            task_count: 未完了タスク件数
+        """
+        if event_count == 0 and task_count == 0:
+            logger.debug("Morning digest skipped: no events or tasks")
+            return
+
+        parts = []
+        if event_count > 0:
+            parts.append(f"予定 {event_count}件")
+        if task_count > 0:
+            parts.append(f"タスク {task_count}件")
+        body = "今週の " + "、".join(parts) + " があります"
+
+        self.send(
+            subscription=subscription,
+            title="ClearBag ダイジェスト",
+            body=body,
+            url="/calendar",
+        )
+
+    def notify_event_reminder(
+        self,
+        subscription: PushSubscription,
+        events: list,
+    ) -> None:
+        """
+        翌日のイベントリマインダープッシュ通知を送信する。
+
+        Args:
+            subscription: 送信先のプッシュサブスクリプション
+            events: 翌日のイベントリスト（EventData のリスト）
+        """
+        count = len(events)
+        if count == 0:
+            return
+
+        body = f"明日の予定が {count}件 あります"
+        self.send(
+            subscription=subscription,
+            title="明日の予定リマインダー",
+            body=body,
+            url="/calendar",
+        )
