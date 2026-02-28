@@ -9,6 +9,7 @@ DELETE /api/documents/{id}   → 204
 from __future__ import annotations
 
 import hashlib
+import io
 import logging
 import os
 import uuid
@@ -22,6 +23,7 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel
+from pypdf import PdfReader
 
 from v2.adapters.cloud_storage import GCSBlobStorage
 from v2.adapters.cloud_tasks_queue import CloudTasksQueue
@@ -43,6 +45,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 _FREE_PLAN_LIMIT = 5  # 無料プランの月間解析枚数上限
+_MAX_UPLOAD_SIZE_MB = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "10"))
+_MAX_UPLOAD_SIZE_BYTES = _MAX_UPLOAD_SIZE_MB * 1024 * 1024
+_MAX_PDF_PAGES = int(os.environ.get("MAX_PDF_PAGES", "3"))
 
 
 class UploadResponse(BaseModel):
@@ -106,7 +111,23 @@ async def upload_document(
             detail=f"無料プランの月間上限（{_FREE_PLAN_LIMIT}枚）に達しました。プレミアムプランへのアップグレードをご検討ください。",
         )
 
+    # ── ファイルサイズ事前チェック（file.size が取得できる場合） ──────────────
+    if file.size is not None and file.size > _MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"ファイルサイズが上限（{_MAX_UPLOAD_SIZE_MB}MB）を超えています。",
+        )
+
     content = await file.read()
+
+    # ── ファイルサイズ事後チェック（file.size が None だったケースのフォールバック） ─
+    if len(content) > _MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"ファイルサイズが上限（{_MAX_UPLOAD_SIZE_MB}MB）を超えています。",
+        )
+
+    mime_type = file.content_type or "application/octet-stream"
 
     # ── 冪等性チェック（SHA-256 による重複排除） ────────────────────────────
     content_hash = hashlib.sha256(content).hexdigest()
@@ -119,9 +140,24 @@ async def upload_document(
         )
         return UploadResponse(id=existing.id, status=existing.status)
 
+    # ── PDF ページ数チェック ───────────────────────────────────────────────
+    if mime_type == "application/pdf":
+        try:
+            reader = PdfReader(io.BytesIO(content))
+            num_pages = len(reader.pages)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="PDF ファイルを読み取れませんでした。ファイルが破損していないか確認してください。",
+            ) from None
+        if num_pages > _MAX_PDF_PAGES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"PDF のページ数（{num_pages}ページ）が上限（{_MAX_PDF_PAGES}ページ）を超えています。",
+            )
+
     # ── GCS にファイルを保存 ─────────────────────────────────────────────────
     document_id = str(uuid.uuid4())
-    mime_type = file.content_type or "application/octet-stream"
     ext = _ext_from_mime(mime_type)
     storage_path = f"uploads/{ctx.family_id}/{document_id}{ext}"
     storage.upload(storage_path, content, mime_type)

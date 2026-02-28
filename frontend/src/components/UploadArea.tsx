@@ -10,6 +10,9 @@
 import { useRef, useState } from "react";
 import { uploadDocument, ApiError } from "@/lib/api";
 
+const MAX_UPLOAD_SIZE_MB = 10;
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+
 interface UploadAreaProps {
   onUploaded?: (documentId: string) => void;
   onError?: (error: string) => void;
@@ -36,16 +39,27 @@ export function UploadArea({ onUploaded, onError }: UploadAreaProps) {
       return;
     }
 
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      onError?.(`ファイルサイズが上限（${MAX_UPLOAD_SIZE_MB}MB）を超えています。`);
+      return;
+    }
+
     setUploading(true);
     try {
       const result = await uploadDocument(file);
       onUploaded?.(result.id);
     } catch (e) {
-      const msg =
-        e instanceof ApiError && e.status === 402
-          ? "無料プランの月間上限（5枚）に達しました。プレミアムプランへのアップグレードをご検討ください。"
-          : "アップロードに失敗しました。もう一度お試しください。";
-      onError?.(msg);
+      if (e instanceof ApiError) {
+        if (e.status === 402) {
+          onError?.("無料プランの月間上限（5枚）に達しました。プレミアムプランへのアップグレードをご検討ください。");
+        } else if (e.status === 413 || e.status === 422) {
+          onError?.(e.detail || "ファイルの処理に失敗しました。");
+        } else {
+          onError?.("アップロードに失敗しました。もう一度お試しください。");
+        }
+      } else {
+        onError?.("アップロードに失敗しました。もう一度お試しください。");
+      }
     } finally {
       setUploading(false);
     }
@@ -124,7 +138,7 @@ export function UploadArea({ onUploaded, onError }: UploadAreaProps) {
           </div>
 
           <p className="text-xs text-gray-400">
-            PDF · JPG · PNG · WebP · HEIC
+            PDF · JPG · PNG · WebP · HEIC（最大 10MB）
           </p>
         </div>
       )}

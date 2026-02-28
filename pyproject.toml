@@ -26,6 +26,8 @@ dependencies = [
     "pywebpush>=2.0.0",
     # --- リトライ ---
     "tenacity>=9.0.0",
+    # --- PDF 解析 ---
+    "pypdf>=4.0.0",
     # --- ユーティリティ ---
     "python-dotenv>=1.2.1",
     "slack-sdk>=3.39.0",
