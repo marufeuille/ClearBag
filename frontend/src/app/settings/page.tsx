@@ -69,7 +69,9 @@ export default function SettingsPage() {
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (e) {
-      setPushError(e instanceof Error ? e.message : "通知の設定に失敗しました");
+      const message = e instanceof Error ? e.message : "通知の設定に失敗しました";
+      console.error("[Push通知] エラー:", e);
+      setPushError(message);
     } finally {
       setSaving(false);
     }
