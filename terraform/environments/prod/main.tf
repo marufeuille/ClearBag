@@ -25,6 +25,14 @@ data "google_project" "project" {
   project_id = var.project_id
 }
 
+# Cloud Run Service Agent に Artifact Registry からのイメージ pull 権限を付与
+# 新規プロジェクトではデフォルトで付与されないため明示的に設定が必要
+resource "google_project_iam_member" "cloud_run_ar_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:service-${data.google_project.project.number}@serverless-robot-prod.iam.gserviceaccount.com"
+}
+
 # ---------------------------------------------------------------------------
 # Cloud Run Job 実行用 Service Account
 # ---------------------------------------------------------------------------
