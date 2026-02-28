@@ -26,7 +26,7 @@ import os
 
 import firebase_admin
 import vertexai
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from firebase_admin import credentials as fb_creds
 from google.cloud import firestore
 from vertexai.generative_models import GenerativeModel
@@ -39,6 +39,7 @@ from v2.adapters.firestore_repository import (
 )
 from v2.adapters.gemini import GeminiDocumentAnalyzer
 from v2.domain.models import Profile, UserProfile
+from v2.entrypoints.api.worker_auth import verify_worker_token
 from v2.services.document_processor import DocumentProcessor
 
 logger = logging.getLogger(__name__)
@@ -136,7 +137,7 @@ def run_analysis_sync(
 
 # ── Worker ルーター（app.py で /worker プレフィックスにマウント） ───────────────
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_worker_token)])
 
 
 @router.post("/analyze", status_code=status.HTTP_200_OK)
@@ -144,7 +145,7 @@ async def analyze_document(request: Request) -> dict:
     """
     Cloud Tasks から呼び出されるドキュメント解析エンドポイント。
 
-    Cloud Tasks の OIDC トークン検証は Cloud Run のオーディエンス設定で行う。
+    OIDC トークン検証は verify_worker_token Depends によりアプリレベルで実施済み。
     """
     payload = await request.json()
     uid: str = payload["uid"]

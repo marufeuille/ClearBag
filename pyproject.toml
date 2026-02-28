@@ -78,3 +78,4 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # FastAPI の Depends() は引数デフォルト値での使用が公式パターン (B008)
 "v2/entrypoints/api/**" = ["B008"]
+"v2/entrypoints/worker.py" = ["B008"]

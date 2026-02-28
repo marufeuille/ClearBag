@@ -79,7 +79,7 @@ app.include_router(ical.router, prefix=_PREFIX)
 app.include_router(settings.router, prefix=_PREFIX)
 
 # ── Cloud Tasks ワーカールート（/worker/*）────────────────────────────────────
-# Firebase Auth なし。Cloud Tasks の OIDC トークンで保護される。
+# Firebase Auth なし。アプリレベルの OIDC トークン検証（verify_worker_token）で保護される。
 app.include_router(worker.router, prefix="/worker")
 
 
