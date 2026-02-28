@@ -9,7 +9,9 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   GoogleAuthProvider,
   getAuth,
+  getRedirectResult,
   signInWithPopup,
+  signInWithRedirect,
   signOut as fbSignOut,
 } from "firebase/auth";
 
@@ -26,10 +28,30 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-/** Google サインインポップアップを開く */
+/** モバイル端末かどうかを判定 */
+function isMobile(): boolean {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+/**
+ * Google サインイン
+ * - PC: ポップアップ方式
+ * - モバイル: リダイレクト方式（ポップアップはブロックされるため）
+ */
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
+  if (isMobile()) {
+    return signInWithRedirect(auth, provider);
+  }
   return signInWithPopup(auth, provider);
+}
+
+/**
+ * リダイレクト認証後の結果を取得する。
+ * モバイルでのリダイレクト方式では、ページ再読み込み後にこれを呼ぶ必要がある。
+ */
+export async function getGoogleRedirectResult() {
+  return getRedirectResult(auth);
 }
 
 /** サインアウト */
