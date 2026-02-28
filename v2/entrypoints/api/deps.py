@@ -49,9 +49,7 @@ def _get_firebase_app() -> firebase_admin.App:
                 cred,
                 options={"projectId": project_id} if project_id else {},
             )
-            logger.info(
-                "Firebase Admin initialized (deps) project=%s", project_id
-            )
+            logger.info("Firebase Admin initialized (deps) project=%s", project_id)
     return _firebase_app
 
 
