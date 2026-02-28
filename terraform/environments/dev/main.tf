@@ -199,6 +199,7 @@ locals {
     "roles/datastore.owner",                 # Firestore 管理 (B2C)
     "roles/cloudtasks.admin",                # Cloud Tasks キュー管理 (B2C)
     "roles/firebasehosting.admin",           # Firebase Hosting デプロイ
+    "roles/firebaserules.admin",             # Firestore セキュリティルール デプロイ
   ]
 }
 
