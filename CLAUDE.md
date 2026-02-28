@@ -191,6 +191,12 @@ FIRESTORE_EMULATOR_HOST=localhost:8080 uv run pytest tests/e2e/ -m e2e -v
 
 ## 6. コード変更 → PR → マージ → デプロイフロー
 
+### タスク管理
+
+- タスクは [GitHub Projects](https://github.com/users/marufeuille/projects/2/views/1) で管理している
+- Issue の作成・更新時は、GitHub Projects のステータスも併せて更新すること
+- `gh project item-edit` コマンドでプロジェクトボードのフィールドを更新できる
+
 **特に指定がない場合、以下のステップを順に実行すること。**
 
 ### ステップ 1: ブランチ作成・実装
