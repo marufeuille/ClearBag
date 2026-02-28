@@ -5,6 +5,7 @@
  * - 初期状態: ドキュメントなし
  * - ファイルアップロード → 成功メッセージ表示
  * - ドキュメント一覧が自動更新 → アップロードしたファイルが表示される
+ * - サイズ制限超過 → クライアント/サーバー側それぞれでエラーメッセージ表示
  */
 import { test, expect } from "@playwright/test";
 
@@ -71,4 +72,64 @@ test("ファイルアップロード後にドキュメント一覧が更新さ�
   // ドキュメント一覧が更新され、ファイル名と「待機中」ステータスが表示されること
   await expect(page.getByText("school-notice.pdf")).toBeVisible();
   await expect(page.getByText("待機中")).toBeVisible();
+});
+
+test("クライアント側: 10MB 超のファイルはアップロード前にエラーになる", async ({
+  page,
+}) => {
+  // API へのリクエストは飛ばないことを確認するためにルートをセット
+  await page.route("**/api/documents", (route) =>
+    route.fulfill({ status: 200, body: "[]" })
+  );
+  await page.route("**/api/documents/upload", (route) =>
+    route.fulfill({ status: 200, body: "{}" })
+  );
+
+  await page.goto("/dashboard");
+
+  // 11MB のダミーバッファを作成してファイル選択 input に直接セット
+  const fileInput = page.locator('input[type="file"][accept*="pdf"]');
+  await fileInput.setInputFiles({
+    name: "huge-file.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.alloc(11 * 1024 * 1024),
+  });
+
+  // クライアント側バリデーションでエラーメッセージが表示される
+  await expect(
+    page.getByText("ファイルサイズが上限（10MB）を超えています。")
+  ).toBeVisible();
+});
+
+test("サーバー側: 413 レスポンス時にサイズ超過エラーが表示される", async ({
+  page,
+}) => {
+  await page.route("**/api/documents", (route) =>
+    route.fulfill({ status: 200, body: "[]" })
+  );
+
+  // サーバーが 413 を返すシナリオをモック
+  await page.route("**/api/documents/upload", (route) =>
+    route.fulfill({
+      status: 413,
+      contentType: "application/json",
+      body: JSON.stringify({
+        detail: "ファイルサイズが上限（10MB）を超えています。",
+      }),
+    })
+  );
+
+  await page.goto("/dashboard");
+
+  const fileInput = page.locator('input[type="file"][accept*="pdf"]');
+  await fileInput.setInputFiles({
+    name: "test.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4 fake content"),
+  });
+
+  // サーバーの detail メッセージがそのまま表示される
+  await expect(
+    page.getByText("ファイルサイズが上限（10MB）を超えています。")
+  ).toBeVisible();
 });

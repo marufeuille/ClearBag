@@ -5,6 +5,7 @@ dependency_overrides を使ってリポジトリ・ストレージをモック�
 """
 
 import hashlib
+import io
 from unittest.mock import MagicMock
 
 import pytest
@@ -27,6 +28,18 @@ _CONTENT = b"fake-pdf-content"
 _HASH = hashlib.sha256(_CONTENT).hexdigest()
 
 _FAMILY_CONTEXT = FamilyContext(uid=_UID, family_id=_FAMILY_ID, role="owner")
+
+
+def _make_pdf(num_pages: int = 1) -> bytes:
+    """テスト用に有効な PDF バイト列を生成する"""
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    for _ in range(num_pages):
+        writer.add_blank_page(width=72, height=72)
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
 
 
 @pytest.fixture
@@ -90,7 +103,7 @@ class TestUploadDocument:
         """正常アップロードで 202 Accepted を返す"""
         response = client.post(
             "/api/documents/upload",
-            files={"file": ("test.pdf", _CONTENT, "application/pdf")},
+            files={"file": ("test.pdf", _make_pdf(), "application/pdf")},
         )
         assert response.status_code == 202
         data = response.json()
@@ -140,7 +153,64 @@ class TestUploadDocument:
         }
         response = client.post(
             "/api/documents/upload",
-            files={"file": ("test.pdf", _CONTENT, "application/pdf")},
+            files={"file": ("test.pdf", _make_pdf(), "application/pdf")},
+        )
+        assert response.status_code == 202
+
+    def test_upload_size_exceeds_limit_returns_413(self, client, monkeypatch):
+        """サイズ上限超過で 413 を返す"""
+        import v2.entrypoints.api.routes.documents as docs_module
+
+        monkeypatch.setattr(docs_module, "_MAX_UPLOAD_SIZE_BYTES", 1)
+        response = client.post(
+            "/api/documents/upload",
+            files={"file": ("test.pdf", b"ab", "application/pdf")},
+        )
+        assert response.status_code == 413
+
+    def test_upload_size_within_limit_succeeds(self, client):
+        """サイズ上限内のファイルは 202 を返す"""
+        response = client.post(
+            "/api/documents/upload",
+            files={"file": ("test.pdf", _make_pdf(), "application/pdf")},
+        )
+        assert response.status_code == 202
+
+    def test_upload_pdf_too_many_pages_returns_422(self, client, monkeypatch):
+        """ページ数上限超過で 422 を返す"""
+        import v2.entrypoints.api.routes.documents as docs_module
+
+        monkeypatch.setattr(docs_module, "_MAX_PDF_PAGES", 0)
+        response = client.post(
+            "/api/documents/upload",
+            files={"file": ("test.pdf", _make_pdf(num_pages=1), "application/pdf")},
+        )
+        assert response.status_code == 422
+
+    def test_upload_pdf_within_page_limit_succeeds(self, client, monkeypatch):
+        """ページ数上限内の PDF は 202 を返す"""
+        import v2.entrypoints.api.routes.documents as docs_module
+
+        monkeypatch.setattr(docs_module, "_MAX_PDF_PAGES", 3)
+        response = client.post(
+            "/api/documents/upload",
+            files={"file": ("test.pdf", _make_pdf(num_pages=2), "application/pdf")},
+        )
+        assert response.status_code == 202
+
+    def test_upload_corrupted_pdf_returns_422(self, client):
+        """破損した PDF ファイルは 422 を返す"""
+        response = client.post(
+            "/api/documents/upload",
+            files={"file": ("test.pdf", b"not-a-real-pdf", "application/pdf")},
+        )
+        assert response.status_code == 422
+
+    def test_upload_image_skips_page_check(self, client):
+        """画像ファイルは PDF ページ数チェックをスキップして 202 を返す"""
+        response = client.post(
+            "/api/documents/upload",
+            files={"file": ("photo.jpg", b"fake-jpeg-content", "image/jpeg")},
         )
         assert response.status_code == 202
 
