@@ -70,6 +70,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       terraform: ${{ steps.filter.outputs.terraform }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      firestore_rules: ${{ steps.filter.outputs.firestore_rules }}
     steps:
       - uses: actions/checkout@v4
 
@@ -86,6 +87,9 @@ jobs:
               - 'terraform/**'
             frontend:
               - 'frontend/**'
+            firestore_rules:
+              - 'firestore.rules'
+              - 'firebase.json'
 
   deploy:
     needs: [lint, test, changes]
@@ -230,8 +234,28 @@ jobs:
       - name: Deploy to Firebase Hosting
         run: firebase deploy --only hosting --project ${{ env.PROJECT_ID }}
 
+  deploy-firestore-rules:
+    needs: [lint, test, changes]
+    if: needs.changes.outputs.firestore_rules == 'true'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Deploy Firestore rules
+        run: firebase deploy --only firestore:rules --project ${{ env.PROJECT_ID }}
+
   notify:
-    needs: [lint, test, deploy, deploy-frontend]
+    needs: [lint, test, deploy, deploy-frontend, deploy-firestore-rules]
     if: always()
     uses: ./.github/workflows/_notify-slack.yml
     with:
@@ -240,7 +264,8 @@ jobs:
       # 各ジョブは success か skipped であれば正常（skipped = 変更なしでスキップ）
       result: ${{ (
           (needs.deploy.result == 'success' || needs.deploy.result == 'skipped') &&
-          (needs.deploy-frontend.result == 'success' || needs.deploy-frontend.result == 'skipped')
+          (needs.deploy-frontend.result == 'success' || needs.deploy-frontend.result == 'skipped') &&
+          (needs.deploy-firestore-rules.result == 'success' || needs.deploy-firestore-rules.result == 'skipped')
         ) && 'success' || 'failure' }}
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
