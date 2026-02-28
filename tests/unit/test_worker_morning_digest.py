@@ -6,6 +6,7 @@ VAPID_PRIVATE_KEY 未設定時のスキップ、WebPush 送信ロジック、
 
 from __future__ import annotations
 
+import hashlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,6 +24,10 @@ def worker_client():
     app.dependency_overrides.clear()
 
 
+def _sub_key(endpoint: str) -> str:
+    return hashlib.sha256(endpoint.encode()).hexdigest()[:16]
+
+
 class TestMorningDigestEndpoint:
     def test_skips_when_no_vapid_key(self, worker_client):
         with patch.dict("os.environ", {}, clear=True):
@@ -38,11 +43,14 @@ class TestMorningDigestEndpoint:
 
     def test_sends_to_users_with_web_push_enabled(self, worker_client):
         """web_push=True かつ subscription があるユーザーに送信する"""
+        endpoint1 = "https://fcm.example.com/push/user1"
         user_with_push = {
             "notification_preferences": {"web_push": True},
-            "web_push_subscription": {
-                "endpoint": "https://fcm.example.com/push/user1",
-                "keys": {"auth": "auth1", "p256dh": "p256dh1"},
+            "web_push_subscriptions": {
+                _sub_key(endpoint1): {
+                    "endpoint": endpoint1,
+                    "keys": {"auth": "auth1", "p256dh": "p256dh1"},
+                }
             },
             "family_id": "family-1",
         }
@@ -98,17 +106,21 @@ class TestMorningDigestEndpoint:
         assert data["errors"] == 0
 
     def test_removes_subscription_on_410(self, worker_client):
-        """410 Gone エラー時に Firestore からサブスクリプションを削除する"""
+        """410 Gone エラー時に Firestore から該当端末のサブスクリプションを削除する"""
         from pywebpush import WebPushException
 
         mock_response = MagicMock()
         mock_response.status_code = 410
 
+        endpoint = "https://fcm.example.com/push/expired"
+        sub_key = _sub_key(endpoint)
         user_data = {
             "notification_preferences": {"web_push": True},
-            "web_push_subscription": {
-                "endpoint": "https://fcm.example.com/push/expired",
-                "keys": {"auth": "auth", "p256dh": "p256dh"},
+            "web_push_subscriptions": {
+                sub_key: {
+                    "endpoint": endpoint,
+                    "keys": {"auth": "auth", "p256dh": "p256dh"},
+                }
             },
             "family_id": "family-1",
         }
@@ -153,5 +165,8 @@ class TestMorningDigestEndpoint:
         assert r.status_code == 200
         data = r.json()
         assert data["errors"] == 1
-        # Firestore の update が呼ばれたことを確認（DELETE_FIELD で削除）
-        mock_db.collection("users").document("uid-expired").update.assert_called_once()
+        # Firestore の update が呼ばれ、該当端末キーのみ DELETE_FIELD で削除される
+        update_call = mock_db.collection("users").document("uid-expired").update
+        update_call.assert_called_once()
+        updated_field = list(update_call.call_args[0][0].keys())[0]
+        assert updated_field == f"web_push_subscriptions.{sub_key}"

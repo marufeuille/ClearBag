@@ -234,8 +234,8 @@ export async function registerPushSubscription(
   await post<void>("/api/push-subscriptions", { endpoint, keys });
 }
 
-export async function deletePushSubscription(): Promise<void> {
-  await post<void>("/api/push-subscriptions/unsubscribe");
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  await post<void>("/api/push-subscriptions/unsubscribe", { endpoint });
 }
 
 // ── ファミリー ────────────────────────────────────────────────────────────────

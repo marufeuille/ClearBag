@@ -6,6 +6,7 @@ VAPID_PRIVATE_KEY 未設定時のスキップ、翌日イベントがあるユ�
 
 from __future__ import annotations
 
+import hashlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,6 +23,10 @@ def worker_client():
     app.dependency_overrides.clear()
 
 
+def _sub_key(endpoint: str) -> str:
+    return hashlib.sha256(endpoint.encode()).hexdigest()[:16]
+
+
 class TestEventReminderEndpoint:
     def test_skips_when_no_vapid_key(self, worker_client):
         import os
@@ -36,19 +41,25 @@ class TestEventReminderEndpoint:
 
     def test_sends_only_to_users_with_tomorrow_events(self, worker_client):
         """翌日のイベントがあるユーザーにのみ送信する"""
+        endpoint1 = "https://fcm.example.com/push/u1"
+        endpoint2 = "https://fcm.example.com/push/u2"
         user_with_events = {
             "notification_preferences": {"web_push": True},
-            "web_push_subscription": {
-                "endpoint": "https://fcm.example.com/push/u1",
-                "keys": {"auth": "a", "p256dh": "p"},
+            "web_push_subscriptions": {
+                _sub_key(endpoint1): {
+                    "endpoint": endpoint1,
+                    "keys": {"auth": "a", "p256dh": "p"},
+                }
             },
             "family_id": "fam-1",
         }
         user_no_events = {
             "notification_preferences": {"web_push": True},
-            "web_push_subscription": {
-                "endpoint": "https://fcm.example.com/push/u2",
-                "keys": {"auth": "b", "p256dh": "q"},
+            "web_push_subscriptions": {
+                _sub_key(endpoint2): {
+                    "endpoint": endpoint2,
+                    "keys": {"auth": "b", "p256dh": "q"},
+                }
             },
             "family_id": "fam-2",
         }
@@ -99,17 +110,21 @@ class TestEventReminderEndpoint:
         mock_notifier.notify_event_reminder.assert_called_once()
 
     def test_removes_subscription_on_410(self, worker_client):
-        """410 Gone 時に Firestore からサブスクリプションを削除する"""
+        """410 Gone 時に Firestore から該当端末のサブスクリプションを削除する"""
         from pywebpush import WebPushException
 
         mock_response = MagicMock()
         mock_response.status_code = 410
 
+        endpoint = "https://expired.example.com/push"
+        sub_key = _sub_key(endpoint)
         user_data = {
             "notification_preferences": {"web_push": True},
-            "web_push_subscription": {
-                "endpoint": "https://expired.example.com/push",
-                "keys": {"auth": "a", "p256dh": "p"},
+            "web_push_subscriptions": {
+                sub_key: {
+                    "endpoint": endpoint,
+                    "keys": {"auth": "a", "p256dh": "p"},
+                }
             },
             "family_id": "fam-1",
         }
@@ -152,4 +167,8 @@ class TestEventReminderEndpoint:
 
         assert r.status_code == 200
         assert r.json()["errors"] == 1
-        mock_db.collection("users").document("uid-expired").update.assert_called_once()
+        # Firestore の update が呼ばれ、該当端末キーのみ DELETE_FIELD で削除される
+        update_call = mock_db.collection("users").document("uid-expired").update
+        update_call.assert_called_once()
+        updated_field = list(update_call.call_args[0][0].keys())[0]
+        assert updated_field == f"web_push_subscriptions.{sub_key}"
