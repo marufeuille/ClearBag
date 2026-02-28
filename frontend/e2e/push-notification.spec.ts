@@ -78,9 +78,15 @@ test.describe("プッシュ通知設定 UI", () => {
     await expect(page.getByText("プッシュ通知")).toBeVisible();
   });
 
-  test("通知が許可された状態ではトグルが操作可能", async ({ page, context }) => {
-    // 通知を「granted」状態にする
-    await context.grantPermissions(["notifications"]);
+  test("通知が許可された状態ではトグルが操作可能", async ({ page }) => {
+    // headless Chromium では grantPermissions が Notification.permission を反映しないため
+    // addInitScript でページ実行前に直接モックする
+    await page.addInitScript(() => {
+      Object.defineProperty(Notification, "permission", {
+        get: () => "granted" as NotificationPermission,
+        configurable: true,
+      });
+    });
     await mockSettingsApis(page);
     await page.goto("/settings");
 
