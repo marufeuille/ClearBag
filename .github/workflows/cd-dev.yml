@@ -87,6 +87,7 @@ jobs:
               - 'terraform/**'
             frontend:
               - 'frontend/**'
+              - 'firebase.json'  # Hosting ヘッダー (CSP 等) の変更も frontend デプロイで反映
             firestore_rules:
               - 'firestore.rules'
               - 'firebase.json'
