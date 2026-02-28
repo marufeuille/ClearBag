@@ -200,3 +200,36 @@ resource "google_project_iam_member" "github_actions_prod" {
   role     = each.value
   member   = "serviceAccount:${module.workload_identity.service_account_email}"
 }
+
+# ---------------------------------------------------------------------------
+# 予算アラート
+# ---------------------------------------------------------------------------
+
+resource "google_project_service" "billingbudgets" {
+  project            = var.project_id
+  service            = "billingbudgets.googleapis.com"
+  disable_on_destroy = false
+}
+
+# Billing Account レベルで GitHub Actions SA に costsManager を付与
+# （予算の作成・更新に必要。billing.admin は手動ブートストラップ済みが前提）
+resource "google_billing_account_iam_member" "github_actions_costs_manager" {
+  billing_account_id = var.billing_account_id
+  role               = "roles/billing.costsManager"
+  member             = "serviceAccount:${module.workload_identity.service_account_email}"
+}
+
+module "billing_budget" {
+  source = "../../modules/billing_budget"
+
+  billing_account_id        = var.billing_account_id
+  project_id                = var.project_id
+  budget_amount             = var.budget_amount
+  notification_channel_name = module.monitoring.notification_channel_name
+
+  depends_on = [
+    google_project_iam_member.github_actions_prod,
+    google_project_service.billingbudgets,
+    google_billing_account_iam_member.github_actions_costs_manager,
+  ]
+}

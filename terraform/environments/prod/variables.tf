@@ -33,3 +33,15 @@ variable "notification_email" {
   description = "Cloud Monitoring アラート通知先メールアドレス"
   type        = string
 }
+
+variable "billing_account_id" {
+  description = "GCP 請求先アカウント ID（GitHub Secrets の TF_VAR_BILLING_ACCOUNT_ID から渡す）"
+  type        = string
+  sensitive   = true
+}
+
+variable "budget_amount" {
+  description = "月次予算金額 (USD)"
+  type        = number
+  default     = 50
+}

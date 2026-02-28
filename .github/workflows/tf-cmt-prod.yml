@@ -64,5 +64,6 @@ jobs:
               -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
               -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
               -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}" \
-              -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}"
+              -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}" \
+              -var="billing_account_id=${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}"
         working-directory: terraform/environments/prod

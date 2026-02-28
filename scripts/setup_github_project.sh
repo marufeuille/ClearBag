@@ -59,8 +59,13 @@ else
   success "プロジェクト #${PROJECT_NUM} を作成しました"
 fi
 
+# item-edit に必要な GraphQL node ID を取得（--owner フラグ非対応のため）
+PROJECT_ID=$(gh project list --owner "$OWNER" --format json \
+  --jq ".projects[] | select(.number == ${PROJECT_NUM}) | .id")
+
 PROJECT_URL="https://github.com/users/${OWNER}/projects/${PROJECT_NUM}"
 info "プロジェクト URL: ${PROJECT_URL}"
+info "プロジェクト ID: ${PROJECT_ID}"
 
 # ── Step 2: Priority フィールド作成（冪等性: 既存なら再利用）──────────────
 info "Priority フィールドを確認中..."
@@ -99,71 +104,70 @@ info "P1 ID: ${OPT_P1}"
 info "P2 ID: ${OPT_P2}"
 info "P3 ID: ${OPT_P3}"
 
-# ── Step 3: 全 open issue をプロジェクトに追加 ────────────────────────────
+# issue 番号から Priority オプション ID を返す（Bash 3.2 互換の case 文）
+priority_option_for() {
+  local num="$1"
+  case "$num" in
+    71|70|68|67)                  echo "$OPT_P1" ;;
+    92|90|89|75|74|72|62|61|60)  echo "$OPT_P2" ;;
+    79|78|77|76)                  echo "$OPT_P3" ;;
+    *)                             echo "" ;;
+  esac
+}
+
+priority_label_for() {
+  local num="$1"
+  case "$num" in
+    71|70|68|67)                  echo "P1: High" ;;
+    92|90|89|75|74|72|62|61|60)  echo "P2: Medium" ;;
+    79|78|77|76)                  echo "P3: Low" ;;
+    *)                             echo "（未設定）" ;;
+  esac
+}
+
+# ── Step 3 & 4: 全 open issue をプロジェクトに追加し、Priority を設定 ──────
 info "全 open issue をプロジェクトに追加中..."
 ISSUE_NUMS=$(gh issue list --repo "${OWNER}/${REPO}" --state open \
   --json number --jq '.[].number')
 
-declare -A ITEM_IDS  # issue番号 → project item ID のマップ
-
 for num in $ISSUE_NUMS; do
   ISSUE_URL="https://github.com/${OWNER}/${REPO}/issues/${num}"
+
+  # item-add: 既に追加済みの場合は既存 item ID を返す
   ITEM_ID=$(gh project item-add "$PROJECT_NUM" --owner "$OWNER" \
     --url "$ISSUE_URL" --format json --jq '.id' 2>/dev/null || true)
-  if [[ -n "$ITEM_ID" ]]; then
-    ITEM_IDS[$num]="$ITEM_ID"
-    info "  Issue #${num} → item ${ITEM_ID}"
-  else
+
+  # item-add が空を返した場合（重複追加などで失敗）は item-list から取得
+  if [[ -z "$ITEM_ID" ]]; then
     warn "  Issue #${num} の追加をスキップ（既に追加済みの可能性）"
-    # 既存アイテムの ID を取得
     ITEM_ID=$(gh project item-list "$PROJECT_NUM" --owner "$OWNER" \
       --format json --jq \
       ".items[] | select(.content.number == ${num}) | .id" 2>/dev/null || true)
-    if [[ -n "$ITEM_ID" ]]; then
-      ITEM_IDS[$num]="$ITEM_ID"
-    fi
-  fi
-done
-success "全 issue の追加が完了しました"
-
-# ── Step 4: Priority フィールドを一括設定 ─────────────────────────────────
-info "Priority フィールドを設定中..."
-
-set_priority() {
-  local issue_num="$1"
-  local option_id="$2"
-  local label="$3"
-  local item_id="${ITEM_IDS[$issue_num]:-}"
-
-  if [[ -z "$item_id" ]]; then
-    warn "  Issue #${issue_num} の item ID が不明のためスキップ"
-    return
   fi
 
-  gh project item-edit "$PROJECT_NUM" --owner "$OWNER" \
-    --id "$item_id" \
-    --field-id "$FIELD_ID" \
-    --single-select-option-id "$option_id" >/dev/null 2>&1 && \
-    info "  Issue #${issue_num} → ${label}" || \
-    warn "  Issue #${issue_num} の Priority 設定に失敗"
-}
+  if [[ -z "$ITEM_ID" ]]; then
+    warn "  Issue #${num}: item ID を取得できませんでした"
+    continue
+  fi
 
-# P1: High
-for num in 71 70 68 67; do
-  set_priority "$num" "$OPT_P1" "P1: High"
+  info "  Issue #${num} → item ${ITEM_ID}"
+
+  # Priority フィールドを設定
+  OPT_ID=$(priority_option_for "$num")
+  if [[ -n "$OPT_ID" ]]; then
+    LABEL=$(priority_label_for "$num")
+    # item-edit は --owner 非対応。--project-id に GraphQL node ID を渡す
+    gh project item-edit \
+      --id "$ITEM_ID" \
+      --field-id "$FIELD_ID" \
+      --project-id "$PROJECT_ID" \
+      --single-select-option-id "$OPT_ID" >/dev/null 2>&1 && \
+      info "    Priority → ${LABEL}" || \
+      warn "    Issue #${num} の Priority 設定に失敗"
+  fi
 done
 
-# P2: Medium
-for num in 92 90 89 75 74 72 62 61 60; do
-  set_priority "$num" "$OPT_P2" "P2: Medium"
-done
-
-# P3: Low
-for num in 79 78 77 76; do
-  set_priority "$num" "$OPT_P3" "P3: Low"
-done
-
-success "Priority フィールドの一括設定が完了しました"
+success "全 issue の追加と Priority 設定が完了しました"
 
 # ── 完了メッセージ ────────────────────────────────────────────────────────
 echo ""
