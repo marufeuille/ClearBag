@@ -7,7 +7,7 @@ terraform {
     }
   }
   backend "gcs" {
-    bucket = "marufeuille-linebot-terraform-backend"
+    bucket = "clearbag-prod-terraform-backend"
     prefix = "terraform/environments/prod"
   }
 }

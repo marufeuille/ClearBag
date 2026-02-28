@@ -7,7 +7,7 @@ PR に Terraform の変更が含まれる場合、`terraform plan` の結果を 
 ## 調査結果まとめ
 
 - **クラウド**: GCP
-- **Terraform state**: GCS バケット `marufeuille-linebot-terraform-backend`
+- **Terraform state**: GCS バケット `clearbag-dev-terraform-backend` (dev) / `clearbag-prod-terraform-backend` (prod)
 - **認証**: Workload Identity Federation (`google-github-actions/auth@v2`)
   - dev: `environment: dev` に `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT` が設定済み
   - prod: `environment: prod` に `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT` が設定済み（保護ルールなし）

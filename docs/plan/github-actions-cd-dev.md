@@ -67,12 +67,12 @@ module "workload_identity" {
 
 ### 手順 (ローカルで実行)
 
-1. GCS バケット `marufeuille-linebot-terraform-backend` は既存のものを使用する。
+1. GCS バケット `clearbag-dev-terraform-backend` を使用する。
 
 2. `terraform/environments/dev/main.tf` の backend ブロックを有効化:
    ```hcl
    backend "gcs" {
-     bucket = "marufeuille-linebot-terraform-backend"
+     bucket = "clearbag-dev-terraform-backend"
      prefix = "terraform/environments/dev"
    }
    ```
@@ -154,7 +154,7 @@ test → ─┘
 | 1 | WIF Terraform モジュール作成 | ローカル | `terraform/modules/workload_identity/` |
 | 2 | dev/main.tf に WIF + IAM 追加 | ローカル | モジュール呼び出し + ロール付与 |
 | 3 | `terraform apply` (ローカル) | ローカル | WIF リソースを GCP に作成 |
-| 4 | GCS バケット確認 | ローカル (gcloud) | `marufeuille-linebot-terraform-backend` を使用 |
+| 4 | GCS バケット確認 | ローカル (gcloud) | `clearbag-dev-terraform-backend` を使用 |
 | 5 | GCS backend 有効化 + state 移行 | ローカル | `terraform init -migrate-state` |
 | 6 | GitHub Secrets 設定 | GitHub UI | WIF_PROVIDER, WIF_SERVICE_ACCOUNT, TF_VAR_* |
 | 7 | `cd-dev.yml` 作成 | PR | CD ワークフローファイル |
