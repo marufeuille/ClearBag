@@ -99,6 +99,25 @@ class TestUnregisterPushSubscription:
         expected_field = f"web_push_subscriptions.{_ENDPOINT_KEY}"
         assert expected_field in update_dict
 
-    def test_unregister_missing_endpoint_returns_422(self, client):
+    def test_unregister_no_body_removes_all_subscriptions(self, client, mock_user_repo):
+        """body なし（旧 SW キャッシュ由来）のリクエストで全サブスクリプションを削除する"""
+        r = client.post("/api/push-subscriptions/unsubscribe")
+
+        assert r.status_code == 204
+        call_args = mock_user_repo.update_user.call_args
+        update_dict = call_args[0][1]
+        # 新旧両フィールドが DELETE_FIELD で削除される
+        assert "web_push_subscriptions" in update_dict
+        assert "web_push_subscription" in update_dict
+
+    def test_unregister_empty_endpoint_removes_all_subscriptions(
+        self, client, mock_user_repo
+    ):
+        """endpoint が空の場合も全サブスクリプションを削除する"""
         r = client.post("/api/push-subscriptions/unsubscribe", json={})
-        assert r.status_code == 422
+
+        assert r.status_code == 204
+        call_args = mock_user_repo.update_user.call_args
+        update_dict = call_args[0][1]
+        assert "web_push_subscriptions" in update_dict
+        assert "web_push_subscription" in update_dict
