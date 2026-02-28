@@ -176,7 +176,7 @@ module "workload_identity" {
   source        = "../../modules/workload_identity"
   project_id    = var.project_id
   github_repo   = "marufeuille/ClearBag"
-  ref_condition = "assertion.ref == 'refs/heads/main'"
+  ref_condition = "assertion.ref == 'refs/heads/main' || assertion.event_name == 'pull_request'"
 
   depends_on = [
     google_project_service.sts,
