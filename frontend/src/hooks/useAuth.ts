@@ -10,7 +10,7 @@
 import { User, onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
 
-import { auth, signInWithGoogle, signOut } from "@/lib/firebase";
+import { auth, getGoogleRedirectResult, signInWithGoogle, signOut } from "@/lib/firebase";
 
 interface AuthState {
   user: User | null;
@@ -34,6 +34,8 @@ export function useAuth(): AuthState & {
 
   useEffect(() => {
     if (IS_E2E) return;
+    // モバイルリダイレクト認証後の結果を処理する（失敗してもサイレントに無視）
+    getGoogleRedirectResult().catch(() => {});
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setState({ user, loading: false });
     });
