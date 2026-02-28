@@ -119,13 +119,6 @@ echo "  結果: PASS=${PASS}  FAIL=${FAIL}"
 if [ "${FAIL}" -gt 0 ]; then
   echo ""
   echo "  ❌ OIDC 認証が正しく機能していません"
-  echo ""
-  echo "  確認事項:"
-  echo "    1. PR #86 が dev ブランチにマージ・デプロイ済みか"
-  echo "    2. Cloud Run の WORKER_SERVICE_ACCOUNT_EMAIL 環境変数が設定されているか"
-  echo "       gcloud run services describe ${SERVICE_NAME} \\"
-  echo "         --project=${PROJECT_ID} --region=${REGION} \\"
-  echo "         --format='value(spec.template.spec.containers[0].env)'"
   exit 1
 else
   echo ""
