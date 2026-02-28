@@ -4,6 +4,7 @@ POST /api/push-subscriptions             → サブスクリプション登録
 POST /api/push-subscriptions/unsubscribe → サブスクリプション削除
 """
 
+import hashlib
 from unittest.mock import MagicMock
 
 import pytest
@@ -26,6 +27,10 @@ _SUBSCRIPTION_PAYLOAD = {
         "p256dh": "test-p256dh-key",
     },
 }
+
+_ENDPOINT_KEY = hashlib.sha256(
+    _SUBSCRIPTION_PAYLOAD["endpoint"].encode()
+).hexdigest()[:16]
 
 
 @pytest.fixture
@@ -54,7 +59,7 @@ class TestRegisterPushSubscription:
         mock_user_repo.update_user.assert_called_once_with(
             _UID,
             {
-                "web_push_subscription": {
+                f"web_push_subscriptions.{_ENDPOINT_KEY}": {
                     "endpoint": _SUBSCRIPTION_PAYLOAD["endpoint"],
                     "keys": _SUBSCRIPTION_PAYLOAD["keys"],
                 }
@@ -80,12 +85,20 @@ class TestUnregisterPushSubscription:
         self, client, mock_user_repo
     ):
         # Act
-        r = client.post("/api/push-subscriptions/unsubscribe")
+        r = client.post(
+            "/api/push-subscriptions/unsubscribe",
+            json={"endpoint": _SUBSCRIPTION_PAYLOAD["endpoint"]},
+        )
 
         # Assert
         assert r.status_code == 204
-        # DELETE_FIELD sentinel が渡されることを確認（型チェックは省略）
         assert mock_user_repo.update_user.call_count == 1
         call_args = mock_user_repo.update_user.call_args
         assert call_args[0][0] == _UID
-        assert "web_push_subscription" in call_args[0][1]
+        update_dict = call_args[0][1]
+        expected_field = f"web_push_subscriptions.{_ENDPOINT_KEY}"
+        assert expected_field in update_dict
+
+    def test_unregister_missing_endpoint_returns_422(self, client):
+        r = client.post("/api/push-subscriptions/unsubscribe", json={})
+        assert r.status_code == 422

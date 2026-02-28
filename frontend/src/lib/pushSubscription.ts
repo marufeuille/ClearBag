@@ -15,10 +15,11 @@ import { deletePushSubscription, registerPushSubscription } from "./api";
  */
 async function ensureServiceWorker(): Promise<ServiceWorkerRegistration> {
   const registrations = await navigator.serviceWorker.getRegistrations();
-  if (registrations.length > 0) {
-    return registrations[0];
+  if (registrations.length === 0) {
+    await navigator.serviceWorker.register("/sw.js");
   }
-  return navigator.serviceWorker.register("/sw.js");
+  // ready は SW が active になるまで待機してから resolve する
+  return navigator.serviceWorker.ready;
 }
 
 /** VAPID 公開鍵（Base64url → Uint8Array<ArrayBuffer> 変換） */
@@ -116,8 +117,8 @@ export async function unsubscribePush(): Promise<void> {
   ]);
   const subscription = await registration.pushManager.getSubscription();
   if (subscription) {
+    const endpoint = subscription.endpoint;
     await subscription.unsubscribe();
+    await deletePushSubscription(endpoint);
   }
-
-  await deletePushSubscription();
 }

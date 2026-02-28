@@ -232,10 +232,13 @@ async def morning_digest(request: Request) -> dict:
         uid = user_doc.id
         user_data = user_doc.to_dict() or {}
         prefs = user_data.get("notification_preferences", {})
-        subscription_data = user_data.get("web_push_subscription")
         family_id = user_data.get("family_id")
 
-        if not prefs.get("web_push", False) or not subscription_data or not family_id:
+        if not prefs.get("web_push", False) or not family_id:
+            continue
+
+        all_subs = _collect_subscriptions(user_data)
+        if not all_subs:
             continue
 
         try:
@@ -243,22 +246,33 @@ async def morning_digest(request: Request) -> dict:
                 family_id, from_date=from_date, to_date=to_date
             )
             tasks = doc_repo.list_tasks(family_id, completed=False)
-            sub = PushSubscription(
-                endpoint=subscription_data["endpoint"],
-                keys=subscription_data["keys"],
-            )
-            notifier.notify_morning_digest(sub, len(events), len(tasks))
-            sent += 1
-        except Exception as e:
-            # 410 Gone はサブスクリプション失効 → Firestore から自動削除
-            if _is_gone_error(e):
-                logger.info("Push subscription expired, removing: uid=%s", uid)
-                db.collection("users").document(uid).update(
-                    {"web_push_subscription": DELETE_FIELD}
-                )
-            else:
-                logger.exception("Morning digest failed for uid=%s", uid)
+        except Exception:
+            logger.exception("Morning digest data fetch failed for uid=%s", uid)
             errors += 1
+            continue
+
+        for field_key, subscription_data in all_subs:
+            try:
+                sub = PushSubscription(
+                    endpoint=subscription_data["endpoint"],
+                    keys=subscription_data["keys"],
+                )
+                notifier.notify_morning_digest(sub, len(events), len(tasks))
+                sent += 1
+            except Exception as e:
+                # 410 Gone はサブスクリプション失効 → 該当端末のみ削除
+                if _is_gone_error(e):
+                    logger.info(
+                        "Push subscription expired, removing: uid=%s, field=%s",
+                        uid,
+                        field_key,
+                    )
+                    db.collection("users").document(uid).update(
+                        {field_key: DELETE_FIELD}
+                    )
+                else:
+                    logger.exception("Morning digest failed for uid=%s", uid)
+                errors += 1
 
     logger.info("Morning digest complete: sent=%d, errors=%d", sent, errors)
     return {"status": "ok", "sent": sent, "errors": errors}
@@ -312,33 +326,48 @@ async def event_reminder(request: Request) -> dict:
         uid = user_doc.id
         user_data = user_doc.to_dict() or {}
         prefs = user_data.get("notification_preferences", {})
-        subscription_data = user_data.get("web_push_subscription")
         family_id = user_data.get("family_id")
 
-        if not prefs.get("web_push", False) or not subscription_data or not family_id:
+        if not prefs.get("web_push", False) or not family_id:
+            continue
+
+        all_subs = _collect_subscriptions(user_data)
+        if not all_subs:
             continue
 
         try:
             events = doc_repo.list_events(
                 family_id, from_date=tomorrow, to_date=tomorrow
             )
-            if not events:
-                continue
-            sub = PushSubscription(
-                endpoint=subscription_data["endpoint"],
-                keys=subscription_data["keys"],
-            )
-            notifier.notify_event_reminder(sub, events)
-            sent += 1
-        except Exception as e:
-            if _is_gone_error(e):
-                logger.info("Push subscription expired, removing: uid=%s", uid)
-                db.collection("users").document(uid).update(
-                    {"web_push_subscription": DELETE_FIELD}
-                )
-            else:
-                logger.exception("Event reminder failed for uid=%s", uid)
+        except Exception:
+            logger.exception("Event reminder data fetch failed for uid=%s", uid)
             errors += 1
+            continue
+
+        if not events:
+            continue
+
+        for field_key, subscription_data in all_subs:
+            try:
+                sub = PushSubscription(
+                    endpoint=subscription_data["endpoint"],
+                    keys=subscription_data["keys"],
+                )
+                notifier.notify_event_reminder(sub, events)
+                sent += 1
+            except Exception as e:
+                if _is_gone_error(e):
+                    logger.info(
+                        "Push subscription expired, removing: uid=%s, field=%s",
+                        uid,
+                        field_key,
+                    )
+                    db.collection("users").document(uid).update(
+                        {field_key: DELETE_FIELD}
+                    )
+                else:
+                    logger.exception("Event reminder failed for uid=%s", uid)
+                errors += 1
 
     logger.info("Event reminder complete: sent=%d, errors=%d", sent, errors)
     return {"status": "ok", "sent": sent, "errors": errors}
@@ -355,6 +384,27 @@ def _is_gone_error(e: Exception) -> bool:
     )
 
 
+def _collect_subscriptions(user_data: dict) -> list[tuple[str, dict]]:
+    """
+    ユーザーデータから全サブスクリプションを返す。
+
+    新形式 (web_push_subscriptions map) と旧形式 (web_push_subscription 単数)
+    の両方をサポートする（移行期間の後方互換）。
+
+    Returns:
+        [(firestore_field_key, subscription_data), ...]
+    """
+    result: list[tuple[str, dict]] = []
+    subscriptions_map = user_data.get("web_push_subscriptions") or {}
+    for key, sub_data in subscriptions_map.items():
+        result.append((f"web_push_subscriptions.{key}", sub_data))
+    # 旧形式: 移行期間の後方互換
+    old_sub = user_data.get("web_push_subscription")
+    if old_sub:
+        result.append(("web_push_subscription", old_sub))
+    return result
+
+
 def _try_send_notification(
     uid: str,
     family_id: str,
@@ -364,7 +414,7 @@ def _try_send_notification(
     db: firestore.Client,
 ) -> None:
     """
-    通知設定に基づいて WebPush 通知を試みる。
+    通知設定に基づいて全端末の WebPush 通知を試みる。
     通知の失敗は無視してメインフローを継続する。
     通知設定は個人単位（uid）で管理する。
     """
@@ -372,55 +422,64 @@ def _try_send_notification(
         user = user_repo.get_user(uid)
         prefs = user.get("notification_preferences", {})
 
-        # Web Push 通知
-        if prefs.get("web_push", False):
-            subscription_data = user.get("web_push_subscription")
-            vapid_private_key = os.environ.get("VAPID_PRIVATE_KEY", "")
-            vapid_public_key = os.environ.get("VAPID_PUBLIC_KEY", "")
-            vapid_email = os.environ.get("VAPID_CLAIMS_EMAIL", "")
+        if not prefs.get("web_push", False):
+            return
 
-            if subscription_data and vapid_private_key:
-                from v2.adapters.webpush_notifier import (
-                    PushSubscription,
-                    VapidConfig,
-                    WebPushNotifier,
+        all_subs = _collect_subscriptions(user)
+        vapid_private_key = os.environ.get("VAPID_PRIVATE_KEY", "")
+        vapid_public_key = os.environ.get("VAPID_PUBLIC_KEY", "")
+        vapid_email = os.environ.get("VAPID_CLAIMS_EMAIL", "")
+
+        if not all_subs or not vapid_private_key:
+            return
+
+        from v2.adapters.webpush_notifier import (
+            PushSubscription,
+            VapidConfig,
+            WebPushNotifier,
+        )
+
+        notifier_wp = WebPushNotifier(
+            VapidConfig(
+                private_key=vapid_private_key,
+                public_key=vapid_public_key,
+                claims_email=vapid_email,
+            )
+        )
+        doc_snap = (
+            db.collection("families")
+            .document(family_id)
+            .collection("documents")
+            .document(document_id)
+            .get()
+        )
+        original_filename = (
+            doc_snap.get("original_filename") if doc_snap.exists else "document"
+        )
+
+        for field_key, subscription_data in all_subs:
+            sub = PushSubscription(
+                endpoint=subscription_data["endpoint"],
+                keys=subscription_data["keys"],
+            )
+            try:
+                notifier_wp.notify_analysis_complete(
+                    sub, original_filename, document_id
                 )
+            except Exception as e:
+                if _is_gone_error(e):
+                    from google.cloud.firestore import DELETE_FIELD
 
-                notifier_wp = WebPushNotifier(
-                    VapidConfig(
-                        private_key=vapid_private_key,
-                        public_key=vapid_public_key,
-                        claims_email=vapid_email,
+                    logger.info(
+                        "Push subscription expired, removing: uid=%s, field=%s",
+                        uid,
+                        field_key,
                     )
-                )
-                sub = PushSubscription(
-                    endpoint=subscription_data["endpoint"],
-                    keys=subscription_data["keys"],
-                )
-                doc_snap = (
-                    db.collection("families")
-                    .document(family_id)
-                    .collection("documents")
-                    .document(document_id)
-                    .get()
-                )
-                original_filename = (
-                    doc_snap.get("original_filename") if doc_snap.exists else "document"
-                )
-                try:
-                    notifier_wp.notify_analysis_complete(
-                        sub, original_filename, document_id
+                    db.collection("users").document(uid).update(
+                        {field_key: DELETE_FIELD}
                     )
-                except Exception as e:
-                    if _is_gone_error(e):
-                        from google.cloud.firestore import DELETE_FIELD
-
-                        logger.info("Push subscription expired, removing: uid=%s", uid)
-                        db.collection("users").document(uid).update(
-                            {"web_push_subscription": DELETE_FIELD}
-                        )
-                    else:
-                        raise
+                else:
+                    raise
 
     except Exception:
         logger.exception(
