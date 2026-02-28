@@ -168,7 +168,7 @@ jobs:
 #### 環境変数
 
 ```
-LATEST_PROD_URL = asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-prod/school-agent-v2:latest-prod
+LATEST_PROD_URL = asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:latest-prod
 SHA_URL         = ...:{7桁SHA}
 RELEASE_URL     = ...:{v* タグ}
 TARGET_URL      = ...:{target_tag}（ロールバック時）
@@ -239,8 +239,8 @@ jobs:
 #### terraform/environments/prod/terraform.tfvars
 
 ```hcl
-project_id        = "marufeuille-linebot"
-image_url         = "asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-prod/school-agent-v2:latest-prod"
+project_id        = "clearbag-prod"
+image_url         = "asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:latest-prod"
 inbox_folder_id   = "12IMb0DKR7MgGhZCBZGi2EQqHX9T2Dqe7"
 spreadsheet_id    = "1uOjIj00ztJlfLzlwKQaZXMYsdCo7Aan41Hz8knkfBTk"
 archive_folder_id = "1BsctFITQMnvd_jUsmnad_nYDjj_YWHPo"

@@ -248,7 +248,7 @@ uv run pytest tests/ --cov=v2 --cov-report=term-missing
 | `WIF_SERVICE_ACCOUNT` | WIF 用サービスアカウント（`github-actions-deploy@...`） |
 | `TF_VAR_NOTIFICATION_EMAIL` | Cloud Monitoring アラート通知先メール |
 | `TF_VAR_ALLOWED_EMAILS` | ログイン許可メール（カンマ区切り、空で全員許可） |
-| `FIREBASE_PROJECT_ID` | Firebase プロジェクト ID（`clear-bag` 等） |
+| `FIREBASE_PROJECT_ID` | ~~削除~~ GCP プロジェクトと同一のため不要（`clearbag-dev` / `clearbag-prod`） |
 | `SLACK_WEBHOOK_URL` | CD 完了通知用 Slack Webhook |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase ウェブアプリの API キー |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `{project}.firebaseapp.com` |
@@ -261,13 +261,8 @@ uv run pytest tests/ --cov=v2 --cov-report=term-missing
 
 #### 4. Firebase Hosting のプロジェクト設定
 
-Firebase の WIF サービスアカウントにクロスプロジェクト権限が必要な場合（Firebase プロジェクト ≠ GCP プロジェクトのとき）:
-
-```bash
-gcloud projects add-iam-policy-binding YOUR_FIREBASE_PROJECT_ID \
-  --member="serviceAccount:github-actions-deploy@YOUR_GCP_PROJECT.iam.gserviceaccount.com" \
-  --role="roles/firebasehosting.admin"
-```
+GCP プロジェクト = Firebase プロジェクト（`clearbag-dev` / `clearbag-prod`）に統一されているため、クロスプロジェクト権限の付与は不要です。
+Terraform が `roles/firebasehosting.admin` を GitHub Actions SA に付与します。
 
 #### 5. main ブランチに push → CI/CD が自動デプロイ
 
@@ -276,7 +271,7 @@ git push origin main
 # lint → test → Docker build → Terraform apply → Firebase Hosting deploy
 ```
 
-> **注意**: 初回 Terraform apply は既存 Firestore DB があると 409 エラーになる場合があります。`dev/main.tf` の `import {}` ブロックで対処済みです。
+> **注意**: `clearbag-dev` / `clearbag-prod` プロジェクトではゼロからリソースを作成するため、Firestore `import {}` ブロックは不要です。
 
 ### iCal URL について
 

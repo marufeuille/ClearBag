@@ -15,7 +15,7 @@ permissions:
   id-token: write  # WIF OIDC トークン発行に必要
 
 env:
-  PROJECT_ID: marufeuille-linebot
+  PROJECT_ID: clearbag-prod
   REGION: asia-northeast1
   REPOSITORY_ID: school-agent-prod
   IMAGE_NAME: school-agent-v2

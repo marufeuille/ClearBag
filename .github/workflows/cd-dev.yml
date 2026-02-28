@@ -10,7 +10,7 @@ permissions:
   id-token: write  # WIF OIDC トークン発行に必要
 
 env:
-  PROJECT_ID: marufeuille-linebot
+  PROJECT_ID: clearbag-dev
   REGION: asia-northeast1
   REPOSITORY_ID: school-agent-dev
   IMAGE_NAME: school-agent-v2
@@ -157,7 +157,6 @@ jobs:
             -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
             -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}" \
             -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}" \
-            -var="firebase_project_id=${{ secrets.FIREBASE_PROJECT_ID }}" \
             -var="allowed_emails=${{ secrets.TF_VAR_ALLOWED_EMAILS }}"
 
       - name: Get Terraform outputs
@@ -229,7 +228,7 @@ jobs:
         run: npm install -g firebase-tools
 
       - name: Deploy to Firebase Hosting
-        run: firebase deploy --only hosting --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: firebase deploy --only hosting --project ${{ env.PROJECT_ID }}
 
   notify:
     needs: [lint, test, deploy, deploy-frontend]

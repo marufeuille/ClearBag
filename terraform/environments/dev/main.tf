@@ -7,7 +7,7 @@ terraform {
     }
   }
   backend "gcs" {
-    bucket = "marufeuille-linebot-terraform-backend"
+    bucket = "clearbag-dev-terraform-backend"
     prefix = "terraform/environments/dev"
   }
 }
@@ -230,13 +230,11 @@ resource "google_project_service" "firebasehosting" {
   disable_on_destroy = false
 }
 
-# 既存の Firestore (default) データベースを Terraform state に取り込む
-# 前回の apply で作成済みのため 409 が発生するのを防ぐ
+# Firebase Console 経由で既に作成された Firestore DB を Terraform state に取り込む
 import {
   to = module.firestore.google_firestore_database.this
-  id = "projects/marufeuille-linebot/databases/(default)"
+  id = "projects/clearbag-dev/databases/(default)"
 }
-
 
 module "firestore" {
   source = "../../modules/firestore"
@@ -309,7 +307,6 @@ module "api_service" {
 
   env_vars = {
     PROJECT_ID              = var.project_id
-    FIREBASE_PROJECT_ID     = var.firebase_project_id
     GCS_BUCKET_NAME         = module.cloud_storage_uploads.bucket_name
     CLOUD_TASKS_QUEUE       = module.cloud_tasks_analysis.queue_id
     CLOUD_TASKS_LOCATION    = var.region
@@ -324,9 +321,9 @@ module "api_service" {
     ALLOWED_EMAILS          = var.allowed_emails
     # 開発環境では枚数制限を無効化
     DISABLE_RATE_LIMIT      = "true"
-    # Firebase Hosting のオリジン（カンマ区切り）
-    CORS_ORIGINS            = "https://${var.firebase_project_id}.web.app,https://${var.firebase_project_id}.firebaseapp.com"
-    FRONTEND_BASE_URL       = "https://${var.firebase_project_id}.web.app"
+    # Firebase Hosting のオリジン（カンマ区切り）。GCP プロジェクト = Firebase プロジェクトなので project_id をそのまま使用
+    CORS_ORIGINS            = "https://${var.project_id}.web.app,https://${var.project_id}.firebaseapp.com"
+    FRONTEND_BASE_URL       = "https://${var.project_id}.web.app"
   }
 
   # SENDGRID_API_KEY / VAPID_PRIVATE_KEY は Secret Manager にまだ値が未登録のため

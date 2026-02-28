@@ -15,7 +15,7 @@ GitHub の tag push (`v*`) をトリガーとして、GitHub Actions 経由で p
 | イメージタグ (Terraform) | `:latest` | `:<sha7>` (+ `prod-latest` エイリアス) |
 | Artifact Registry | `school-agent-dev` | `school-agent-prod` (新規) |
 | WIF | `github-actions` pool + `github-actions-deploy` SA | 同 pool を参照、`github-actions-deploy-prod` SA を新規作成 |
-| GCP プロジェクト | `marufeuille-linebot` | 同一プロジェクト (現状に合わせる) |
+| GCP プロジェクト | `clearbag-prod` | 同一プロジェクト (現状に合わせる) |
 
 ---
 
@@ -37,9 +37,9 @@ Job 定義が変わらず、Terraform apply が no-op になり新イメージ�
   → このタグは GitHub tag push 時のみ更新されるため、dev の `latest` とは明確に区別できる
 
 ```
-asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-prod/school-agent-v2:<sha7>   ← Terraform が参照
-asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-prod/school-agent-v2:prod-latest  ← エイリアス
-asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-prod/school-agent-v2:v1.2.3  ← GitHub tag 名と同一
+asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:<sha7>   ← Terraform が参照
+asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:prod-latest  ← エイリアス
+asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:v1.2.3  ← GitHub tag 名と同一
 ```
 
 ---
@@ -64,7 +64,7 @@ terraform/
 
 ```hcl
 backend "gcs" {
-  bucket = "marufeuille-linebot-terraform-backend"
+  bucket = "clearbag-prod-terraform-backend"
   prefix = "terraform/environments/prod"
 }
 ```
@@ -313,7 +313,7 @@ GitHub Actions → Run workflow → target_tag に "v1.0.0" を入力 → 実行
 
 ```bash
 # ロールバック先のイメージ URL を確認 (例: v1.0.0 タグ)
-ROLLBACK_URL="asia-northeast1-docker.pkg.dev/marufeuille-linebot/school-agent-prod/school-agent-v2:v1.0.0"
+ROLLBACK_URL="asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:v1.0.0"
 
 # Cloud Run Job を直接更新
 gcloud run jobs update school-agent-v2-prod \
@@ -371,12 +371,12 @@ Cloud Run Jobs は定時実行 (Scheduler) のため、デプロイ直後に次�
 
 ## 考慮事項・制約
 
-### 同一 GCP プロジェクトを共有
+### GCP プロジェクト分離
 
-dev と prod が同一プロジェクト (`marufeuille-linebot`) を使用するため:
-- WIF Pool/Provider は共有 (dev Terraform 管理)
-- prod Terraform が WIF Pool を削除・変更しないよう、pool は data source か参照のみで扱う
-- 将来的にプロジェクト分離を検討する場合は Terraform module の project_id を変えるだけで対応可能
+dev (`clearbag-dev`) と prod (`clearbag-prod`) は別プロジェクト:
+- WIF Pool/Provider はそれぞれのプロジェクト内に独立して作成
+- dev と prod の Terraform state も別バケット (`clearbag-dev-terraform-backend` / `clearbag-prod-terraform-backend`) で管理
+- プロジェクト分離により本番環境への意図しない変更リスクを排除
 
 ### 初回 Terraform apply の課題
 

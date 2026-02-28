@@ -17,7 +17,7 @@ variable "image_url" {
 variable "api_image_url" {
   description = "B2C API サーバーのコンテナイメージ URL（deploy 時に -var で渡す）"
   type        = string
-  default     = "asia-northeast1-docker.pkg.dev/clearbag-dev/school-agent-dev/clearbag-api:latest"
+  default     = "asia-northeast1-docker.pkg.dev/clearbag-dev/school-agent-dev/school-agent-v2:latest"
 }
 
 variable "spreadsheet_id" {
@@ -38,12 +38,6 @@ variable "archive_folder_id" {
 variable "notification_email" {
   description = "Cloud Monitoring アラート通知先メールアドレス"
   type        = string
-}
-
-variable "firebase_project_id" {
-  description = "Firebase プロジェクトID（GCPプロジェクトと異なる場合に設定）"
-  type        = string
-  default     = ""
 }
 
 variable "allowed_emails" {

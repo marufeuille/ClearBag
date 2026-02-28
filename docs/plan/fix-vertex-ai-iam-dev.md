@@ -6,7 +6,7 @@ Cloud Run Job の実行 SA（`school-agent-v2-dev`）が Vertex AI（Gemini）�
 
 ```
 403 Permission 'aiplatform.endpoints.predict' denied on resource
-  '//aiplatform.googleapis.com/projects/marufeuille-linebot/locations/us-central1/publishers/google/models/gemini-2.5-pro'
+  '//aiplatform.googleapis.com/projects/clearbag-dev/locations/us-central1/publishers/google/models/gemini-2.5-pro'
 ```
 
 ### 原因
