@@ -463,7 +463,9 @@ def _try_send_notification(
                 keys=subscription_data["keys"],
             )
             try:
-                notifier_wp.notify_analysis_complete(sub, original_filename, document_id)
+                notifier_wp.notify_analysis_complete(
+                    sub, original_filename, document_id
+                )
             except Exception as e:
                 if _is_gone_error(e):
                     from google.cloud.firestore import DELETE_FIELD
