@@ -133,7 +133,9 @@ class TestSetupLogging:
 
     def test_uses_json_formatter_in_cloud_run_job_env(self):
         """CLOUD_RUN_JOB 環境変数がある場合、JSON フォーマッタが使われること"""
-        with patch.dict("os.environ", {"CLOUD_RUN_JOB": "school-agent-dev"}, clear=False):
+        with patch.dict(
+            "os.environ", {"CLOUD_RUN_JOB": "school-agent-dev"}, clear=False
+        ):
             setup_logging()
 
         root_logger = logging.getLogger()

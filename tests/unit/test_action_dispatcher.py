@@ -1,9 +1,9 @@
 """ActionDispatcher のテスト"""
 
-import pytest
-from unittest.mock import MagicMock, call
-from v2.domain.models import Category, EventData, TaskData, DocumentAnalysis, FileInfo, Profile
-from v2.services.action_dispatcher import ActionDispatcher, DispatchResult
+from unittest.mock import call
+
+from v2.domain.models import Category, DocumentAnalysis, EventData, Profile, TaskData
+from v2.services.action_dispatcher import ActionDispatcher
 
 
 class TestActionDispatcher:
@@ -39,13 +39,16 @@ class TestActionDispatcher:
         )
 
     def test_dispatch_resolves_calendar_id_from_profile(
-        self, mock_calendar, mock_task_service, mock_notifier, sample_file_info, sample_profiles
+        self,
+        mock_calendar,
+        mock_task_service,
+        mock_notifier,
+        sample_file_info,
+        sample_profiles,
     ):
         """related_profile_ids からカレンダーIDが正しく解決される"""
         # Arrange
-        event = EventData(
-            summary="イベント", start="2026-04-25", end="2026-04-25"
-        )
+        event = EventData(summary="イベント", start="2026-04-25", end="2026-04-25")
         analysis = DocumentAnalysis(
             summary="テスト",
             category=Category.EVENT,
@@ -69,9 +72,7 @@ class TestActionDispatcher:
     ):
         """Profileが見つからない場合は primary にフォールバック"""
         # Arrange
-        event = EventData(
-            summary="イベント", start="2026-04-25", end="2026-04-25"
-        )
+        event = EventData(summary="イベント", start="2026-04-25", end="2026-04-25")
         analysis = DocumentAnalysis(
             summary="テスト",
             category=Category.EVENT,
@@ -121,9 +122,7 @@ class TestActionDispatcher:
     ):
         """通知が送信される"""
         # Arrange
-        event = EventData(
-            summary="イベント", start="2026-04-25", end="2026-04-25"
-        )
+        event = EventData(summary="イベント", start="2026-04-25", end="2026-04-25")
         task = TaskData(title="タスク", due_date="2026-04-20")
         analysis = DocumentAnalysis(
             summary="テスト文書",

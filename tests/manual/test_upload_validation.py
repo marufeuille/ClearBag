@@ -59,6 +59,7 @@ SKIP = "⏭️"
 # テストデータ生成
 # ───────────────────────────────────────────────
 
+
 def _make_pdf_bytes(num_pages: int) -> bytes:
     """pypdf で num_pages ページの空白 PDF を生成する"""
     writer = PdfWriter()
@@ -84,7 +85,10 @@ def _load_or_generate(fixture_name: str, generator_fn) -> bytes:
 # HTTP ヘルパー
 # ───────────────────────────────────────────────
 
-def _upload(client: httpx.Client, filename: str, content: bytes, mime_type: str) -> tuple[int, dict]:
+
+def _upload(
+    client: httpx.Client, filename: str, content: bytes, mime_type: str
+) -> tuple[int, dict]:
     resp = client.post(
         f"{API_URL}/api/documents/upload",
         files={"file": (filename, content, mime_type)},
@@ -107,6 +111,7 @@ def _delete(client: httpx.Client, doc_id: str) -> None:
 # ───────────────────────────────────────────────
 # 各シナリオ
 # ───────────────────────────────────────────────
+
 
 def scenario_normal_pdf(client: httpx.Client) -> bool:
     """[1] 通常 PDF (1ページ) → 202"""
@@ -165,13 +170,16 @@ def scenario_corrupted_pdf(client: httpx.Client) -> bool:
 # メイン
 # ───────────────────────────────────────────────
 
+
 def main() -> None:
     # 前提チェック
     errors = []
     if not API_URL:
         errors.append("API_URL が未設定です")
     if not FIREBASE_TOKEN:
-        errors.append("FIREBASE_TOKEN が未設定です（取得手順は UPLOAD_VALIDATION_GUIDE.md 参照）")
+        errors.append(
+            "FIREBASE_TOKEN が未設定です（取得手順は UPLOAD_VALIDATION_GUIDE.md 参照）"
+        )
     if errors:
         for e in errors:
             print(f"❌ {e}")
@@ -189,7 +197,6 @@ def main() -> None:
 
     results: list[bool] = []
     with httpx.Client(headers=headers) as client:
-
         print("\n[1/4] 通常 PDF (1ページ, ~1KB) → 202 期待")
         results.append(scenario_normal_pdf(client))
         time.sleep(0.5)

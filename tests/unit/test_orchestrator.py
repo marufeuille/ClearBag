@@ -24,9 +24,7 @@ class TestOrchestrator:
         # Arrange
         from v2.services.action_dispatcher import ActionDispatcher
 
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
         orchestrator = Orchestrator(
             mock_config, mock_storage, mock_analyzer, dispatcher
         )
@@ -67,9 +65,7 @@ class TestOrchestrator:
         from v2.services.action_dispatcher import ActionDispatcher
 
         mock_storage.list_inbox_files.return_value = []
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
         orchestrator = Orchestrator(
             mock_config, mock_storage, mock_analyzer, dispatcher
         )
@@ -96,9 +92,7 @@ class TestOrchestrator:
         from v2.services.action_dispatcher import ActionDispatcher
 
         mock_config.load_profiles.side_effect = Exception("Config error")
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
         orchestrator = Orchestrator(
             mock_config, mock_storage, mock_analyzer, dispatcher
         )
@@ -125,9 +119,7 @@ class TestOrchestrator:
         from v2.services.action_dispatcher import ActionDispatcher
 
         mock_storage.download.side_effect = Exception("Download failed")
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
         orchestrator = Orchestrator(
             mock_config, mock_storage, mock_analyzer, dispatcher
         )
@@ -158,9 +150,7 @@ class TestOrchestrator:
         from v2.services.action_dispatcher import ActionDispatcher
 
         mock_analyzer.analyze.side_effect = Exception("Analysis failed")
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
         orchestrator = Orchestrator(
             mock_config, mock_storage, mock_analyzer, dispatcher
         )
@@ -188,12 +178,8 @@ class TestOrchestrator:
         # Arrange
         from v2.services.action_dispatcher import ActionDispatcher
 
-        file1 = FileInfo(
-            id="f1", name="file1.pdf", mime_type="application/pdf"
-        )
-        file2 = FileInfo(
-            id="f2", name="file2.pdf", mime_type="application/pdf"
-        )
+        file1 = FileInfo(id="f1", name="file1.pdf", mime_type="application/pdf")
+        file2 = FileInfo(id="f2", name="file2.pdf", mime_type="application/pdf")
         mock_storage.list_inbox_files.return_value = [file1, file2]
 
         analysis1 = DocumentAnalysis(
@@ -208,9 +194,7 @@ class TestOrchestrator:
         )
         mock_analyzer.analyze.side_effect = [analysis1, analysis2]
 
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
         orchestrator = Orchestrator(
             mock_config, mock_storage, mock_analyzer, dispatcher
         )
@@ -241,12 +225,8 @@ class TestOrchestrator:
         # Arrange
         from v2.services.action_dispatcher import ActionDispatcher
 
-        file1 = FileInfo(
-            id="f1", name="file1.pdf", mime_type="application/pdf"
-        )
-        file2 = FileInfo(
-            id="f2", name="file2.pdf", mime_type="application/pdf"
-        )
+        file1 = FileInfo(id="f1", name="file1.pdf", mime_type="application/pdf")
+        file2 = FileInfo(id="f2", name="file2.pdf", mime_type="application/pdf")
         mock_storage.list_inbox_files.return_value = [file1, file2]
 
         # file1はダウンロードエラー、file2は成功
@@ -260,9 +240,7 @@ class TestOrchestrator:
             archive_filename="file2.pdf",
         )
 
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
         orchestrator = Orchestrator(
             mock_config, mock_storage, mock_analyzer, dispatcher
         )
@@ -290,9 +268,7 @@ class TestOrchestrator:
         # Arrange
         from v2.services.action_dispatcher import ActionDispatcher
 
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
         orchestrator = Orchestrator(
             mock_config, mock_storage, mock_analyzer, dispatcher
         )
@@ -302,7 +278,9 @@ class TestOrchestrator:
             orchestrator.run()
 
         # Assert: サマリーログに必須フィールドが含まれること
-        summary_logs = [r for r in caplog.records if "execution_summary" in r.getMessage()]
+        summary_logs = [
+            r for r in caplog.records if "execution_summary" in r.getMessage()
+        ]
         assert len(summary_logs) == 1, "execution_summary ログが1件出力されること"
 
         summary_message = summary_logs[0].getMessage()
@@ -331,9 +309,7 @@ class TestOrchestrator:
         )
         mock_analyzer.analyze.return_value = analysis_no_filename
 
-        dispatcher = ActionDispatcher(
-            mock_calendar, mock_task_service, mock_notifier
-        )
+        dispatcher = ActionDispatcher(mock_calendar, mock_task_service, mock_notifier)
         orchestrator = Orchestrator(
             mock_config, mock_storage, mock_analyzer, dispatcher
         )
@@ -343,6 +319,4 @@ class TestOrchestrator:
 
         # Assert
         expected_name = f"PROCESSED_{sample_file_info.name}"
-        mock_storage.archive.assert_called_once_with(
-            sample_file_info.id, expected_name
-        )
+        mock_storage.archive.assert_called_once_with(sample_file_info.id, expected_name)

@@ -8,20 +8,18 @@ Adapter の手動動作確認テスト
     uv run pytest tests/integration/test_adapters_manual.py -v -m manual
 """
 
-import pytest
 import os
+
+import pytest
 from dotenv import load_dotenv
-from v2.domain.models import TaskData, EventData
+from v2.domain.models import EventData, TaskData
 
 # .envから環境変数読み込み
 load_dotenv()
 
 
 @pytest.mark.manual
-@pytest.mark.skipif(
-    not os.getenv("SLACK_BOT_TOKEN"),
-    reason="SLACK_BOT_TOKEN not set"
-)
+@pytest.mark.skipif(not os.getenv("SLACK_BOT_TOKEN"), reason="SLACK_BOT_TOKEN not set")
 class TestSlackAdapter:
     """Slack Adapter の動作確認"""
 
@@ -31,7 +29,7 @@ class TestSlackAdapter:
 
         notifier = SlackNotifier(
             bot_token=os.getenv("SLACK_BOT_TOKEN"),
-            channel_id=os.getenv("SLACK_CHANNEL_ID")
+            channel_id=os.getenv("SLACK_CHANNEL_ID"),
         )
 
         # テストデータ
@@ -65,8 +63,7 @@ class TestSlackAdapter:
 
 @pytest.mark.manual
 @pytest.mark.skipif(
-    not os.getenv("TODOIST_API_TOKEN"),
-    reason="TODOIST_API_TOKEN not set"
+    not os.getenv("TODOIST_API_TOKEN"), reason="TODOIST_API_TOKEN not set"
 )
 class TestTodoistAdapter:
     """Todoist Adapter の動作確認"""
@@ -75,9 +72,7 @@ class TestTodoistAdapter:
         """Todoistに実際にタスクを作成"""
         from v2.adapters.todoist import TodoistAdapter
 
-        adapter = TodoistAdapter(
-            api_token=os.getenv("TODOIST_API_TOKEN")
-        )
+        adapter = TodoistAdapter(api_token=os.getenv("TODOIST_API_TOKEN"))
 
         # テストタスク
         task = TaskData(
@@ -88,10 +83,7 @@ class TestTodoistAdapter:
         )
 
         # 実行
-        task_id = adapter.create_task(
-            task,
-            file_link="https://example.com/test.pdf"
-        )
+        task_id = adapter.create_task(task, file_link="https://example.com/test.pdf")
 
         print(f"✅ Todoistタスクが作成されました: {task_id}")
         print("   Todoistアプリで確認してください。")

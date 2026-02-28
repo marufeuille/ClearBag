@@ -18,6 +18,8 @@ Cloud Run Service として動作し、Firebase Auth で認証する。
   GET    /api/ical/{token}     ← 認証不要
   GET    /api/settings
   PATCH  /api/settings
+  POST   /api/push-subscriptions
+  POST   /api/push-subscriptions/unsubscribe
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ from v2.entrypoints.api.routes import (
     families,
     ical,
     profiles,
+    push_subscriptions,
     settings,
     tasks,
 )
@@ -74,6 +77,7 @@ app.include_router(profiles.router, prefix=_PREFIX)
 app.include_router(families.router, prefix=_PREFIX)
 app.include_router(ical.router, prefix=_PREFIX)
 app.include_router(settings.router, prefix=_PREFIX)
+app.include_router(push_subscriptions.router, prefix=_PREFIX)
 
 # ── Cloud Tasks ワーカールート（/worker/*）────────────────────────────────────
 # Firebase Auth なし。アプリレベルの OIDC トークン検証（verify_worker_token）で保護される。

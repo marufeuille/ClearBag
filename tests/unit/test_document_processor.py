@@ -54,11 +54,15 @@ class TestDocumentProcessor:
                 calendar_id="",
             )
         }
-        rules = [Rule(rule_id="R1", target_profile="ALL", rule_type="INFO", content="test")]
+        rules = [
+            Rule(rule_id="R1", target_profile="ALL", rule_type="INFO", content="test")
+        ]
 
         processor.process(content, mime_type, profiles, rules)
 
-        mock_analyzer.analyze.assert_called_once_with(content, mime_type, profiles, rules)
+        mock_analyzer.analyze.assert_called_once_with(
+            content, mime_type, profiles, rules
+        )
 
     def test_process_reraises_analyzer_exception(self, processor, mock_analyzer):
         """analyzer が例外を投げた場合、process() も例外を再送出する"""
@@ -84,7 +88,12 @@ class TestDocumentProcessor:
         """analyzer が例外を投げた場合、エラーログが出力される"""
         mock_analyzer.analyze.side_effect = ValueError("bad input")
 
-        with caplog.at_level(logging.ERROR, logger="v2.services.document_processor"), pytest.raises(ValueError):
+        with (
+            caplog.at_level(logging.ERROR, logger="v2.services.document_processor"),
+            pytest.raises(ValueError),
+        ):
             processor.process(b"data", "application/pdf", {}, [])
 
-        assert any("Document processing failed" in r.getMessage() for r in caplog.records)
+        assert any(
+            "Document processing failed" in r.getMessage() for r in caplog.records
+        )

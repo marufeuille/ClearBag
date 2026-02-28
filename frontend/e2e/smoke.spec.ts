@@ -28,7 +28,6 @@ async function mockAllApis(page: Page) {
         plan: "free",
         documents_this_month: 0,
         ical_url: "",
-        notification_email: false,
         notification_web_push: false,
       }),
     })

@@ -16,7 +16,7 @@ Cloud Tasks から HTTP POST を受け取り、ドキュメント解析を非同
   2. Firestore からファミリーのプロファイルを取得
   3. DocumentProcessor で AI 解析
   4. 解析結果を Firestore に保存（families/{family_id} 配下）
-  5. メール/WebPush 通知（設定済みの場合）
+  5. WebPush 通知（設定済みの場合）
 """
 
 from __future__ import annotations
@@ -185,26 +185,40 @@ def _convert_profiles(user_profiles: list[UserProfile]) -> dict[str, Profile]:
 @router.post("/morning-digest", status_code=status.HTTP_200_OK)
 async def morning_digest(request: Request) -> dict:
     """
-    朝のダイジェストメール送信エンドポイント（Cloud Scheduler から呼び出し）。
+    朝のダイジェスト WebPush 送信エンドポイント（Cloud Scheduler から呼び出し）。
 
-    全ファミリーメンバーに対して今後7日間の予定・未完了タスクをメールで送信する。
+    web_push 通知を有効化した全ユーザーに今後7日間の予定・未完了タスク件数をプッシュ通知する。
     Cloud Scheduler の OIDC トークンで保護される想定。
     """
     _ensure_firebase_init()
 
-    db = firestore.Client()
-    doc_repo = FirestoreDocumentRepository(db)
-
-    sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
-    if not sendgrid_key:
-        logger.warning("SENDGRID_API_KEY not set, skipping morning digest")
-        return {"status": "skipped", "reason": "no_sendgrid_key"}
-
-    from v2.adapters.email_notifier import EmailConfig, SendGridEmailNotifier
-
-    notifier = SendGridEmailNotifier(EmailConfig(api_key=sendgrid_key))
+    vapid_private_key = os.environ.get("VAPID_PRIVATE_KEY", "")
+    if not vapid_private_key:
+        logger.warning("VAPID_PRIVATE_KEY not set, skipping morning digest")
+        return {"status": "skipped", "reason": "no_vapid_key"}
 
     import datetime
+
+    from google.cloud.firestore import DELETE_FIELD
+
+    from v2.adapters.webpush_notifier import (
+        PushSubscription,
+        VapidConfig,
+        WebPushNotifier,
+    )
+
+    vapid_public_key = os.environ.get("VAPID_PUBLIC_KEY", "")
+    vapid_email = os.environ.get("VAPID_CLAIMS_EMAIL", "")
+    notifier = WebPushNotifier(
+        VapidConfig(
+            private_key=vapid_private_key,
+            public_key=vapid_public_key,
+            claims_email=vapid_email,
+        )
+    )
+
+    db = firestore.Client()
+    doc_repo = FirestoreDocumentRepository(db)
 
     today = datetime.date.today()
     from_date = today.isoformat()
@@ -213,36 +227,132 @@ async def morning_digest(request: Request) -> dict:
     sent = 0
     errors = 0
 
-    # 全ユーザーを走査し、family_id からファミリーのイベント/タスクを取得
     users_ref = db.collection("users").stream()
     for user_doc in users_ref:
         uid = user_doc.id
         user_data = user_doc.to_dict() or {}
         prefs = user_data.get("notification_preferences", {})
-        user_email = user_data.get("email", "")
+        subscription_data = user_data.get("web_push_subscription")
         family_id = user_data.get("family_id")
 
-        if not prefs.get("email", False) or not user_email or not family_id:
+        if not prefs.get("web_push", False) or not subscription_data or not family_id:
             continue
 
         try:
-            # ファミリー単位でイベント/タスクを取得
             events = doc_repo.list_events(
                 family_id, from_date=from_date, to_date=to_date
             )
             tasks = doc_repo.list_tasks(family_id, completed=False)
-            notifier.send_morning_digest(
-                to_email=user_email,
-                upcoming_events=events,
-                pending_tasks=tasks,
+            sub = PushSubscription(
+                endpoint=subscription_data["endpoint"],
+                keys=subscription_data["keys"],
             )
+            notifier.notify_morning_digest(sub, len(events), len(tasks))
             sent += 1
-        except Exception:
-            logger.exception("Morning digest failed for uid=%s", uid)
+        except Exception as e:
+            # 410 Gone はサブスクリプション失効 → Firestore から自動削除
+            if _is_gone_error(e):
+                logger.info("Push subscription expired, removing: uid=%s", uid)
+                db.collection("users").document(uid).update(
+                    {"web_push_subscription": DELETE_FIELD}
+                )
+            else:
+                logger.exception("Morning digest failed for uid=%s", uid)
             errors += 1
 
     logger.info("Morning digest complete: sent=%d, errors=%d", sent, errors)
     return {"status": "ok", "sent": sent, "errors": errors}
+
+
+@router.post("/event-reminder", status_code=status.HTTP_200_OK)
+async def event_reminder(request: Request) -> dict:
+    """
+    翌日イベントリマインダー WebPush 送信エンドポイント（Cloud Scheduler から呼び出し）。
+
+    翌日に予定があるユーザーに対してプッシュ通知を送信する。
+    Cloud Scheduler の OIDC トークンで保護される想定。
+    """
+    _ensure_firebase_init()
+
+    vapid_private_key = os.environ.get("VAPID_PRIVATE_KEY", "")
+    if not vapid_private_key:
+        logger.warning("VAPID_PRIVATE_KEY not set, skipping event reminder")
+        return {"status": "skipped", "reason": "no_vapid_key"}
+
+    import datetime
+
+    from google.cloud.firestore import DELETE_FIELD
+
+    from v2.adapters.webpush_notifier import (
+        PushSubscription,
+        VapidConfig,
+        WebPushNotifier,
+    )
+
+    vapid_public_key = os.environ.get("VAPID_PUBLIC_KEY", "")
+    vapid_email = os.environ.get("VAPID_CLAIMS_EMAIL", "")
+    notifier = WebPushNotifier(
+        VapidConfig(
+            private_key=vapid_private_key,
+            public_key=vapid_public_key,
+            claims_email=vapid_email,
+        )
+    )
+
+    db = firestore.Client()
+    doc_repo = FirestoreDocumentRepository(db)
+
+    tomorrow = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+
+    sent = 0
+    errors = 0
+
+    users_ref = db.collection("users").stream()
+    for user_doc in users_ref:
+        uid = user_doc.id
+        user_data = user_doc.to_dict() or {}
+        prefs = user_data.get("notification_preferences", {})
+        subscription_data = user_data.get("web_push_subscription")
+        family_id = user_data.get("family_id")
+
+        if not prefs.get("web_push", False) or not subscription_data or not family_id:
+            continue
+
+        try:
+            events = doc_repo.list_events(
+                family_id, from_date=tomorrow, to_date=tomorrow
+            )
+            if not events:
+                continue
+            sub = PushSubscription(
+                endpoint=subscription_data["endpoint"],
+                keys=subscription_data["keys"],
+            )
+            notifier.notify_event_reminder(sub, events)
+            sent += 1
+        except Exception as e:
+            if _is_gone_error(e):
+                logger.info("Push subscription expired, removing: uid=%s", uid)
+                db.collection("users").document(uid).update(
+                    {"web_push_subscription": DELETE_FIELD}
+                )
+            else:
+                logger.exception("Event reminder failed for uid=%s", uid)
+            errors += 1
+
+    logger.info("Event reminder complete: sent=%d, errors=%d", sent, errors)
+    return {"status": "ok", "sent": sent, "errors": errors}
+
+
+def _is_gone_error(e: Exception) -> bool:
+    """WebPushException の HTTP 410 Gone を判定する"""
+    from pywebpush import WebPushException
+
+    return (
+        isinstance(e, WebPushException)
+        and getattr(e, "response", None) is not None
+        and e.response.status_code == 410
+    )
 
 
 def _try_send_notification(
@@ -254,39 +364,13 @@ def _try_send_notification(
     db: firestore.Client,
 ) -> None:
     """
-    通知設定に基づいてメール/WebPush 通知を試みる。
+    通知設定に基づいて WebPush 通知を試みる。
     通知の失敗は無視してメインフローを継続する。
     通知設定は個人単位（uid）で管理する。
     """
     try:
         user = user_repo.get_user(uid)
         prefs = user.get("notification_preferences", {})
-
-        # メール通知
-        sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
-        user_email = user.get("email", "")
-        if prefs.get("email", False) and sendgrid_key and user_email:
-            from v2.adapters.email_notifier import EmailConfig, SendGridEmailNotifier
-
-            notifier = SendGridEmailNotifier(EmailConfig(api_key=sendgrid_key))
-            # families/{family_id}/documents/{document_id} からファイル名を取得
-            doc_snap = (
-                db.collection("families")
-                .document(family_id)
-                .collection("documents")
-                .document(document_id)
-                .get()
-            )
-            original_filename = (
-                doc_snap.get("original_filename") if doc_snap.exists else "document"
-            )
-            notifier.notify_analysis_complete(
-                to_email=user_email,
-                original_filename=original_filename,
-                summary=analysis.summary,
-                events=analysis.events,
-                tasks=analysis.tasks,
-            )
 
         # Web Push 通知
         if prefs.get("web_push", False):
@@ -323,9 +407,20 @@ def _try_send_notification(
                 original_filename = (
                     doc_snap.get("original_filename") if doc_snap.exists else "document"
                 )
-                notifier_wp.notify_analysis_complete(
-                    sub, original_filename, document_id
-                )
+                try:
+                    notifier_wp.notify_analysis_complete(
+                        sub, original_filename, document_id
+                    )
+                except Exception as e:
+                    if _is_gone_error(e):
+                        from google.cloud.firestore import DELETE_FIELD
+
+                        logger.info("Push subscription expired, removing: uid=%s", uid)
+                        db.collection("users").document(uid).update(
+                            {"web_push_subscription": DELETE_FIELD}
+                        )
+                    else:
+                        raise
 
     except Exception:
         logger.exception(

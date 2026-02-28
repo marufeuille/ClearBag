@@ -3,12 +3,13 @@
 Profilesシートに設定されたカレンダーIDを使ってイベントを作成
 """
 
-from datetime import datetime
 import os
+from datetime import datetime
+
 from dotenv import load_dotenv
 from v2.adapters.credentials import get_google_credentials
-from v2.adapters.google_sheets import GoogleSheetsConfigSource
 from v2.adapters.google_calendar import GoogleCalendarService
+from v2.adapters.google_sheets import GoogleSheetsConfigSource
 from v2.domain.models import EventData
 
 load_dotenv()
@@ -49,7 +50,7 @@ event = EventData(
     description="Profilesシートに設定されたカレンダーへのテスト投稿です。",
 )
 
-print(f"\nイベント作成中...")
+print("\nイベント作成中...")
 url = calendar.create_event(calendar_id, event, "https://example.com/test.pdf")
 print(f"✅ 作成成功: {url}")
 print(f"\n{kotaro_profile.name}のGoogle Calendarで確認してください！")
