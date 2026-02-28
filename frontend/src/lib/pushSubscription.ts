@@ -58,7 +58,16 @@ export async function subscribePush(): Promise<boolean> {
     throw new Error("VAPID 公開鍵が設定されていません");
   }
 
-  const registration = await navigator.serviceWorker.ready;
+  // navigator.serviceWorker.ready はSWインストール失敗時に永遠に待機することがあるため、タイムアウトを設ける
+  const registration = await Promise.race<ServiceWorkerRegistration>([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Service Worker の準備がタイムアウトしました。ページを再読み込みしてお試しください")),
+        10000
+      )
+    ),
+  ]);
   const subscription = await registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
@@ -81,7 +90,15 @@ export async function subscribePush(): Promise<boolean> {
 export async function unsubscribePush(): Promise<void> {
   if (!isPushSupported()) return;
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await Promise.race<ServiceWorkerRegistration>([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Service Worker の準備がタイムアウトしました。ページを再読み込みしてお試しください")),
+        10000
+      )
+    ),
+  ]);
   const subscription = await registration.pushManager.getSubscription();
   if (subscription) {
     await subscription.unsubscribe();
