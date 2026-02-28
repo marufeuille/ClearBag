@@ -211,23 +211,17 @@ resource "google_project_service" "billingbudgets" {
   disable_on_destroy = false
 }
 
-# google_billing_account_iam_member の API コールに cloudbilling.googleapis.com が必要
+# google_billing_budget は cloudbilling.googleapis.com API を使用する
 resource "google_project_service" "cloudbilling" {
   project            = var.project_id
   service            = "cloudbilling.googleapis.com"
   disable_on_destroy = false
 }
 
-# Billing Account レベルで GitHub Actions SA に costsManager を付与
-# （予算の作成・更新に必要。billing.admin は手動ブートストラップ済みが前提）
-resource "google_billing_account_iam_member" "github_actions_costs_manager" {
-  billing_account_id = var.billing_account_id
-  role               = "roles/billing.costsManager"
-  member             = "serviceAccount:${module.workload_identity.service_account_email}"
-
-  depends_on = [google_project_service.cloudbilling]
-}
-
+# 注意: GitHub Actions SA への roles/billing.costsManager 付与は手動で行う
+# gcloud billing accounts add-iam-policy-binding BILLING_ACCOUNT_ID \
+#   --member="serviceAccount:github-actions-deploy-prod@clearbag-prod.iam.gserviceaccount.com" \
+#   --role="roles/billing.costsManager"
 module "billing_budget" {
   source = "../../modules/billing_budget"
 
@@ -239,6 +233,6 @@ module "billing_budget" {
   depends_on = [
     google_project_iam_member.github_actions_prod,
     google_project_service.billingbudgets,
-    google_billing_account_iam_member.github_actions_costs_manager,
+    google_project_service.cloudbilling,
   ]
 }
