@@ -7,6 +7,20 @@
 
 import { deletePushSubscription, registerPushSubscription } from "./api";
 
+/**
+ * SW が登録済みであればその Registration を返す。
+ * 未登録の場合は /sw.js を登録してから返す。
+ * navigator.serviceWorker.ready は SW が未登録だと永遠に resolve しないため、
+ * このヘルパーでフォールバック登録を行う。
+ */
+async function ensureServiceWorker(): Promise<ServiceWorkerRegistration> {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  if (registrations.length > 0) {
+    return registrations[0];
+  }
+  return navigator.serviceWorker.register("/sw.js");
+}
+
 /** VAPID 公開鍵（Base64url → Uint8Array<ArrayBuffer> 変換） */
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -58,9 +72,10 @@ export async function subscribePush(): Promise<boolean> {
     throw new Error("VAPID 公開鍵が設定されていません");
   }
 
-  // navigator.serviceWorker.ready はSWインストール失敗時に永遠に待機することがあるため、タイムアウトを設ける
+  // ensureServiceWorker で未登録の場合も /sw.js を登録してから取得する
+  // タイムアウトは SW の activate 待ちなど想定外の遅延への安全弁として維持する
   const registration = await Promise.race<ServiceWorkerRegistration>([
-    navigator.serviceWorker.ready,
+    ensureServiceWorker(),
     new Promise<never>((_, reject) =>
       setTimeout(
         () => reject(new Error("Service Worker の準備がタイムアウトしました。ページを再読み込みしてお試しください")),
@@ -91,7 +106,7 @@ export async function unsubscribePush(): Promise<void> {
   if (!isPushSupported()) return;
 
   const registration = await Promise.race<ServiceWorkerRegistration>([
-    navigator.serviceWorker.ready,
+    ensureServiceWorker(),
     new Promise<never>((_, reject) =>
       setTimeout(
         () => reject(new Error("Service Worker の準備がタイムアウトしました。ページを再読み込みしてお試しください")),
