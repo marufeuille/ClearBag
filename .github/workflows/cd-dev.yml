@@ -125,7 +125,7 @@ jobs:
           docker tag "${SHA_URL}" "${LATEST_URL}"
           docker push "${SHA_URL}"
           docker push "${LATEST_URL}"
-          echo "IMAGE_URL=${LATEST_URL}" >> $GITHUB_ENV
+          echo "IMAGE_URL=${SHA_URL}" >> $GITHUB_ENV
 
       - name: Get current image URL (Terraform-only change)
         # バックエンド変更なし → 現行の Cloud Run イメージ URL を引き継ぐ
