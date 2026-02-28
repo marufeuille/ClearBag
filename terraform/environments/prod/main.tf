@@ -228,6 +228,7 @@ module "billing_budget" {
   billing_account_id        = var.billing_account_id
   project_id                = var.project_id
   budget_amount             = var.budget_amount
+  currency_code             = var.currency_code
   notification_channel_name = module.monitoring.notification_channel_name
 
   depends_on = [
