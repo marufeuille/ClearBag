@@ -46,7 +46,7 @@ class PushSubscriptionRequest(BaseModel):
 
 
 class UnsubscribeRequest(BaseModel):
-    endpoint: str
+    endpoint: str | None = None
 
 
 @router.post("", status_code=204)
@@ -71,11 +71,27 @@ async def register_push_subscription(
 
 @router.post("/unsubscribe", status_code=204)
 async def unregister_push_subscription(
-    body: UnsubscribeRequest,
+    body: UnsubscribeRequest | None = None,
     ctx: FamilyContext = Depends(get_family_context),
     user_repo: FirestoreUserConfigRepository = Depends(get_user_config_repo),
 ) -> None:
-    """Firestore から指定 endpoint の Push サブスクリプションを削除する"""
-    key = _endpoint_key(body.endpoint)
-    user_repo.update_user(ctx.uid, {f"web_push_subscriptions.{key}": DELETE_FIELD})
-    logger.info("Push subscription removed: uid=%s, key=%s", ctx.uid, key)
+    """Firestore から Push サブスクリプションを削除する。
+
+    endpoint が指定された場合は該当端末のみ削除する。
+    指定なし（旧クライアントや SW キャッシュ由来のリクエスト）の場合は
+    全サブスクリプションを削除する（後方互換）。
+    """
+    if body and body.endpoint:
+        key = _endpoint_key(body.endpoint)
+        user_repo.update_user(ctx.uid, {f"web_push_subscriptions.{key}": DELETE_FIELD})
+        logger.info("Push subscription removed: uid=%s, key=%s", ctx.uid, key)
+    else:
+        # endpoint なし: 全サブスクリプション削除（旧 SW キャッシュからのリクエスト等）
+        user_repo.update_user(
+            ctx.uid,
+            {
+                "web_push_subscriptions": DELETE_FIELD,
+                "web_push_subscription": DELETE_FIELD,
+            },
+        )
+        logger.info("All push subscriptions removed (no endpoint): uid=%s", ctx.uid)
