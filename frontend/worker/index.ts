@@ -21,6 +21,7 @@ interface PushPayload {
   title: string;
   body: string;
   url?: string;
+  tag?: string;
 }
 
 // Firebase Auth / Google Sign-In が利用する外部エンドポイントは
@@ -48,8 +49,9 @@ sw.addEventListener("push", (event: PushEvent) => {
   event.waitUntil(
     sw.registration.showNotification(title, {
       body,
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-72x72.png",
+      icon: "/icon-192.png",
+      badge: "/icon-badge-72.png",
+      tag: payload.tag ?? "clearbag-default",
       data: { url },
     })
   );
