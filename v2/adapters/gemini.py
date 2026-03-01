@@ -28,9 +28,8 @@ from v2.domain.models import (
     Category,
     DocumentAnalysis,
     EventData,
-    Profile,
-    Rule,
     TaskData,
+    UserProfile,
 )
 from v2.domain.ports import DocumentAnalyzer
 
@@ -65,8 +64,8 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
         self,
         content: bytes,
         mime_type: str,
-        profiles: dict[str, Profile],
-        rules: list[Rule],
+        profiles: dict[str, UserProfile],
+        rules: list | None = None,
     ) -> DocumentAnalysis:
         """
         文書を解析して構造化データを抽出。
@@ -86,7 +85,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
         try:
             # プロンプト構築
             self._build_system_prompt()
-            user_prompt = self._build_user_prompt(profiles, rules)
+            user_prompt = self._build_user_prompt(profiles, rules or [])
 
             # Gemini API呼び出し
             document_part = Part.from_data(data=content, mime_type=mime_type)
@@ -176,9 +175,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
 出力は必ずJSON形式で行ってください。Markdownのコードブロックは不要です。
 """
 
-    def _build_user_prompt(
-        self, profiles: dict[str, Profile], rules: list[Rule]
-    ) -> str:
+    def _build_user_prompt(self, profiles: dict[str, UserProfile], rules: list) -> str:
         """ユーザープロンプトを構築"""
         # ProfilesをJSONに変換（dataclass → dict）
         profiles_dict = {
@@ -187,21 +184,11 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
                 "name": p.name,
                 "grade": p.grade,
                 "keywords": p.keywords,
-                "calendar_id": p.calendar_id,
             }
             for pid, p in profiles.items()
         }
 
-        # RulesをJSONに変換（dataclass → dict）
-        rules_list = [
-            {
-                "rule_id": r.rule_id,
-                "target_profile": r.target_profile,
-                "rule_type": r.rule_type,
-                "content": r.content,
-            }
-            for r in rules
-        ]
+        rules_list = rules
 
         profiles_str = json.dumps(profiles_dict, ensure_ascii=False, indent=2)
         rules_str = json.dumps(rules_list, ensure_ascii=False, indent=2)

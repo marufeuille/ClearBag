@@ -99,8 +99,7 @@ class TestNotifyAnalysisComplete:
             for i in range(5)
         ]
         tasks = [
-            SimpleNamespace(title=f"タスク{i}", due_date="2025-10-20")
-            for i in range(4)
+            SimpleNamespace(title=f"タスク{i}", due_date="2025-10-20") for i in range(4)
         ]
 
         with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:

@@ -16,27 +16,6 @@ class Category(Enum):
 
 
 @dataclass(frozen=True)
-class Profile:
-    """家族メンバーのプロファイル"""
-
-    id: str  # 例: "CHILD1"
-    name: str  # 例: "太郎"
-    grade: str  # 例: "小3"
-    keywords: str  # 例: "サッカー,遠足"
-    calendar_id: str  # 例: "c_abc123@group.calendar.google.com"
-
-
-@dataclass(frozen=True)
-class Rule:
-    """処理ルール"""
-
-    rule_id: str  # 例: "R001"
-    target_profile: str  # 例: "CHILD1" or "ALL"
-    rule_type: str  # 例: "REMINDER", "IGNORE", "NAMING"
-    content: str  # 例: "持ち物が必要なイベントは3日前にタスク期限を設定"
-
-
-@dataclass(frozen=True)
 class EventData:
     """カレンダーイベントデータ"""
 
@@ -116,26 +95,3 @@ class Invitation:
     token: str  # UUID v4（URLに埋め込む）
     status: str  # "pending" | "accepted" | "expired"
     invited_by_uid: str
-
-
-@dataclass(frozen=True)
-class FileInfo:
-    """Google Driveファイル情報"""
-
-    id: str  # Google Drive file ID
-    name: str  # 元のファイル名
-    mime_type: str  # 例: "application/pdf"
-    web_view_link: str = ""
-
-
-@dataclass(frozen=True)
-class ProcessingResult:
-    """各ファイル処理の結果。テストや冪等性チェックに利用。"""
-
-    file_info: FileInfo
-    analysis: DocumentAnalysis | None = None
-    events_created: int = 0
-    tasks_created: int = 0
-    notification_sent: bool = False
-    archived: bool = False
-    error: str | None = None

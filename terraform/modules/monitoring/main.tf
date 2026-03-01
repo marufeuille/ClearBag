@@ -13,8 +13,10 @@ resource "google_monitoring_notification_channel" "email" {
   }
 }
 
-# Cloud Run Job 実行失敗アラート
+# Cloud Run Job 実行失敗アラート（job_name が指定された場合のみ作成）
 resource "google_monitoring_alert_policy" "job_failure" {
+  count = var.job_name != "" ? 1 : 0
+
   project      = var.project_id
   display_name = "Cloud Run Job Failure - ${var.job_name}"
   combiner     = "OR"

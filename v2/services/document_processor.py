@@ -1,11 +1,7 @@
 """DocumentProcessor - 単一ファイルのAI解析サービス
 
-orchestrator._process_single から解析コアロジックを抽出した独立サービス。
-バッチモード（Cloud Run Jobs）と API ワーカー（Cloud Tasks）の両方から利用可能。
-
 設計方針:
-- ストレージ操作（Drive/GCS）はここでは行わない
-- アクション実行（Calendar/Todoist）もここでは行わない
+- ストレージ操作（GCS）はここでは行わない
 - 「content → DocumentAnalysis」の変換のみに責務を絞る
 """
 
@@ -13,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from v2.domain.models import DocumentAnalysis, Profile, Rule
+from v2.domain.models import DocumentAnalysis, UserProfile
 from v2.domain.ports import DocumentAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -39,8 +35,8 @@ class DocumentProcessor:
         self,
         content: bytes,
         mime_type: str,
-        profiles: dict[str, Profile],
-        rules: list[Rule],
+        profiles: dict[str, UserProfile],
+        rules: list | None = None,
     ) -> DocumentAnalysis:
         """
         ファイル内容を解析して DocumentAnalysis を返す。
@@ -48,8 +44,8 @@ class DocumentProcessor:
         Args:
             content: ファイルのバイナリ内容
             mime_type: MIMEタイプ（例: "application/pdf", "image/jpeg"）
-            profiles: プロファイル辞書 (profile_id -> Profile)
-            rules: 適用するルールのリスト
+            profiles: プロファイル辞書 (profile_id -> UserProfile)
+            rules: 適用するルールのリスト（省略可）
 
         Returns:
             DocumentAnalysis: 解析結果（category/events/tasks/summary 等）
@@ -58,11 +54,10 @@ class DocumentProcessor:
             Exception: 解析に失敗した場合（ログ記録後に再送出）
         """
         logger.info(
-            "Processing document: mime_type=%s, size=%d bytes, profiles=%d, rules=%d",
+            "Processing document: mime_type=%s, size=%d bytes, profiles=%d",
             mime_type,
             len(content),
             len(profiles),
-            len(rules),
         )
 
         try:

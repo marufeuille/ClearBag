@@ -14,76 +14,37 @@ from v2.domain.models import (
     Category,
     DocumentAnalysis,
     EventData,
-    FileInfo,
-    Profile,
-    Rule,
     TaskData,
+    UserProfile,
 )
 from v2.domain.ports import (
-    CalendarService,
-    ConfigSource,
     DocumentAnalyzer,
-    FileStorage,
-    Notifier,
-    TaskService,
 )
 
 # ========== サンプルデータ ==========
 
 
 @pytest.fixture
-def sample_profile_child1() -> Profile:
+def sample_user_profile_child1() -> UserProfile:
     """サンプルプロファイル: 子供1"""
-    return Profile(
-        id="CHILD1",
-        name="太郎",
-        grade="小3",
-        keywords="サッカー,遠足",
-        calendar_id="calendar_child1@example.com",
-    )
+    return UserProfile(id="CHILD1", name="太郎", grade="小3", keywords="サッカー,遠足")
 
 
 @pytest.fixture
-def sample_profile_child2() -> Profile:
+def sample_user_profile_child2() -> UserProfile:
     """サンプルプロファイル: 子供2"""
-    return Profile(
-        id="CHILD2",
-        name="花子",
-        grade="小1",
-        keywords="ダンス",
-        calendar_id="calendar_child2@example.com",
-    )
+    return UserProfile(id="CHILD2", name="花子", grade="小1", keywords="ダンス")
 
 
 @pytest.fixture
-def sample_profiles(sample_profile_child1, sample_profile_child2) -> dict[str, Profile]:
+def sample_profiles(
+    sample_user_profile_child1, sample_user_profile_child2
+) -> dict[str, UserProfile]:
     """サンプルプロファイル辞書"""
     return {
-        "CHILD1": sample_profile_child1,
-        "CHILD2": sample_profile_child2,
+        "CHILD1": sample_user_profile_child1,
+        "CHILD2": sample_user_profile_child2,
     }
-
-
-@pytest.fixture
-def sample_rule() -> Rule:
-    """サンプルルール"""
-    return Rule(
-        rule_id="R001",
-        target_profile="ALL",
-        rule_type="REMINDER",
-        content="持ち物が必要なイベントは3日前にタスク期限を設定する",
-    )
-
-
-@pytest.fixture
-def sample_file_info() -> FileInfo:
-    """サンプルファイル情報"""
-    return FileInfo(
-        id="file_123",
-        name="遠足のお知らせ.pdf",
-        mime_type="application/pdf",
-        web_view_link="https://drive.google.com/file/d/file_123/view",
-    )
 
 
 @pytest.fixture
@@ -140,49 +101,8 @@ def sample_analysis(
 
 
 @pytest.fixture
-def mock_config(sample_profiles, sample_rule) -> MagicMock:
-    """ConfigSource のモック"""
-    mock = MagicMock(spec=ConfigSource)
-    mock.load_profiles.return_value = sample_profiles
-    mock.load_rules.return_value = [sample_rule]
-    return mock
-
-
-@pytest.fixture
-def mock_storage(sample_file_info) -> MagicMock:
-    """FileStorage のモック"""
-    mock = MagicMock(spec=FileStorage)
-    mock.list_inbox_files.return_value = [sample_file_info]
-    mock.download.return_value = b"fake-pdf-content"
-    return mock
-
-
-@pytest.fixture
 def mock_analyzer(sample_analysis) -> MagicMock:
     """DocumentAnalyzer のモック"""
     mock = MagicMock(spec=DocumentAnalyzer)
     mock.analyze.return_value = sample_analysis
-    return mock
-
-
-@pytest.fixture
-def mock_calendar() -> MagicMock:
-    """CalendarService のモック"""
-    mock = MagicMock(spec=CalendarService)
-    mock.create_event.return_value = "event_123"
-    return mock
-
-
-@pytest.fixture
-def mock_task_service() -> MagicMock:
-    """TaskService のモック"""
-    mock = MagicMock(spec=TaskService)
-    mock.create_task.return_value = "task_456"
-    return mock
-
-
-@pytest.fixture
-def mock_notifier() -> MagicMock:
-    """Notifier のモック"""
-    mock = MagicMock(spec=Notifier)
     return mock
