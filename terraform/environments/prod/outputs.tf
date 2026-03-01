@@ -22,3 +22,8 @@ output "github_actions_service_account_email" {
   description = "GitHub Actions prod デプロイ用 SA メールアドレス（GitHub Environment Secret: WIF_SERVICE_ACCOUNT に設定）"
   value       = module.workload_identity.service_account_email
 }
+
+output "api_service_url" {
+  description = "B2C API Cloud Run Service の URL"
+  value       = module.api_service.service_url
+}

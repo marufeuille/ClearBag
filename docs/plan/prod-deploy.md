@@ -1,407 +1,410 @@
-# prod 環境デプロイ計画
+# ClearBag 本番環境デプロイ計画
 
-## 目標
+## Context
 
-GitHub の tag push (`v*`) をトリガーとして、GitHub Actions 経由で prod 環境へ自動デプロイする仕組みを構築する。
-既存の手動デプロイ済み prod 環境は、新環境が正常稼働後に削除する。
-
----
-
-## 現状確認
-
-| 項目 | dev 環境 (現状) | prod 環境 (今回構築) |
-|------|----------------|---------------------|
-| トリガー | `main` ブランチ push | GitHub tag push (`v*`) |
-| イメージタグ (Terraform) | `:latest` | `:<sha7>` (+ `prod-latest` エイリアス) |
-| Artifact Registry | `school-agent-dev` | `school-agent-prod` (新規) |
-| WIF | `github-actions` pool + `github-actions-deploy` SA | 同 pool を参照、`github-actions-deploy-prod` SA を新規作成 |
-| GCP プロジェクト | `clearbag-prod` | 同一プロジェクト (現状に合わせる) |
+ClearBag の B2C SaaS 基盤は dev 環境（`clearbag-dev`）で稼働中だが、prod 環境は GCP プロジェクトすら未作成。
+既存の `terraform/environments/prod/main.tf` にはインフラの骨格（SA, AR, WIF, Monitoring, Billing）のみ定義されており、
+アプリ実体（Cloud Run Service, Firestore, GCS, Cloud Tasks, Secret Manager, Scheduler）がすべて欠落している。
+本計画では dev 環境をリファレンスに prod を一から構築する。
 
 ---
 
-## イメージタグ戦略の決定
+## Phase 0: 手動セットアップ（GCP/Firebase/シークレット）
 
-### dev vs prod の問題
+> コード変更なし。GCP Console・CLI・Firebase Console で実施。
 
-dev は `latest` タグを使うため、`main` push のたびに `latest` が更新される。
-GCP Cloud Run Jobs は **Job 更新時点のイメージダイジェストを内部的に固定する**仕様のため、
-`prod-latest` のような可変タグを Terraform の `image_url` にしても、タグが更新されるだけでは
-Job 定義が変わらず、Terraform apply が no-op になり新イメージが反映されない。
+### 0-1. GCP プロジェクト作成 & Billing 紐付け
 
-### 採用方針
-
-- Terraform `image_url` には **`<sha7>` タグ** を使用する
-  → 毎回異なる URL になるため Terraform が差分を検出し Cloud Run Job を更新する
-- **`prod-latest` タグも同時に push** する
-  → オペレーター参照・ロールバック確認用の安定したエイリアスとして機能する
-  → このタグは GitHub tag push 時のみ更新されるため、dev の `latest` とは明確に区別できる
-
+```bash
+gcloud projects create clearbag-prod --name="ClearBag Prod"
+gcloud billing projects link clearbag-prod --billing-account=<BILLING_ACCOUNT_ID>
 ```
-asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:<sha7>   ← Terraform が参照
-asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:prod-latest  ← エイリアス
-asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:v1.2.3  ← GitHub tag 名と同一
+
+### 0-2. Terraform ブートストラップ用 API 有効化
+
+Terraform が管理する API の有効化は `google_project_service` で行うが、Terraform 自体の実行に必要な最低限の API は手動で有効化:
+
+```bash
+gcloud services enable \
+  iam.googleapis.com \
+  cloudresourcemanager.googleapis.com \
+  sts.googleapis.com \
+  iamcredentials.googleapis.com \
+  artifactregistry.googleapis.com \
+  run.googleapis.com \
+  secretmanager.googleapis.com \
+  cloudscheduler.googleapis.com \
+  aiplatform.googleapis.com \
+  storage.googleapis.com \
+  --project=clearbag-prod
 ```
+
+### 0-3. Terraform state バケット作成
+
+```bash
+gcloud storage buckets create gs://clearbag-prod-terraform-backend \
+  --project=clearbag-prod \
+  --location=asia-northeast1 \
+  --uniform-bucket-level-access
+```
+
+### 0-4. Firebase プロジェクト設定
+
+```bash
+firebase projects:addfirebase clearbag-prod
+```
+
+Firebase Console で:
+1. **Authentication** > Google sign-in 有効化
+2. **Firestore** > `asia-northeast1` に Native mode で DB 作成
+3. **Hosting** > 初期化（デプロイは CI から実施）
+4. **Web アプリ追加** > 設定値（API_KEY, AUTH_DOMAIN, APP_ID 等）を控える
+
+### 0-5. VAPID キー生成
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Public key → GitHub Secrets (`NEXT_PUBLIC_VAPID_PUBLIC_KEY`) + Terraform 環境変数
+Private key → Phase 1 の Terraform apply 後に Secret Manager へ格納:
+
+```bash
+echo -n "<PRIVATE_KEY>" | gcloud secrets versions add clearbag-vapid-private-key-prod \
+  --project=clearbag-prod --data-file=-
+```
+
+### 0-6. ローカルから初回 Terraform apply（WIF ブートストラップ）
+
+Phase 1 のコード変更後、ローカル ADC でまず WIF + SA + AR だけを作成。
+Cloud Run Service のイメージがまだ存在しないため、2段階 apply が必要:
+
+**ステップ A**: `api_service`, `morning_digest_scheduler`, `event_reminder_scheduler` モジュールを一時コメントアウトして apply
+**ステップ B**: プレースホルダイメージを push
+
+```bash
+docker pull gcr.io/cloudrun/hello
+docker tag gcr.io/cloudrun/hello asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:latest-prod
+gcloud auth configure-docker asia-northeast1-docker.pkg.dev --quiet
+docker push asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:latest-prod
+```
+
+**ステップ C**: コメントアウトを戻して再度 apply → Cloud Run Service + Scheduler が作成される
+
+### 0-7. billing.costsManager 手動付与
+
+```bash
+gcloud billing accounts add-iam-policy-binding <BILLING_ACCOUNT_ID> \
+  --member="serviceAccount:github-actions-deploy-prod@clearbag-prod.iam.gserviceaccount.com" \
+  --role="roles/billing.costsManager"
+```
+
+### 0-8. 確認チェックリスト
+
+- [ ] `gcloud projects describe clearbag-prod` が正常
+- [ ] `gsutil ls gs://clearbag-prod-terraform-backend` が正常
+- [ ] `firebase projects:list` に `clearbag-prod` 表示
+- [ ] Firebase Auth Google sign-in 有効
+- [ ] VAPID キーペア生成済み
 
 ---
 
-## Terraform 構成
+## Phase 1: Terraform prod/main.tf 書き換え
 
-### ディレクトリ構造
+### 変更ファイル一覧
+
+| ファイル | 変更内容 |
+|---|---|
+| `terraform/environments/prod/main.tf` | B2C 基盤リソース追加（~130行追加） |
+| `terraform/environments/prod/variables.tf` | 変数 3 つ追加 |
+| `terraform/environments/prod/terraform.tfvars` | バッチ時代の値を削除 |
+| `terraform/environments/prod/outputs.tf` | `api_service_url` 追加 |
+
+### 1-1. `main.tf` に追加する GCP API リソース
+
+`billingbudgets`/`cloudbilling` は既存。以下 7 つを追加:
 
 ```
-terraform/
-├── environments/
-│   ├── dev/          # 既存 (変更なし)
-│   └── prod/         # 新規作成
-│       ├── main.tf
-│       ├── variables.tf
-│       ├── outputs.tf
-│       └── terraform.tfvars
-└── modules/          # 既存モジュールを流用 (変更なし)
+google_project_service.sts                  (sts.googleapis.com)
+google_project_service.iamcredentials       (iamcredentials.googleapis.com)
+google_project_service.cloudresourcemanager  (cloudresourcemanager.googleapis.com)
+google_project_service.firestore            (firestore.googleapis.com)
+google_project_service.cloudtasks           (cloudtasks.googleapis.com)
+google_project_service.firebase             (firebase.googleapis.com)
+google_project_service.firebasehosting      (firebasehosting.googleapis.com)
 ```
 
-### backend 設定
+参考: dev/main.tf:87-171
+
+### 1-2. WIF module に `depends_on` 追加
+
+現状 prod の `module "workload_identity"` に `depends_on` がない（dev:111-114 にはある）。
+`google_project_service.sts` と `google_project_service.iamcredentials` への依存を追加。
+
+### 1-3. GitHub Actions IAM ロール 3 つ追加
+
+`github_actions_prod_roles` local に追加:
+- `roles/datastore.owner` — Firestore 管理
+- `roles/cloudtasks.admin` — Cloud Tasks キュー管理
+- `roles/firebasehosting.admin` — Firebase Hosting デプロイ
+
+参考: dev/main.tf:130-132
+
+### 1-4. Cloud Run SA self-actAs IAM 追加
+
+Cloud Tasks の OIDC トークン生成に必要。prod に欠落中。
 
 ```hcl
-backend "gcs" {
-  bucket = "clearbag-prod-terraform-backend"
-  prefix = "terraform/environments/prod"
+resource "google_service_account_iam_member" "cloud_run_self_actas" {
+  service_account_id = google_service_account.cloud_run.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 ```
 
-既存の dev と同一バケットの別 prefix を使用する。
+参考: dev/main.tf:50-56
 
-### 作成リソース一覧
+### 1-5. B2C モジュール追加（7 モジュール）
 
-| リソース種別 | リソース名 | 備考 |
-|-------------|-----------|------|
-| Service Account | `school-agent-v2-prod` | Cloud Run Job 実行用 |
-| IAM binding | `roles/aiplatform.user` → 上記 SA | Vertex AI 呼び出し権限 |
-| IAM binding | `roles/iam.serviceAccountTokenCreator` → Cloud Scheduler SA | スケジューラー呼び出し権限 |
-| Artifact Registry | `school-agent-prod` | prod 専用リポジトリ |
-| Secret Manager | `school-agent-slack-bot-token-prod` | |
-| Secret Manager | `school-agent-slack-channel-id-prod` | |
-| Secret Manager | `school-agent-todoist-api-token-prod` | |
-| Cloud Run Job | `school-agent-v2-prod` | |
-| Cloud Scheduler | `school-agent-v2-scheduler-prod` | スケジュールは dev と同じ `0 9,17 * * *` を初期値に |
-| Service Account | `github-actions-deploy-prod` | GitHub Actions デプロイ用 |
-| WIF binding | 既存 pool への SA バインド | pool/provider は dev Terraform 管理のものを ID 指定で参照 |
-| IAM bindings | 各種権限 → `github-actions-deploy-prod` SA | 下記参照 |
+| モジュール | prod 固有設定 | 参考 |
+|---|---|---|
+| `module "firestore"` | `deletion_policy = "ABANDON"` (prod安全策) | dev:179-192 |
+| `module "cloud_storage_uploads"` | bucket: `clearbag-prod-clearbag-uploads-prod`, lifecycle: 365日 | dev:194-201 |
+| `module "cloud_tasks_analysis"` | queue: `clearbag-analysis-prod` | dev:203-219 |
+| `module "secret_vapid_private_key"` | secret: `clearbag-vapid-private-key-prod` | dev:221-227 |
+| `module "api_service"` | 下記参照 | dev:229-274 |
+| `module "morning_digest_scheduler"` | job: `clearbag-morning-digest-prod` | dev:314-327 |
+| `module "event_reminder_scheduler"` | job: `clearbag-event-reminder-prod` | dev:329-343 |
 
-### GitHub Actions SA に付与する IAM ロール (prod)
-
-dev と同一セットを prod スコープで付与:
-
-```
-roles/artifactregistry.writer          # Docker push
-roles/run.developer                    # Cloud Run Job 更新
-roles/iam.serviceAccountUser           # Cloud Run SA として実行
-roles/storage.admin                    # Terraform state (GCS)
-roles/cloudscheduler.admin             # Cloud Scheduler 管理
-roles/resourcemanager.projectIamAdmin  # IAM ポリシー変更
-roles/secretmanager.admin              # Secret Manager 管理
-roles/serviceusage.serviceUsageAdmin   # API 有効化
-roles/iam.serviceAccountAdmin          # SA 作成・管理
-```
-
-### WIF の取り扱い
-
-WIF Pool・Provider は dev Terraform で管理済みのため、prod Terraform では新規作成しない。
-prod SA (`github-actions-deploy-prod`) を既存 pool に WIF バインドする:
+**Firestore の `import` ブロック**: Firebase Console で Firestore を先に作成した場合は必要:
 
 ```hcl
-resource "google_service_account_iam_member" "wif_binding_prod" {
-  service_account_id = google_service_account.github_actions_prod.name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/attribute.repository/marufeuille/ClearBag"
+import {
+  to = module.firestore.google_firestore_database.this
+  id = "projects/clearbag-prod/databases/(default)"
 }
 ```
 
-`<PROJECT_NUMBER>` は `data "google_project"` で動的取得する。
+### 1-6. `api_service` の prod 固有設定
 
----
+dev との主要差分:
 
-## GitHub Actions ワークフロー
+| 環境変数 | dev | prod |
+|---|---|---|
+| `DISABLE_RATE_LIMIT` | `"true"` | **設定しない**（rate limit 有効） |
+| `CORS_ORIGINS` | `clearbag-dev.web.app,...` | `clearbag-prod.web.app,clearbag-prod.firebaseapp.com` |
+| `FRONTEND_BASE_URL` | `clearbag-dev.web.app` | `clearbag-prod.web.app` |
+| `API_BASE_URL` | `clearbag-api-dev-...` | `clearbag-api-prod-...` |
+| `WORKER_URL` | `clearbag-api-dev-.../worker/analyze` | `clearbag-api-prod-.../worker/analyze` |
+| service_name | `clearbag-api-dev` | `clearbag-api-prod` |
 
-### ファイル: `.github/workflows/cd-prod.yml`
+### 1-7. `variables.tf` — 変数 3 つ追加
 
+```hcl
+variable "api_image_url" {
+  description = "B2C API サーバーのコンテナイメージ URL（deploy 時に -var で渡す）"
+  type        = string
+  default     = "asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:latest-prod"
+}
+
+variable "allowed_emails" {
+  description = "ログイン許可メールアドレス（カンマ区切り）。未設定の場合は全員許可。"
+  type        = string
+  default     = ""
+}
+
+variable "vapid_claims_email" {
+  description = "Web Push VAPID クレームの連絡先メールアドレス（mailto: に使用）"
+  type        = string
+  default     = ""
+}
 ```
-on:
-  push:
-    tags:
-      - 'v*'
-```
 
-#### ジョブ構成
+### 1-8. `terraform.tfvars` — クリーンアップ
 
-1. **lint** - dev と同じ ruff lint チェック
-2. **test** - dev と同じ pytest 実行
-3. **deploy** (needs: [lint, test])
-   - Environment: `prod`
-   - concurrency: `deploy-prod`
-   - 手順:
-     1. WIF 認証 (prod secrets: `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`)
-     2. Docker 認証
-     3. `uv export` で requirements.txt 生成
-     4. イメージビルド
-        - `IMAGE_TAG = "${GITHUB_SHA::7}"`  (SHA タグ)
-        - `RELEASE_TAG = "${GITHUB_REF_NAME}"` (例: `v1.2.3`)
-        - SHA URL: `<registry>/school-agent-prod/school-agent-v2:<sha7>`
-        - `prod-latest` URL: `<registry>/school-agent-prod/school-agent-v2:prod-latest`
-        - Release tag URL: `<registry>/school-agent-prod/school-agent-v2:<v1.2.3>`
-     5. 3タグすべて push
-     6. Terraform init / apply
-        - `working-directory: terraform/environments/prod`
-        - `-var="image_url=${SHA_URL}"` ← SHA タグで固定
+バッチ時代の `image_url`, `inbox_folder_id`, `spreadsheet_id`, `archive_folder_id` を削除。
+`project_id = "clearbag-prod"` のみ残す。
 
-#### Terraform apply に渡す変数
+### 1-9. `outputs.tf` — 追加
 
-| 変数名 | 設定方法 |
-|--------|---------|
-| `project_id` | ワークフロー env または secrets |
-| `image_url` | ビルド時の SHA URL を `$GITHUB_ENV` 経由で渡す |
-| `spreadsheet_id` | GitHub Environment Secret: `TF_VAR_SPREADSHEET_ID` |
-| `inbox_folder_id` | GitHub Environment Secret: `TF_VAR_INBOX_FOLDER_ID` |
-| `archive_folder_id` | GitHub Environment Secret: `TF_VAR_ARCHIVE_FOLDER_ID` |
-
----
-
-## GitHub 設定 (手動作業)
-
-### Environment `prod` の作成
-
-GitHub リポジトリ Settings → Environments → New environment で `prod` を作成し、
-以下の Secrets を設定する:
-
-| Secret 名 | 内容 |
-|-----------|------|
-| `WIF_PROVIDER` | Terraform apply 後に出力される prod SA の WIF Provider パス |
-| `WIF_SERVICE_ACCOUNT` | `github-actions-deploy-prod` SA のメールアドレス |
-| `TF_VAR_SPREADSHEET_ID` | prod 用 Google スプレッドシート ID |
-| `TF_VAR_INBOX_FOLDER_ID` | prod 用 受信フォルダ ID |
-| `TF_VAR_ARCHIVE_FOLDER_ID` | prod 用 アーカイブフォルダ ID |
-
-> オプション: Environment の Protection rules で「Required reviewers」を設定すると、
-> tag push 後に手動承認が必要になり誤デプロイを防止できる。
-
-### Secret Manager への値の手動投入
-
-Terraform は Secret のリソース（シェル）を作成するが、値は別途投入が必要:
-
-```bash
-echo -n "<SLACK_BOT_TOKEN>" | gcloud secrets versions add school-agent-slack-bot-token-prod --data-file=-
-echo -n "<SLACK_CHANNEL_ID>" | gcloud secrets versions add school-agent-slack-channel-id-prod --data-file=-
-echo -n "<TODOIST_API_TOKEN>" | gcloud secrets versions add school-agent-todoist-api-token-prod --data-file=-
+```hcl
+output "api_service_url" {
+  description = "B2C API Cloud Run Service の URL（フロントエンド NEXT_PUBLIC_API_BASE_URL に設定）"
+  value       = module.api_service.service_url
+}
 ```
 
 ---
 
-## デプロイ手順
+## Phase 2: CI/CD ワークフロー更新
 
-### Phase 1: Terraform prod 環境の初期構築
+### 変更ファイル一覧
 
-```
-前提: terraform/environments/prod/ ファイルを作成済み
-```
+| ファイル | 変更内容 |
+|---|---|
+| `.github/workflows/cd-prod-terraform.yml` | Terraform vars 追加 + フロントエンドデプロイジョブ追加 |
+| `.github/workflows/tf-cmt-prod.yml` | PR トリガー有効化 + vars 追加 |
 
-1. 初回は GitHub Actions を使わず、ローカルから初期化のみ実施
-   ```bash
-   cd terraform/environments/prod
-   terraform init
-   # (plan で確認後)
-   terraform apply -var="image_url=dummy" -var="project_id=..." ...
-   ```
-   ※ `image_url=dummy` で一旦インフラだけ構築。Cloud Run Job は後で正しいイメージで上書き。
+### 2-1. `cd-prod-terraform.yml` — Terraform Apply 修正
 
-   **または**: 初回デプロイは tag を push して Actions 経由で実施 (推奨)
-   → Artifact Registry や Secret Manager 等がないと Actions が失敗するため、
-     先に Terraform で `exclude_resources = [cloud_run_job, cloud_scheduler]` 的に部分 apply するか、
-     Actions の deploy ジョブを 2 段階に分けることを検討する
+現状（行 60-63）: `IMAGE_URL` を解決するが Terraform に渡していない。
 
-2. Terraform outputs から WIF 情報を取得し、GitHub Environment Secrets に設定
-3. Secret Manager に値を投入
-
-### Phase 2: 初回 prod リリース
-
-1. Secret Manager に prod の各シークレット値を投入 (上記コマンド)
-2. main ブランチで動作確認完了後、tag を打つ:
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-3. GitHub Actions `cd-prod.yml` が起動 → テスト → イメージビルド → Terraform apply
-4. Cloud Run Job が正常に実行されることを確認
-
-### Phase 3: 既存手動デプロイの削除
-
-新環境が正常稼働していることを確認後、手動デプロイで作成したリソースを削除:
-
-```bash
-# 手動でデプロイされた Cloud Run Job (名前を確認の上)
-gcloud run jobs delete <OLD_PROD_JOB_NAME> --region=asia-northeast1
-
-# 手動でデプロイされた Cloud Scheduler (あれば)
-gcloud scheduler jobs delete <OLD_PROD_SCHEDULER_NAME> --location=asia-northeast1
-
-# 手動で作成した Service Account (あれば、かつ Terraform 管理外であれば)
-# gcloud iam service-accounts delete <OLD_SA_EMAIL>
+修正後:
+```yaml
+terraform apply -auto-approve \
+  -var="api_image_url=${IMAGE_URL}" \
+  -var="project_id=${{ env.PROJECT_ID }}" \
+  -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}" \
+  -var="allowed_emails=${{ secrets.TF_VAR_ALLOWED_EMAILS }}" \
+  -var="billing_account_id=${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}" \
+  -var="vapid_claims_email=${{ secrets.TF_VAR_VAPID_CLAIMS_EMAIL }}"
 ```
 
-> Terraform 管理対象のリソースは `terraform destroy` を使わないこと。
++ Terraform output 取得ステップ追加（`api_service_url`）
++ `deploy` ジョブに `outputs:` 追加
 
----
+### 2-2. `cd-prod-terraform.yml` — `deploy-frontend` ジョブ追加
 
-## ロールバック戦略
+`cd-dev.yml:170-234` をベースに prod 用に作成:
+- `needs: [deploy]` で Terraform deploy 完了後に実行
+- Cloud Run URL を `deploy.outputs.api_service_url` から取得（フォールバック: `gcloud run services describe`）
+- `NEXT_PUBLIC_*` 環境変数を `secrets.*` から注入
+- `npm ci` → `npm run build` → `firebase deploy --only hosting --project clearbag-prod`
 
-### 前提: ロールバックが可能な理由
+### 2-3. `cd-prod-terraform.yml` — `notify` ジョブ更新
 
-Terraform `image_url` に SHA タグを使っているため、以下が担保される:
+`needs` に `deploy-frontend` を追加、`result` 判定に含める。
 
-- Artifact Registry に各バージョンのイメージが残る (`v1.0.0`, `v1.1.0` など)
-- Terraform state に「どの SHA で何の Job が動いているか」が記録される
-- 過去の SHA URL を Terraform apply に渡せば、任意のバージョンに戻せる
+### 2-4. `tf-cmt-prod.yml` — PR トリガー有効化
 
-**Artifact Registry のクリーンアップポリシーに注意**: ロールバック用イメージが自動削除されないよう、
-prod リポジトリではクリーンアップポリシーを設定しないか、最低でも過去 N バージョンを保持する設定にする。
-
----
-
-### ロールバック手順
-
-#### 方法1: GitHub Actions の workflow_dispatch でロールバック（推奨）
-
-`cd-prod.yml` に `workflow_dispatch` トリガーと `target_tag` 入力を追加する:
+行 4-8 のコメントアウトを解除:
 
 ```yaml
 on:
-  push:
-    tags: ['v*']
+  pull_request:
+    paths:
+      - "terraform/environments/prod/**"
+      - "terraform/modules/**"
   workflow_dispatch:
-    inputs:
-      target_tag:
-        description: 'ロールバック先の release tag (例: v1.0.0)'
-        required: true
 ```
 
-ロールバック時の操作:
-```
-GitHub Actions → Run workflow → target_tag に "v1.0.0" を入力 → 実行
-```
-
-ワークフロー内では:
-- `target_tag` 入力がある場合: `git checkout <target_tag>` してそのコードをビルド
-- ただし、**イメージはすでに Artifact Registry に存在**するため、再ビルドしない
-  → Artifact Registry に `v1.0.0` タグのイメージが存在すれば、それを Terraform に渡すだけで良い
-
-```yaml
-- name: Resolve rollback image
-  if: github.event_name == 'workflow_dispatch'
-  run: |
-    TARGET_TAG="${{ github.event.inputs.target_tag }}"
-    SHA_URL="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_ID}/${IMAGE_NAME}:${TARGET_TAG}"
-    echo "SHA_URL=${SHA_URL}" >> $GITHUB_ENV
-    # prod-latest は更新しない（ロールバック中は現在の prod-latest を維持）
-```
-
-**メリット**: Terraform state と実際のリソースが一致したまま
++ plan コマンドに `-var="allowed_emails=..."` と `-var="vapid_claims_email=..."` 追加
 
 ---
 
-#### 方法2: 緊急ロールバック（手動 gcloud）
+## Phase 3: GitHub Secrets 設定
 
-デプロイパイプラインが壊れていて Actions が使えない緊急時:
+GitHub Environment `prod` に以下を追加:
+
+### 既存 Secrets（Phase 0 で設定済みのはず）
+
+| Secret | 値の取得元 |
+|---|---|
+| `WIF_PROVIDER` | `terraform output workload_identity_provider` |
+| `WIF_SERVICE_ACCOUNT` | `terraform output github_actions_service_account_email` |
+| `TF_VAR_NOTIFICATION_EMAIL` | 通知先メールアドレス |
+| `TF_VAR_BILLING_ACCOUNT_ID` | GCP 請求先アカウント ID |
+| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL |
+
+### 新規追加 Secrets（9 個）
+
+| Secret | 値 |
+|---|---|
+| `TF_VAR_ALLOWED_EMAILS` | カンマ区切りの許可メールアドレス |
+| `TF_VAR_VAPID_CLAIMS_EMAIL` | VAPID 連絡先メールアドレス |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase Console > Web アプリ設定 |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `clearbag-prod.firebaseapp.com` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | `clearbag-prod` |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | `clearbag-prod.firebasestorage.app` |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Console |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase Console |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Phase 0-5 で生成した公開鍵 |
 
 ```bash
-# ロールバック先のイメージ URL を確認 (例: v1.0.0 タグ)
-ROLLBACK_URL="asia-northeast1-docker.pkg.dev/clearbag-prod/school-agent-prod/school-agent-v2:v1.0.0"
-
-# Cloud Run Job を直接更新
-gcloud run jobs update school-agent-v2-prod \
-  --image="${ROLLBACK_URL}" \
-  --region=asia-northeast1
+# 一括設定例
+gh secret set TF_VAR_ALLOWED_EMAILS --env prod --body "..."
+gh secret set NEXT_PUBLIC_FIREBASE_API_KEY --env prod --body "..."
+# ... (全 9 個)
 ```
-
-**注意**: この操作は Terraform state と実際のリソースを乖離させる。
-次回 `terraform apply` 時に最新の Terraform 設定（最後に apply した SHA）に上書きされるため、
-緊急ロールバック後は必ず方法1でロールバックを Terraform 管理下に戻すこと。
 
 ---
 
-#### 方法3: 旧バージョンタグで新 release tag を切る（コードレベルでのロールバック）
+## Phase 4: 初回デプロイ & 検証
 
-v1.1.0 で問題が発生し、v1.0.0 のコードに戻したい場合:
+### 4-1. デプロイ手順
+
+1. **PR 作成**: Phase 1-2 のコード変更をブランチに push → PR
+   - `tf-cmt-prod.yml` が Terraform plan をコメント（~20 リソース追加を確認）
+2. **PR マージ** → `cd-dev.yml` 実行（dev のみ、prod 影響なし）
+3. **タグ push**: `git tag v1.0.0 && git push origin v1.0.0`
+   - `cd-prod-build.yml`: lint → test → Docker build → push（3 タグ）
+   - `cd-prod-terraform.yml`: terraform apply → firestore rules → frontend deploy
+4. **CI 監視**:
+   ```bash
+   gh run list
+   gh run watch <run-id>
+   ```
+
+### 4-2. 検証チェックリスト
 
 ```bash
-git checkout v1.0.0
-git checkout -b hotfix/rollback-to-v1.0.0
-# 必要であれば最小限の修正を加えて
-git tag v1.1.1
-git push origin v1.1.1
+# バックエンド API
+curl https://clearbag-api-prod-<NUMBER>.asia-northeast1.run.app/health
+
+# フロントエンド
+curl -I https://clearbag-prod.web.app
+
+# Firestore
+gcloud firestore databases describe --project=clearbag-prod
+
+# Cloud Tasks
+gcloud tasks queues describe clearbag-analysis-prod \
+  --location=asia-northeast1 --project=clearbag-prod
+
+# Cloud Scheduler
+gcloud scheduler jobs list --location=asia-northeast1 --project=clearbag-prod
 ```
 
-`cd-prod.yml` が起動し、v1.0.0 相当のコードで `v1.1.1` イメージをビルドしてデプロイ。
-コードとリリース履歴が明示的に残る。
+### 4-3. E2E 動作確認
+
+1. `https://clearbag-prod.web.app` にアクセス
+2. Google ログイン（`ALLOWED_EMAILS` に含まれるアカウント）
+3. テスト PDF アップロード → 解析完了を確認
+4. カレンダーイベント・タスク表示を確認
+5. Push 通知の受信を確認
 
 ---
 
-### ロールバック判断基準
+## Phase 5: デプロイ後タスク
 
-Cloud Run Jobs は定時実行 (Scheduler) のため、デプロイ直後に次の定時実行が来るまで問題に気づかない可能性がある。
+### 5-1. 初期ユーザーアクティベーション
 
-| 問題の種類 | 確認方法 | 対応 |
-|-----------|---------|------|
-| Job がクラッシュする | Cloud Logging でエラー確認 | 方法1 または 方法2 |
-| Job は成功するが出力が不正 | Slack 通知・スプレッドシートの確認 | 方法1 |
-| Actions パイプラインが壊れている | GitHub Actions のログ確認 | 方法2 |
-| コードレベルの問題 | テスト・ログ解析 | 方法3 |
-
----
-
-### prod-latest タグのロールバック時の扱い
-
-- **通常デプロイ時**: `prod-latest` を最新 SHA に更新する
-- **ロールバック時 (方法1・2)**: `prod-latest` は**更新しない**
-  → ロールバック中であることを明示するため、`prod-latest` が最新リリースを指さない状態を許容する
-  → または `prod-latest` もロールバック先の SHA に戻すことで「現在動いているイメージ = prod-latest」を維持する
-
-設計判断: `prod-latest` は「現在 prod で動いているイメージ」を常に指すようにするのが望ましい。
-ワークフローでは Terraform apply 成功後に `prod-latest` を更新するステップを配置する。
-
----
-
-## 考慮事項・制約
-
-### GCP プロジェクト分離
-
-dev (`clearbag-dev`) と prod (`clearbag-prod`) は別プロジェクト:
-- WIF Pool/Provider はそれぞれのプロジェクト内に独立して作成
-- dev と prod の Terraform state も別バケット (`clearbag-dev-terraform-backend` / `clearbag-prod-terraform-backend`) で管理
-- プロジェクト分離により本番環境への意図しない変更リスクを排除
-
-### 初回 Terraform apply の課題
-
-Cloud Run Job の image_url に有効なイメージが必要なため、以下のいずれかで対応:
-1. **Actions 経由**: Terraform plan のみ先行し、イメージ push 後に apply (推奨)
-2. **ローカル先行**: インフラ部分 (AR, SA, Secrets) を先に apply → tag push で Cloud Run Job 含めて apply
-
-### Cloud Run Job のイメージ更新確認
-
-tag push → Actions → terraform apply が成功したら:
 ```bash
-gcloud run jobs describe school-agent-v2-prod --region=asia-northeast1 --format="get(template.template.containers[0].image)"
+PROJECT_ID=clearbag-prod uv run python scripts/activate_existing_users.py --email <EMAIL>
 ```
-で SHA タグが反映されているか確認する。
+
+### 5-2. Scheduler 手動実行テスト
+
+```bash
+gcloud scheduler jobs run clearbag-morning-digest-prod --location=asia-northeast1 --project=clearbag-prod
+gcloud scheduler jobs run clearbag-event-reminder-prod --location=asia-northeast1 --project=clearbag-prod
+```
+
+### 5-3. prod URL の記録
+
+| 用途 | URL |
+|---|---|
+| フロントエンド | `https://clearbag-prod.web.app` |
+| API | `https://clearbag-api-prod-<NUMBER>.asia-northeast1.run.app` |
+| Swagger UI | `https://clearbag-api-prod-<NUMBER>.asia-northeast1.run.app/docs` |
 
 ---
 
-## ファイル変更サマリー
+## リスクと対策
 
-| ファイル | 操作 |
-|---------|------|
-| `terraform/environments/prod/main.tf` | 新規作成 |
-| `terraform/environments/prod/variables.tf` | 新規作成 |
-| `terraform/environments/prod/outputs.tf` | 新規作成 |
-| `terraform/environments/prod/terraform.tfvars` | 新規作成 (非シークレット値のみ) |
-| `.github/workflows/cd-prod.yml` | 新規作成 |
-| `terraform/environments/dev/` | 変更なし |
-| `terraform/modules/` | 変更なし |
+| リスク | 対策 |
+|---|---|
+| 初回 apply 時にイメージ未存在 | Phase 0-6 でプレースホルダイメージを push |
+| Firestore が Console で先に作成される | `import` ブロックを追加（Phase 1-5 参照） |
+| Secret Manager にバージョン未格納 | Phase 0-5 で VAPID private key を格納してから apply |
+| ALLOWED_EMAILS 空 → 全員アクセス可 | 初期は制限付きで運用し、安定後に開放を検討 |
