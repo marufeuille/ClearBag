@@ -34,8 +34,10 @@ export function useAuth(): AuthState & {
 
   useEffect(() => {
     if (IS_E2E) return;
-    // モバイルリダイレクト認証後の結果を処理する（失敗してもサイレントに無視）
-    getGoogleRedirectResult().catch(() => {});
+    // モバイルリダイレクト認証後の結果を処理する
+    getGoogleRedirectResult().catch((error) => {
+      console.error("[Auth] getRedirectResult failed:", error?.code, error?.message);
+    });
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setState({ user, loading: false });
     });
