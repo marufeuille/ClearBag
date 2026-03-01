@@ -35,13 +35,19 @@ registerRoute(
 );
 
 sw.addEventListener("push", (event: PushEvent) => {
-  if (!event.data) return;
-
   let payload: PushPayload;
-  try {
-    payload = event.data.json() as PushPayload;
-  } catch {
-    payload = { title: "ClearBag", body: event.data.text() };
+
+  if (!event.data) {
+    // Chrome のクロスデバイス通知同期で転送された push は event.data が空になる場合がある。
+    // showNotification() を呼ばないと Chrome が「不正な疑い」通知を自動生成するため、
+    // フォールバック通知を必ず表示する。
+    payload = { title: "ClearBag", body: "新しいお知らせがあります" };
+  } else {
+    try {
+      payload = event.data.json() as PushPayload;
+    } catch {
+      payload = { title: "ClearBag", body: event.data.text() };
+    }
   }
 
   const { title, body, url = "/" } = payload;
