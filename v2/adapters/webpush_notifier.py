@@ -88,6 +88,8 @@ class WebPushNotifier:
                 vapid_claims={
                     "sub": f"mailto:{self._vapid.claims_email}",
                 },
+                content_encoding="aes128gcm",  # RFC 8188 準拠を明示
+                ttl=86400,  # 24時間後に未配信の push を破棄
             )
             logger.info("Web Push sent: endpoint=%s...", subscription.endpoint[:40])
         except WebPushException as e:

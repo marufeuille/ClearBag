@@ -196,6 +196,17 @@ class TestNotifyMorningDigest:
         assert "他 1件" in payload["body"]
 
 
+class TestWebpushCallParameters:
+    def test_content_encoding_and_ttl_are_passed(self, notifier):
+        """content_encoding と ttl が webpush() に渡されることを検証"""
+        with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:
+            notifier.notify_analysis_complete(_SUB, "file.pdf", "doc-001")
+
+        call_kwargs = mock_wp.call_args.kwargs
+        assert call_kwargs["content_encoding"] == "aes128gcm"
+        assert call_kwargs["ttl"] == 86400
+
+
 class TestNotifyEventReminder:
     def test_sends_push_with_event_count(self, notifier):
         events = [MagicMock(), MagicMock(), MagicMock()]
