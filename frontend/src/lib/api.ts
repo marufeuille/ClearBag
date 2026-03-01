@@ -45,6 +45,7 @@ export interface DocumentRecord {
   mime_type: string;
   summary: string;
   category: string;
+  archive_filename: string;
   error_message: string | null;
 }
 

@@ -160,6 +160,7 @@ class FirestoreDocumentRepository(DocumentRepository):
                 "status": "completed",
                 "summary": analysis.summary,
                 "category": analysis.category.value,
+                "archive_filename": analysis.archive_filename,
                 "updated_at": firestore.SERVER_TIMESTAMP,
             },
         )
@@ -330,6 +331,7 @@ class FirestoreDocumentRepository(DocumentRepository):
             "mime_type": record.mime_type,
             "summary": record.summary,
             "category": record.category,
+            "archive_filename": record.archive_filename,
             "error_message": record.error_message,
             "created_at": firestore.SERVER_TIMESTAMP,
             "updated_at": firestore.SERVER_TIMESTAMP,
@@ -347,6 +349,7 @@ class FirestoreDocumentRepository(DocumentRepository):
             mime_type=data.get("mime_type", "application/octet-stream"),
             summary=data.get("summary", ""),
             category=data.get("category", ""),
+            archive_filename=data.get("archive_filename", ""),
             error_message=data.get("error_message"),
         )
 

@@ -58,6 +58,7 @@ def mock_doc_repo():
         mime_type="application/pdf",
         summary="テスト文書",
         category="EVENT",
+        archive_filename="20251025_遠足_長男.pdf",
     )
     return repo
 
@@ -277,6 +278,13 @@ class TestGetDocument:
         mock_doc_repo.get.return_value = None
         response = client.get("/api/documents/nonexistent-id")
         assert response.status_code == 404
+
+    def test_get_document_includes_archive_filename(self, client):
+        """archive_filename がレスポンスに含まれること"""
+        response = client.get(f"/api/documents/{_DOC_ID}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["archive_filename"] == "20251025_遠足_長男.pdf"
 
 
 class TestDeleteDocument:

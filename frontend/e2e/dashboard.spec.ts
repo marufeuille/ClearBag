@@ -25,6 +25,7 @@ test("ファイルアップロード後にドキュメント一覧が更新さ�
             id: "doc-e2e-1",
             status: "pending",
             original_filename: "school-notice.pdf",
+            archive_filename: "",
             mime_type: "application/pdf",
             summary: "",
             category: "",
@@ -72,6 +73,36 @@ test("ファイルアップロード後にドキュメント一覧が更新さ�
   // ドキュメント一覧が更新され、ファイル名と「待機中」ステータスが表示されること
   await expect(page.getByText("school-notice.pdf")).toBeVisible();
   await expect(page.getByText("待機中")).toBeVisible();
+});
+
+test("archive_filename が設定されている場合は original_filename の代わりに表示される", async ({
+  page,
+}) => {
+  await page.route("**/api/documents", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "doc-e2e-2",
+          status: "completed",
+          original_filename: "IMG_1234.jpg",
+          archive_filename: "20251025_遠足_長男.pdf",
+          mime_type: "image/jpeg",
+          summary: "遠足のお知らせ",
+          category: "EVENT",
+          error_message: null,
+        },
+      ]),
+    });
+  });
+
+  await page.goto("/dashboard");
+
+  // archive_filename が優先表示される
+  await expect(page.getByText("20251025_遠足_長男.pdf")).toBeVisible();
+  // original_filename は表示されない
+  await expect(page.getByText("IMG_1234.jpg")).not.toBeVisible();
 });
 
 test("クライアント側: 10MB 超のファイルはアップロード前にエラーになる", async ({

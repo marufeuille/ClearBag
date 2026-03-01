@@ -28,6 +28,7 @@ def notifier():
 
 class TestNotifyAnalysisComplete:
     def test_sends_push_with_correct_payload(self, notifier):
+        """後方互換: events/tasks なしは旧形式のbodyを返す"""
         with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:
             notifier.notify_analysis_complete(_SUB, "学校だより.pdf", "doc-123")
 
@@ -41,9 +42,79 @@ class TestNotifyAnalysisComplete:
         assert payload["url"] == "/documents/doc-123"
         assert payload["tag"] == "analysis-complete-doc-123"
 
+    def test_rich_body_with_summary_and_events_tasks(self, notifier):
+        """events/tasks を渡すとリッチ形式のbodyが生成される"""
+        import json
+        from types import SimpleNamespace
+
+        events = [SimpleNamespace(summary="[長男] 遠足", start="2025-10-25T08:30:00")]
+        tasks = [SimpleNamespace(title="同意書の提出", due_date="2025-10-20")]
+
+        with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:
+            notifier.notify_analysis_complete(
+                _SUB,
+                "20251025_遠足_長男.pdf",
+                "doc-456",
+                summary="遠足のお知らせです。",
+                events=events,
+                tasks=tasks,
+            )
+
+        payload = json.loads(mock_wp.call_args.kwargs["data"])
+        body = payload["body"]
+        assert "20251025_遠足_長男.pdf" in body
+        assert "遠足のお知らせです。" in body
+        assert "[長男] 遠足" in body
+        assert "2025-10-25" in body
+        assert "同意書の提出" in body
+        assert "2025-10-20" in body
+
+    def test_body_truncated_at_200_chars(self, notifier):
+        """200文字を超えるbodyは '...' で切り詰められる"""
+        import json
+
+        long_summary = "あ" * 300
+        with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:
+            notifier.notify_analysis_complete(
+                _SUB,
+                "file.pdf",
+                "doc-789",
+                summary=long_summary,
+                events=[],
+                tasks=[],
+            )
+
+        payload = json.loads(mock_wp.call_args.kwargs["data"])
+        body = payload["body"]
+        assert len(body) <= 200
+        assert body.endswith("...")
+
+    def test_remaining_count_shown_when_more_than_3(self, notifier):
+        """イベント・タスクが3件超のとき「他 N件」が表示される"""
+        import json
+        from types import SimpleNamespace
+
+        events = [
+            SimpleNamespace(summary=f"イベント{i}", start="2025-10-25")
+            for i in range(5)
+        ]
+        tasks = [
+            SimpleNamespace(title=f"タスク{i}", due_date="2025-10-20")
+            for i in range(4)
+        ]
+
+        with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:
+            notifier.notify_analysis_complete(
+                _SUB, "file.pdf", "doc-999", events=events, tasks=tasks
+            )
+
+        payload = json.loads(mock_wp.call_args.kwargs["data"])
+        assert "他 3件" in payload["body"]  # (5-3) + (4-3) = 3
+
 
 class TestNotifyMorningDigest:
     def test_sends_push_with_event_and_task_counts(self, notifier):
+        """後方互換: events/tasks なしは件数ベースのbodyを返す"""
         with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:
             notifier.notify_morning_digest(_SUB, event_count=3, task_count=2)
 
@@ -83,6 +154,46 @@ class TestNotifyMorningDigest:
             notifier.notify_morning_digest(_SUB, event_count=0, task_count=0)
 
         mock_wp.assert_not_called()
+
+    def test_rich_body_with_events_and_tasks_lists(self, notifier):
+        """events/tasks リストを渡すとリッチ形式のbodyが生成される"""
+        import json
+        from types import SimpleNamespace
+
+        events = [SimpleNamespace(summary="[長男] 保護者会", start="2025-03-07")]
+        tasks = [SimpleNamespace(title="集金袋", due_date="2025-03-03")]
+
+        with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:
+            notifier.notify_morning_digest(
+                _SUB, event_count=1, task_count=1, events=events, tasks=tasks
+            )
+
+        payload = json.loads(mock_wp.call_args.kwargs["data"])
+        body = payload["body"]
+        assert "[長男] 保護者会" in body
+        assert "2025-03-07" in body
+        assert "集金袋" in body
+        assert "2025-03-03" in body
+        # 旧形式の「今週の」は含まれないこと
+        assert "今週の" not in body
+
+    def test_digest_body_remaining_count(self, notifier):
+        """4件以上のイベントは「他 N件」で省略される"""
+        import json
+        from types import SimpleNamespace
+
+        events = [
+            SimpleNamespace(summary=f"イベント{i}", start="2025-03-0{i+1}")
+            for i in range(4)
+        ]
+
+        with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:
+            notifier.notify_morning_digest(
+                _SUB, event_count=4, task_count=0, events=events, tasks=[]
+            )
+
+        payload = json.loads(mock_wp.call_args.kwargs["data"])
+        assert "他 1件" in payload["body"]
 
 
 class TestNotifyEventReminder:

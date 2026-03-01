@@ -63,6 +63,7 @@ class DocumentResponse(BaseModel):
     mime_type: str
     summary: str
     category: str
+    archive_filename: str
     error_message: str | None
 
 
@@ -74,6 +75,7 @@ def _to_response(record: DocumentRecord) -> DocumentResponse:
         mime_type=record.mime_type,
         summary=record.summary,
         category=record.category,
+        archive_filename=record.archive_filename,
         error_message=record.error_message,
     )
 

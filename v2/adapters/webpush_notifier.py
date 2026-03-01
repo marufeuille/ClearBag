@@ -103,28 +103,76 @@ class WebPushNotifier:
         subscription: PushSubscription,
         filename: str,
         document_id: str,
+        summary: str = "",
+        events: list | None = None,
+        tasks: list | None = None,
     ) -> None:
         """
         解析完了プッシュ通知を送信する。
 
         Args:
             subscription: 送信先のプッシュサブスクリプション
-            filename: 解析したファイル名
+            filename: 解析したファイル名（archive_filename 優先）
             document_id: 解析結果の確認 URL に使うドキュメント ID
+            summary: Gemini が生成した文書要約（省略時は旧形式）
+            events: 抽出されたイベントリスト（EventData）
+            tasks: 抽出されたタスクリスト（TaskData）
         """
+        body = self._build_analysis_body(filename, summary, events, tasks)
         self.send(
             subscription=subscription,
             title="解析完了",
-            body=f"「{filename}」の解析が完了しました",
+            body=body,
             url=f"/documents/{document_id}",
             tag=f"analysis-complete-{document_id}",
         )
+
+    @staticmethod
+    def _build_analysis_body(
+        filename: str,
+        summary: str = "",
+        events: list | None = None,
+        tasks: list | None = None,
+    ) -> str:
+        """
+        解析完了通知の本文を構築する。
+
+        events/tasks が渡された場合はリッチ形式（ファイル名・要約・予定・タスク）、
+        渡されない場合は旧形式（「filename」の解析が完了しました）を返す。
+        """
+        _MAX_BODY = 200
+        _SHOW = 3
+
+        if events is None and tasks is None:
+            return f"「{filename}」の解析が完了しました"
+
+        events = events or []
+        tasks = tasks or []
+
+        parts = [filename]
+        if summary:
+            parts.append(summary)
+        for ev in events[:_SHOW]:
+            date = ev.start[:10] if ev.start else ""
+            parts.append(f"予定: {ev.summary} ({date})")
+        for task in tasks[:_SHOW]:
+            parts.append(f"タスク: {task.title} ({task.due_date}まで)")
+        remaining = max(0, len(events) - _SHOW) + max(0, len(tasks) - _SHOW)
+        if remaining:
+            parts.append(f"他 {remaining}件")
+
+        body = "\n".join(parts)
+        if len(body) > _MAX_BODY:
+            body = body[: _MAX_BODY - 3] + "..."
+        return body
 
     def notify_morning_digest(
         self,
         subscription: PushSubscription,
         event_count: int,
         task_count: int,
+        events: list | None = None,
+        tasks: list | None = None,
     ) -> None:
         """
         朝のダイジェストプッシュ通知を送信する。
@@ -135,18 +183,14 @@ class WebPushNotifier:
             subscription: 送信先のプッシュサブスクリプション
             event_count: 今後7日間のイベント件数
             task_count: 未完了タスク件数
+            events: イベントリスト（EventData）。渡すとリッチ形式で表示
+            tasks: タスクリスト（StoredTaskData）。渡すとリッチ形式で表示
         """
         if event_count == 0 and task_count == 0:
             logger.debug("Morning digest skipped: no events or tasks")
             return
 
-        parts = []
-        if event_count > 0:
-            parts.append(f"予定 {event_count}件")
-        if task_count > 0:
-            parts.append(f"タスク {task_count}件")
-        body = "今週の " + "、".join(parts) + " があります"
-
+        body = self._build_digest_body(event_count, task_count, events, tasks)
         self.send(
             subscription=subscription,
             title="ClearBag ダイジェスト",
@@ -154,6 +198,52 @@ class WebPushNotifier:
             url="/calendar",
             tag="morning-digest",
         )
+
+    @staticmethod
+    def _build_digest_body(
+        event_count: int,
+        task_count: int,
+        events: list | None = None,
+        tasks: list | None = None,
+    ) -> str:
+        """
+        朝のダイジェスト通知の本文を構築する。
+
+        events/tasks が None の場合は旧形式（件数のみ）、
+        リストが渡された場合はリッチ形式（個別タイトル・日付）を返す。
+        """
+        _MAX_BODY = 200
+        _SHOW = 3
+
+        if events is None and tasks is None:
+            parts = []
+            if event_count > 0:
+                parts.append(f"予定 {event_count}件")
+            if task_count > 0:
+                parts.append(f"タスク {task_count}件")
+            return "今週の " + "、".join(parts) + " があります"
+
+        events = events or []
+        tasks = tasks or []
+
+        lines = []
+        for ev in events[:_SHOW]:
+            date = ev.start[:10] if ev.start else ""
+            lines.append(f"{ev.summary} ({date})")
+        for task in tasks[:_SHOW]:
+            lines.append(f"{task.title} ({task.due_date}まで)")
+        remaining = max(0, len(events) - _SHOW) + max(0, len(tasks) - _SHOW)
+        if remaining:
+            lines.append(f"他 {remaining}件")
+
+        body = (
+            "\n".join(lines)
+            if lines
+            else "今日のスケジュールをClearBagで確認しましょう"
+        )
+        if len(body) > _MAX_BODY:
+            body = body[: _MAX_BODY - 3] + "..."
+        return body
 
     def notify_event_reminder(
         self,
