@@ -39,6 +39,7 @@ class TestNotifyAnalysisComplete:
         assert payload["title"] == "解析完了"
         assert "学校だより.pdf" in payload["body"]
         assert payload["url"] == "/documents/doc-123"
+        assert payload["tag"] == "analysis-complete-doc-123"
 
 
 class TestNotifyMorningDigest:
@@ -54,6 +55,7 @@ class TestNotifyMorningDigest:
         assert "3" in payload["body"]
         assert "2" in payload["body"]
         assert payload["url"] == "/calendar"
+        assert payload["tag"] == "morning-digest"
 
     def test_sends_with_only_events(self, notifier):
         with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:
@@ -96,6 +98,7 @@ class TestNotifyEventReminder:
         assert payload["title"] == "明日の予定リマインダー"
         assert "3" in payload["body"]
         assert payload["url"] == "/calendar"
+        assert payload["tag"] == "event-reminder"
 
     def test_skips_when_no_events(self, notifier):
         with patch("v2.adapters.webpush_notifier.webpush") as mock_wp:

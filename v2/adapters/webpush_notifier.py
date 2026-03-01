@@ -57,6 +57,7 @@ class WebPushNotifier:
         title: str,
         body: str,
         url: str = "/",
+        tag: str | None = None,
     ) -> None:
         """
         Web Push 通知を送信。
@@ -66,11 +67,15 @@ class WebPushNotifier:
             title: 通知タイトル
             body: 通知本文
             url: タップ時に開く URL（相対パス）
+            tag: 同一 tag の通知を上書きする識別子（重複防止）
 
         Raises:
             WebPushException: 送信に失敗した場合
         """
-        payload = json.dumps({"title": title, "body": body, "url": url})
+        data: dict = {"title": title, "body": body, "url": url}
+        if tag is not None:
+            data["tag"] = tag
+        payload = json.dumps(data)
 
         try:
             webpush(
@@ -112,6 +117,7 @@ class WebPushNotifier:
             title="解析完了",
             body=f"「{filename}」の解析が完了しました",
             url=f"/documents/{document_id}",
+            tag=f"analysis-complete-{document_id}",
         )
 
     def notify_morning_digest(
@@ -146,6 +152,7 @@ class WebPushNotifier:
             title="ClearBag ダイジェスト",
             body=body,
             url="/calendar",
+            tag="morning-digest",
         )
 
     def notify_event_reminder(
@@ -170,4 +177,5 @@ class WebPushNotifier:
             title="明日の予定リマインダー",
             body=body,
             url="/calendar",
+            tag="event-reminder",
         )
