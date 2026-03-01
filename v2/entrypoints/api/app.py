@@ -26,9 +26,12 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.responses import Response
 
 from v2.entrypoints import worker
 from v2.entrypoints.api.routes import (
@@ -54,8 +57,38 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# ── グローバル例外ミドルウェア ──────────────────────────────────────────────────
+# 【登録順の注意】
+#   add_middleware は後から登録したものが外側になる（insert(0, ...) のため）。
+#   このミドルウェアを CORSMiddleware より先に登録することで内側に配置し、
+#   500 レスポンスが CORSMiddleware を通過して CORS ヘッダーが付与される。
+#
+# スタック: ServerErrorMiddleware → CORSMiddleware → このMW → ExceptionMiddleware → Routes
+
+
+@app.middleware("http")
+async def _catch_unhandled_exceptions(
+    request: Request, call_next: Callable[[Request], Response]
+) -> Response:
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        logger.error(
+            "Unhandled exception: %s %s - %s",
+            request.method,
+            request.url.path,
+            exc,
+            exc_info=True,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
+
+
 # ── CORS（PWA フロントエンドからのリクエストを許可） ─────────────────────────
 # CORS_ORIGINS 環境変数でカンマ区切りの追加オリジンを指定可能
+# 【後から登録 = 外側】例外ミドルウェアを内包し、全レスポンスに CORS ヘッダーを付与する
 _extra_origins = [
     o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()
 ]
