@@ -456,10 +456,8 @@ def _try_send_notification(
             .get()
         )
         original_filename = (
-            doc_snap.get("original_filename", "document")
-            if doc_snap.exists
-            else "document"
-        )
+            doc_snap.get("original_filename") if doc_snap.exists else None
+        ) or "document"
         filename = analysis.archive_filename or original_filename
 
         for field_key, subscription_data in all_subs:
