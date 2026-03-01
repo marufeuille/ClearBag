@@ -51,7 +51,7 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
     }
   };
 
-  if (loading) {
+  if (loading && docs.length === 0) {
     return (
       <div className="flex items-center gap-3 px-5 py-8 text-sm text-gray-400">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-blue-400" />
@@ -87,6 +87,12 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
 
   return (
     <ul className="divide-y divide-gray-50">
+      {loading && (
+        <div className="flex items-center gap-2 px-5 py-2 text-xs text-gray-400 border-b border-gray-50">
+          <div className="h-3 w-3 animate-spin rounded-full border border-gray-200 border-t-blue-400" />
+          更新中...
+        </div>
+      )}
       {docs.map((doc) => {
         const cfg = STATUS_CONFIG[doc.status];
         return (
