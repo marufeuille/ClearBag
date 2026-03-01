@@ -12,6 +12,9 @@
 // export {} でモジュールスコープにして lib.dom.d.ts の self 宣言と競合を回避する
 export {};
 
+import { registerRoute } from "workbox-routing";
+import { NetworkOnly } from "workbox-strategies";
+
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
 interface PushPayload {
@@ -19,6 +22,16 @@ interface PushPayload {
   body: string;
   url?: string;
 }
+
+// Firebase Auth / Google Sign-In が利用する外部エンドポイントは
+// SW の runtime cache を通さず常にネットワークへ流す。
+registerRoute(
+  ({ url }) =>
+    /^https:\/\/apis\.google\.com\/js\/api\.js/i.test(url.href) ||
+    /^https:\/\/accounts\.google\.com\//i.test(url.href),
+  new NetworkOnly(),
+  "GET"
+);
 
 sw.addEventListener("push", (event: PushEvent) => {
   if (!event.data) return;
