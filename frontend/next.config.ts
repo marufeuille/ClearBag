@@ -1,12 +1,19 @@
 import type { NextConfig } from "next";
 import withPWA from "next-pwa";
 
+const defaultRuntimeCaching = require("next-pwa/cache");
+const runtimeCaching = defaultRuntimeCaching.filter(
+  (entry: { options?: { cacheName?: string } }) =>
+    entry?.options?.cacheName !== "cross-origin"
+);
+
 const pwaConfig = withPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: false,
   skipWaiting: true,
   customWorkerDir: "worker",
+  runtimeCaching,
 });
 
 const nextConfig: NextConfig = {
