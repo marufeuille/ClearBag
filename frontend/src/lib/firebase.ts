@@ -28,19 +28,24 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-/** モバイル端末かどうかを判定 */
-function isMobile(): boolean {
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+/**
+ * iOS Safari かどうかを判定。
+ * iOS Safari はユーザー操作起点でもポップアップをブロックするため、
+ * リダイレクト方式が必要な唯一のケース。
+ * Android Chrome はユーザー操作起点のポップアップを許可する。
+ */
+function isIOSSafari(): boolean {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
 /**
  * Google サインイン
- * - PC: ポップアップ方式
- * - モバイル: リダイレクト方式（ポップアップはブロックされるため）
+ * - PC / Android Chrome: ポップアップ方式
+ * - iOS Safari: リダイレクト方式（ポップアップがブロックされるため）
  */
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
-  if (isMobile()) {
+  if (isIOSSafari()) {
     return signInWithRedirect(auth, provider);
   }
   return signInWithPopup(auth, provider);
