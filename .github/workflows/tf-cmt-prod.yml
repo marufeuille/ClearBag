@@ -1,11 +1,10 @@
 name: terraform plan prod
 
 on:
-  # prod プロジェクト未作成のため一時無効化
-  # pull_request:
-  #   paths:
-  #     - "terraform/environments/prod/**"
-  #     - "terraform/modules/**"
+  pull_request:
+    paths:
+      - "terraform/environments/prod/**"
+      - "terraform/modules/**"
   workflow_dispatch:
 
 permissions:
@@ -61,5 +60,7 @@ jobs:
             terraform plan -input=false -no-color \
               -var="project_id=${{ env.PROJECT_ID }}" \
               -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}" \
-              -var="billing_account_id=${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}"
+              -var="billing_account_id=${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}" \
+              -var="allowed_emails=${{ secrets.TF_VAR_ALLOWED_EMAILS }}" \
+              -var="vapid_claims_email=${{ secrets.TF_VAR_VAPID_CLAIMS_EMAIL }}"
         working-directory: terraform/environments/prod
