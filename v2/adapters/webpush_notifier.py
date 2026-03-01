@@ -236,7 +236,11 @@ class WebPushNotifier:
         if remaining:
             lines.append(f"他 {remaining}件")
 
-        body = "\n".join(lines) if lines else "今日のスケジュールをClearBagで確認しましょう"
+        body = (
+            "\n".join(lines)
+            if lines
+            else "今日のスケジュールをClearBagで確認しましょう"
+        )
         if len(body) > _MAX_BODY:
             body = body[: _MAX_BODY - 3] + "..."
         return body

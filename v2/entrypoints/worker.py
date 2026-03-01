@@ -456,7 +456,9 @@ def _try_send_notification(
             .get()
         )
         original_filename = (
-            doc_snap.get("original_filename", "document") if doc_snap.exists else "document"
+            doc_snap.get("original_filename", "document")
+            if doc_snap.exists
+            else "document"
         )
         filename = analysis.archive_filename or original_filename
 
