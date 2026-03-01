@@ -6,10 +6,6 @@ from v2.domain.models import (
     DocumentAnalysis,
     DocumentRecord,
     EventData,
-    FileInfo,
-    ProcessingResult,
-    Profile,
-    Rule,
     TaskData,
     UserProfile,
 )
@@ -24,46 +20,6 @@ class TestCategory:
         assert Category.TASK.value == "TASK"
         assert Category.INFO.value == "INFO"
         assert Category.IGNORE.value == "IGNORE"
-
-
-class TestProfile:
-    """Profile dataclass のテスト"""
-
-    def test_create_profile(self):
-        """Profileが正しく生成される"""
-        profile = Profile(
-            id="CHILD1",
-            name="太郎",
-            grade="小3",
-            keywords="サッカー",
-            calendar_id="cal123",
-        )
-        assert profile.id == "CHILD1"
-        assert profile.name == "太郎"
-        assert profile.grade == "小3"
-
-    def test_profile_is_frozen(self):
-        """Profileは不変（frozen）である"""
-        profile = Profile(
-            id="CHILD1", name="太郎", grade="小3", keywords="", calendar_id=""
-        )
-        with pytest.raises(AttributeError):
-            profile.name = "花子"  # type: ignore
-
-
-class TestRule:
-    """Rule dataclass のテスト"""
-
-    def test_create_rule(self):
-        """Ruleが正しく生成される"""
-        rule = Rule(
-            rule_id="R001",
-            target_profile="ALL",
-            rule_type="REMINDER",
-            content="3日前に通知",
-        )
-        assert rule.rule_id == "R001"
-        assert rule.target_profile == "ALL"
 
 
 class TestEventData:
@@ -141,51 +97,6 @@ class TestDocumentAnalysis:
         assert len(analysis.events) == 1
         assert len(analysis.tasks) == 1
         assert analysis.archive_filename == "20260425_test.pdf"
-
-
-class TestFileInfo:
-    """FileInfo dataclass のテスト"""
-
-    def test_create_file_info(self):
-        """FileInfoが正しく生成される"""
-        file_info = FileInfo(
-            id="file123",
-            name="test.pdf",
-            mime_type="application/pdf",
-            web_view_link="https://example.com",
-        )
-        assert file_info.id == "file123"
-        assert file_info.name == "test.pdf"
-
-
-class TestProcessingResult:
-    """ProcessingResult dataclass のテスト"""
-
-    def test_create_result_success(self):
-        """成功時のProcessingResultが生成される"""
-        file_info = FileInfo(id="f1", name="test.pdf", mime_type="application/pdf")
-        analysis = DocumentAnalysis(summary="テスト", category=Category.EVENT)
-
-        result = ProcessingResult(
-            file_info=file_info,
-            analysis=analysis,
-            events_created=2,
-            tasks_created=1,
-            notification_sent=True,
-            archived=True,
-        )
-        assert result.events_created == 2
-        assert result.archived is True
-        assert result.error is None
-
-    def test_create_result_error(self):
-        """エラー時のProcessingResultが生成される"""
-        file_info = FileInfo(id="f1", name="test.pdf", mime_type="application/pdf")
-
-        result = ProcessingResult(file_info=file_info, error="Download failed")
-        assert result.error == "Download failed"
-        assert result.archived is False
-        assert result.analysis is None
 
 
 class TestDocumentRecord:

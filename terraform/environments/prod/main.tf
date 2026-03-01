@@ -72,89 +72,10 @@ module "artifact_registry" {
   depends_on = [google_project_iam_member.github_actions_prod]
 }
 
-# ---------------------------------------------------------------------------
-# Secret Manager
-# ---------------------------------------------------------------------------
-
-module "secret_slack_bot_token" {
-  source = "../../modules/secret_manager"
-
-  project_id            = var.project_id
-  secret_id             = "school-agent-slack-bot-token-prod"
-  service_account_email = google_service_account.cloud_run.email
-}
-
-module "secret_slack_channel_id" {
-  source = "../../modules/secret_manager"
-
-  project_id            = var.project_id
-  secret_id             = "school-agent-slack-channel-id-prod"
-  service_account_email = google_service_account.cloud_run.email
-}
-
-module "secret_todoist_api_token" {
-  source = "../../modules/secret_manager"
-
-  project_id            = var.project_id
-  secret_id             = "school-agent-todoist-api-token-prod"
-  service_account_email = google_service_account.cloud_run.email
-}
-
-# ---------------------------------------------------------------------------
-# Cloud Run Job
-# ---------------------------------------------------------------------------
-
-module "cloud_run_job" {
-  source = "../../modules/cloud_run_job"
-
-  project_id                    = var.project_id
-  region                        = var.region
-  job_name                      = "school-agent-v2-prod"
-  image_url                     = var.image_url
-  service_account_email         = google_service_account.cloud_run.email
-  invoker_service_account_email = google_service_account.cloud_run.email
-
-  env_vars = {
-    PROJECT_ID        = var.project_id
-    SPREADSHEET_ID    = var.spreadsheet_id
-    INBOX_FOLDER_ID   = var.inbox_folder_id
-    ARCHIVE_FOLDER_ID = var.archive_folder_id
-  }
-
-  secret_env_vars = {
-    SLACK_BOT_TOKEN   = module.secret_slack_bot_token.secret_id
-    SLACK_CHANNEL_ID  = module.secret_slack_channel_id.secret_id
-    TODOIST_API_TOKEN = module.secret_todoist_api_token.secret_id
-  }
-
-  depends_on = [
-    module.secret_slack_bot_token,
-    module.secret_slack_channel_id,
-    module.secret_todoist_api_token,
-  ]
-}
-
-# ---------------------------------------------------------------------------
-# Cloud Scheduler
-# ---------------------------------------------------------------------------
-
-module "cloud_scheduler" {
-  source = "../../modules/cloud_scheduler"
-
-  project_id            = var.project_id
-  region                = var.region
-  job_name              = "school-agent-v2-scheduler-prod"
-  schedule              = "0 9,17 * * *"
-  time_zone             = "Asia/Tokyo"
-  target_url            = module.cloud_run_job.job_api_uri
-  service_account_email = google_service_account.cloud_run.email
-}
-
 module "monitoring" {
   source = "../../modules/monitoring"
 
   project_id         = var.project_id
-  job_name           = module.cloud_run_job.job_name
   notification_email = var.notification_email
 
   # IAM 付与と monitoring リソース作成の race condition を防ぐため、

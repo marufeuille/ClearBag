@@ -28,9 +28,9 @@ _SUBSCRIPTION_PAYLOAD = {
     },
 }
 
-_ENDPOINT_KEY = hashlib.sha256(
-    _SUBSCRIPTION_PAYLOAD["endpoint"].encode()
-).hexdigest()[:16]
+_ENDPOINT_KEY = hashlib.sha256(_SUBSCRIPTION_PAYLOAD["endpoint"].encode()).hexdigest()[
+    :16
+]
 
 
 @pytest.fixture

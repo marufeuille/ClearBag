@@ -8,7 +8,7 @@ Cloud Run / Cloud Logging 環境ではJSON形式、ローカルではテキス�
 
 環境変数:
     LOG_LEVEL: ログレベル (DEBUG, INFO, WARNING, ERROR, CRITICAL) デフォルト: INFO
-    K_SERVICE / CLOUD_RUN_JOB: Cloud Run 環境判定（自動設定される）
+    K_SERVICE: Cloud Run Service 環境判定（自動設定される）
 """
 
 import json

@@ -38,7 +38,6 @@ from v2.adapters.firestore_repository import (
     FirestoreUserConfigRepository,
 )
 from v2.adapters.gemini import GeminiDocumentAnalyzer
-from v2.domain.models import Profile, UserProfile
 from v2.entrypoints.api.worker_auth import verify_worker_token
 from v2.services.document_processor import DocumentProcessor
 
@@ -111,10 +110,10 @@ def run_analysis_sync(
 
         # ファミリーのプロファイルを取得して Gemini に渡す
         user_profiles = family_repo.list_profiles(family_id)
-        profiles = _convert_profiles(user_profiles)
+        profiles = {p.id: p for p in user_profiles}
 
         processor = _build_processor()
-        analysis = processor.process(content, mime_type, profiles, rules=[])
+        analysis = processor.process(content, mime_type, profiles)
 
         doc_repo.save_analysis(family_id, document_id, analysis)
         logger.info(
@@ -162,24 +161,6 @@ async def analyze_document(request: Request) -> dict:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Analysis failed: {e}",
         ) from e
-
-
-def _convert_profiles(user_profiles: list[UserProfile]) -> dict[str, Profile]:
-    """
-    UserProfile（B2C）を Profile（既存 Gemini アナライザー用）に変換。
-
-    B2C では calendar_id は不要なので空文字列を設定する。
-    """
-    return {
-        p.id: Profile(
-            id=p.id,
-            name=p.name,
-            grade=p.grade,
-            keywords=p.keywords,
-            calendar_id="",  # B2C では不使用
-        )
-        for p in user_profiles
-    }
 
 
 @router.post("/morning-digest", status_code=status.HTTP_200_OK)

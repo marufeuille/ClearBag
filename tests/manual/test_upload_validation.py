@@ -31,6 +31,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import io
 import os
 import sys
@@ -102,10 +103,8 @@ def _upload(
 
 
 def _delete(client: httpx.Client, doc_id: str) -> None:
-    try:
+    with contextlib.suppress(Exception):
         client.delete(f"{API_URL}/api/documents/{doc_id}", timeout=10)
-    except Exception:
-        pass
 
 
 # ───────────────────────────────────────────────

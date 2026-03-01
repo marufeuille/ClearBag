@@ -6,9 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     # --- Google Cloud / AI ---
-    "google-api-python-client>=2.187.0",
-    "google-auth-httplib2>=0.2.1",
-    "google-auth-oauthlib>=1.2.3",
     "google-cloud-aiplatform>=1.133.0",
     "google-cloud-firestore>=2.20.0",
     "google-cloud-storage>=2.20.0",
@@ -29,8 +26,6 @@ dependencies = [
     "pypdf>=4.0.0",
     # --- ユーティリティ ---
     "python-dotenv>=1.2.1",
-    "slack-sdk>=3.39.0",
-    "todoist-api-python>=3.1.0",
 ]
 
 [project.optional-dependencies]

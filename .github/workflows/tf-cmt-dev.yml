@@ -58,11 +58,7 @@ jobs:
         run: |
           tfcmt --var target:dev plan --patch -- \
             terraform plan -input=false -no-color \
-              -var="image_url=asia-northeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/school-agent-v2:latest" \
               -var="project_id=${{ env.PROJECT_ID }}" \
-              -var="spreadsheet_id=${{ secrets.TF_VAR_SPREADSHEET_ID }}" \
-              -var="inbox_folder_id=${{ secrets.TF_VAR_INBOX_FOLDER_ID }}" \
-              -var="archive_folder_id=${{ secrets.TF_VAR_ARCHIVE_FOLDER_ID }}" \
               -var="notification_email=${{ secrets.TF_VAR_NOTIFICATION_EMAIL }}" \
               -var="billing_account_id=${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}"
         working-directory: terraform/environments/dev

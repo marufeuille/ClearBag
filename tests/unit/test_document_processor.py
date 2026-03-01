@@ -4,7 +4,7 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
-from v2.domain.models import Profile, Rule
+from v2.domain.models import UserProfile
 from v2.domain.ports import DocumentAnalyzer
 from v2.services.document_processor import DocumentProcessor
 
@@ -32,36 +32,31 @@ class TestDocumentProcessor:
         """process() が DocumentAnalysis を返す"""
         content = b"fake-pdf-content"
         mime_type = "application/pdf"
-        rules: list[Rule] = []
 
-        result = processor.process(content, mime_type, sample_profiles, rules)
+        result = processor.process(content, mime_type, sample_profiles)
 
         assert result == sample_analysis
         mock_analyzer.analyze.assert_called_once_with(
-            content, mime_type, sample_profiles, rules
+            content, mime_type, sample_profiles, None
         )
 
-    def test_process_passes_profiles_and_rules(self, processor, mock_analyzer):
-        """process() が profiles と rules を analyzer に正しく渡す"""
+    def test_process_passes_profiles(self, processor, mock_analyzer):
+        """process() が profiles を analyzer に正しく渡す"""
         content = b"data"
         mime_type = "image/jpeg"
         profiles = {
-            "P1": Profile(
+            "P1": UserProfile(
                 id="P1",
                 name="テスト",
                 grade="小1",
                 keywords="",
-                calendar_id="",
             )
         }
-        rules = [
-            Rule(rule_id="R1", target_profile="ALL", rule_type="INFO", content="test")
-        ]
 
-        processor.process(content, mime_type, profiles, rules)
+        processor.process(content, mime_type, profiles)
 
         mock_analyzer.analyze.assert_called_once_with(
-            content, mime_type, profiles, rules
+            content, mime_type, profiles, None
         )
 
     def test_process_reraises_analyzer_exception(self, processor, mock_analyzer):
@@ -69,14 +64,14 @@ class TestDocumentProcessor:
         mock_analyzer.analyze.side_effect = RuntimeError("Gemini API error")
 
         with pytest.raises(RuntimeError, match="Gemini API error"):
-            processor.process(b"data", "application/pdf", {}, [])
+            processor.process(b"data", "application/pdf", {})
 
     def test_process_logs_on_start_and_completion(
         self, processor, sample_profiles, caplog
     ):
         """process() が開始ログと完了ログを出力する"""
         with caplog.at_level(logging.INFO, logger="v2.services.document_processor"):
-            processor.process(b"test", "application/pdf", sample_profiles, [])
+            processor.process(b"test", "application/pdf", sample_profiles)
 
         messages = [r.getMessage() for r in caplog.records]
         # 開始ログ
@@ -92,7 +87,7 @@ class TestDocumentProcessor:
             caplog.at_level(logging.ERROR, logger="v2.services.document_processor"),
             pytest.raises(ValueError),
         ):
-            processor.process(b"data", "application/pdf", {}, [])
+            processor.process(b"data", "application/pdf", {})
 
         assert any(
             "Document processing failed" in r.getMessage() for r in caplog.records

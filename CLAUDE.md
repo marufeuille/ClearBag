@@ -6,7 +6,7 @@ Claude Code がこのリポジトリで作業する際の行動規範・コマ�
 
 ## 1. プロジェクト概要
 
-学校配布物（PDF・画像）を **Gemini 2.5 Pro** で AI 解析し、Google Calendar / Todoist / Slack に自動連携する **B2C SaaS アプリ**。
+学校配布物（PDF・画像）を **Gemini 2.5 Pro** で AI 解析し、カレンダーフィード（iCal）・タスク・通知を自動連携する **B2C SaaS アプリ**。
 
 | レイヤー | 技術スタック |
 |---|---|
@@ -40,7 +40,6 @@ Claude Code がこのリポジトリで作業する際の行動規範・コマ�
 │   │   │   ├── deps.py            # DI・認証 (Firebase Auth 検証)
 │   │   │   └── routes/            # APIルート
 │   │   └── worker.py              # Cloud Tasks ワーカー
-│   ├── config.py                  # frozen dataclass + from_env()
 │   └── logging_config.py
 ├── frontend/                      # PWA フロントエンド
 │   ├── src/
@@ -51,7 +50,6 @@ Claude Code がこのリポジトリで作業する際の行動規範・コマ�
 │   └── e2e/                       # Playwright E2E テスト
 ├── tests/
 │   ├── unit/
-│   ├── integration/
 │   └── e2e/                       # Firestore Emulator を使った API E2E
 ├── terraform/
 │   ├── environments/{dev,prod}/
@@ -182,7 +180,7 @@ FIRESTORE_EMULATOR_HOST=localhost:8080 uv run pytest tests/e2e/ -m e2e -v
 
 | 対象 | コマンド |
 |---|---|
-| ユニット + 統合 | `uv run pytest tests/unit/ tests/integration/ -m "not manual" -v` |
+| ユニット | `uv run pytest tests/unit/ -m "not manual" -v` |
 | バックエンド E2E | `FIRESTORE_EMULATOR_HOST=localhost:8080 uv run pytest tests/e2e/ -m e2e -v` |
 | フロントエンド E2E | `cd frontend && npm run test:e2e` |
 | 全体 | `make test` |
@@ -210,7 +208,7 @@ git checkout -b feat/your-feature-name
 
 ```bash
 make lint
-uv run pytest tests/unit/ tests/integration/ -m "not manual" -v
+uv run pytest tests/unit/ -m "not manual" -v
 # フロントエンドを変更した場合:
 cd frontend && npm run test:e2e
 ```
@@ -301,8 +299,7 @@ git push origin v1.0.0
 ### アーキテクチャ
 
 - **Ports**: `v2/domain/ports.py` に ABC でインターフェースを定義
-- **Adapters**: `v2/adapters/` に Ports の実装を配置
-- **Null Object Pattern**: Todoist / Slack 未設定時は NullAdapter に差し替え
+- **Adapters**: `v2/adapters/` に Ports の実装を配置（Firestore / GCS / Gemini / Cloud Tasks / WebPush 等）
 - **ドメインモデル**: `frozen=True` dataclass でイミュータブルに保つ
 - **DI**: FastAPI の `Depends` + `dependency_overrides`（テスト時に差し替え）
 
