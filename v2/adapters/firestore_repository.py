@@ -293,11 +293,11 @@ class FirestoreDocumentRepository(DocumentRepository):
         return [
             StoredTaskData(
                 id=snap.id,
-                title=d.get("title", ""),
-                due_date=d.get("due_date", ""),
-                assignee=d.get("assignee", "PARENT"),
-                note=d.get("note", ""),
-                completed=d.get("completed", False),
+                title=d.get("title") or "",
+                due_date=d.get("due_date") or "",
+                assignee=d.get("assignee") or "PARENT",
+                note=d.get("note") or "",
+                completed=bool(d.get("completed", False)),
             )
             for snap in query.stream()
             for d in (snap.to_dict() or {},)
