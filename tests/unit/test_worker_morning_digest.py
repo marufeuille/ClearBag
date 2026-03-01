@@ -105,6 +105,60 @@ class TestMorningDigestEndpoint:
         assert data["sent"] == 1  # uid-1 のみ送信
         assert data["errors"] == 0
 
+    def test_passes_events_and_tasks_lists_to_notifier(self, worker_client):
+        """list_events/list_tasks の結果がそのまま notify_morning_digest に渡される"""
+        endpoint1 = "https://fcm.example.com/push/user1"
+        user_with_push = {
+            "notification_preferences": {"web_push": True},
+            "web_push_subscriptions": {
+                _sub_key(endpoint1): {
+                    "endpoint": endpoint1,
+                    "keys": {"auth": "auth1", "p256dh": "p256dh1"},
+                }
+            },
+            "family_id": "family-1",
+        }
+        mock_user_doc = MagicMock()
+        mock_user_doc.id = "uid-1"
+        mock_user_doc.to_dict.return_value = user_with_push
+
+        mock_db = MagicMock()
+        mock_db.collection("users").stream.return_value = [mock_user_doc]
+
+        mock_event = MagicMock()
+        mock_task = MagicMock()
+        mock_doc_repo = MagicMock()
+        mock_doc_repo.list_events.return_value = [mock_event]
+        mock_doc_repo.list_tasks.return_value = [mock_task]
+
+        mock_notifier = MagicMock()
+
+        with (
+            patch("v2.entrypoints.worker._ensure_firebase_init"),
+            patch(
+                "os.environ.get",
+                side_effect=lambda k, d="": (
+                    "fake-key" if k == "VAPID_PRIVATE_KEY" else d
+                ),
+            ),
+            patch("v2.entrypoints.worker.firestore.Client", return_value=mock_db),
+            patch(
+                "v2.entrypoints.worker.FirestoreDocumentRepository",
+                return_value=mock_doc_repo,
+            ),
+            patch(
+                "v2.adapters.webpush_notifier.WebPushNotifier",
+                return_value=mock_notifier,
+            ),
+        ):
+            r = worker_client.post("/worker/morning-digest")
+
+        assert r.status_code == 200
+        mock_notifier.notify_morning_digest.assert_called_once()
+        call_kwargs = mock_notifier.notify_morning_digest.call_args.kwargs
+        assert call_kwargs.get("events") == [mock_event]
+        assert call_kwargs.get("tasks") == [mock_task]
+
     def test_removes_subscription_on_410(self, worker_client):
         """410 Gone エラー時に Firestore から該当端末のサブスクリプションを削除する"""
         from pywebpush import WebPushException

@@ -104,7 +104,7 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
             {/* コンテンツ */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-800 truncate">
-                {doc.original_filename}
+                {doc.archive_filename || doc.original_filename}
               </p>
               {doc.summary && (
                 <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">

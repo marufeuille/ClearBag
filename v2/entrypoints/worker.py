@@ -257,7 +257,9 @@ async def morning_digest(request: Request) -> dict:
                     endpoint=subscription_data["endpoint"],
                     keys=subscription_data["keys"],
                 )
-                notifier.notify_morning_digest(sub, len(events), len(tasks))
+                notifier.notify_morning_digest(
+                    sub, len(events), len(tasks), events=events, tasks=tasks
+                )
                 sent += 1
             except Exception as e:
                 # 410 Gone はサブスクリプション失効 → 該当端末のみ削除
@@ -454,8 +456,9 @@ def _try_send_notification(
             .get()
         )
         original_filename = (
-            doc_snap.get("original_filename") if doc_snap.exists else "document"
+            doc_snap.get("original_filename", "document") if doc_snap.exists else "document"
         )
+        filename = analysis.archive_filename or original_filename
 
         for field_key, subscription_data in all_subs:
             sub = PushSubscription(
@@ -464,7 +467,12 @@ def _try_send_notification(
             )
             try:
                 notifier_wp.notify_analysis_complete(
-                    sub, original_filename, document_id
+                    sub,
+                    filename,
+                    document_id,
+                    summary=analysis.summary,
+                    events=list(analysis.events),
+                    tasks=list(analysis.tasks),
                 )
             except Exception as e:
                 if _is_gone_error(e):

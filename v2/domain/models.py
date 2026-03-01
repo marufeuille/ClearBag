@@ -83,6 +83,7 @@ class DocumentRecord:
     mime_type: str
     summary: str = ""
     category: str = ""  # "EVENT" | "TASK" | "INFO" | "IGNORE"
+    archive_filename: str = ""  # Gemini が生成した意味のあるファイル名
     error_message: str | None = None
 
 
