@@ -63,6 +63,13 @@ resource "google_service_account_iam_member" "cloud_run_self_actas" {
   member             = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
+# Cloud Run SA が GCS 署名付き URL を生成するために signBlob 権限が必要
+resource "google_service_account_iam_member" "cloud_run_self_token_creator" {
+  service_account_id = google_service_account.cloud_run.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.cloud_run.email}"
+}
+
 # ---------------------------------------------------------------------------
 # Artifact Registry (prod 専用リポジトリ)
 # ---------------------------------------------------------------------------
