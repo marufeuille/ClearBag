@@ -121,7 +121,7 @@ module "workload_identity" {
   github_repo   = "marufeuille/ClearBag"
   pool_id       = "github-actions-prod"
   sa_account_id = "github-actions-deploy-prod"
-  ref_condition = "assertion.ref == 'refs/heads/main' || assertion.ref.matches('refs/tags/v.*')"
+  ref_condition = "assertion.ref == 'refs/heads/main' || assertion.ref.matches('refs/tags/v.*') || assertion.event_name == 'pull_request'"
 
   depends_on = [
     google_project_service.sts,
