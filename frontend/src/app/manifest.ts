@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 
+export const dynamic = "force-static";
+
 export default function manifest(): MetadataRoute.Manifest {
   const isDev = process.env.NEXT_PUBLIC_APP_ENV === "dev";
   const themeColor = isDev ? "#CA8A04" : "#3b82f6";
