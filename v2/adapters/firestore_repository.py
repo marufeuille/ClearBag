@@ -263,7 +263,9 @@ class FirestoreDocumentRepository(DocumentRepository):
         if from_date:
             query = query.where(filter=FieldFilter("start", ">=", from_date))
         if to_date:
-            query = query.where(filter=FieldFilter("start", "<=", to_date + "T23:59:59"))
+            query = query.where(
+                filter=FieldFilter("start", "<=", to_date + "T23:59:59")
+            )
 
         return [
             EventData(
@@ -306,7 +308,11 @@ class FirestoreDocumentRepository(DocumentRepository):
 
     def update_task_completed(self, uid: str, task_id: str, completed: bool) -> None:
         """タスクの完了状態を更新"""
-        snaps = self._db.collection_group(_TASKS).where(filter=FieldFilter("family_id", "==", uid)).stream()
+        snaps = (
+            self._db.collection_group(_TASKS)
+            .where(filter=FieldFilter("family_id", "==", uid))
+            .stream()
+        )
         for snap in snaps:
             if snap.id == task_id:
                 snap.reference.update({"completed": completed})
