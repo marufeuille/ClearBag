@@ -84,3 +84,38 @@ sw.addEventListener("notificationclick", (event: NotificationEvent) => {
       })
   );
 });
+
+// ── Web Share Target ──────────────────────────────────────────────────────────
+// NOTE: worker/index.ts は tsconfig exclude のため share-target.ts を import できない。
+//       定数値は share-target.ts と同一の値をリテラルで直書きする。
+const SHARE_TARGET_CACHE_NAME = "clearbag-share-target";
+const SHARE_TARGET_CACHE_KEY = "/share-target-file";
+
+sw.addEventListener("fetch", (event: FetchEvent) => {
+  const url = new URL(event.request.url);
+  if (event.request.method === "POST" && url.pathname === "/share-target/") {
+    event.respondWith(handleShareTarget(event.request));
+  }
+  // それ以外は respondWith を呼ばない → Workbox のリスナーにフォールスルー
+});
+
+async function handleShareTarget(request: Request): Promise<Response> {
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file");
+    if (!file || !(file instanceof File) || file.size === 0) {
+      return Response.redirect("/dashboard/?share_error=no_file", 303);
+    }
+    const cache = await caches.open(SHARE_TARGET_CACHE_NAME);
+    const headers = new Headers({
+      "Content-Type": file.type || "application/octet-stream",
+      "X-Share-Target-Filename": encodeURIComponent(file.name),
+      "X-Share-Target-Timestamp": Date.now().toString(),
+    });
+    await cache.put(SHARE_TARGET_CACHE_KEY, new Response(file.stream(), { headers }));
+    return Response.redirect("/dashboard/?shared=true", 303);
+  } catch (error) {
+    console.error("[SW] Share target handling failed:", error);
+    return Response.redirect("/dashboard/?share_error=failed", 303);
+  }
+}
