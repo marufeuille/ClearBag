@@ -281,12 +281,12 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
         # Events変換
         events = [
             EventData(
-                summary=e.get("summary", ""),
-                start=e.get("start", ""),
-                end=e.get("end", ""),
-                location=e.get("location", ""),
-                description=e.get("description", ""),
-                confidence=e.get("confidence", "HIGH"),
+                summary=e.get("summary") or "",
+                start=e.get("start") or "",
+                end=e.get("end") or "",
+                location=e.get("location") or "",
+                description=e.get("description") or "",
+                confidence=e.get("confidence") or "HIGH",
             )
             for e in raw_json.get("events", [])
         ]

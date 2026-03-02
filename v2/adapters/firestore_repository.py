@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from google.cloud import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from v2.domain.models import (
     DocumentAnalysis,
@@ -234,7 +235,7 @@ class FirestoreDocumentRepository(DocumentRepository):
             self._db.collection(_FAMILIES)
             .document(uid)
             .collection(_DOCUMENTS)
-            .where("content_hash", "==", content_hash)
+            .where(filter=FieldFilter("content_hash", "==", content_hash))
             .limit(1)
             .stream()
         )
@@ -256,22 +257,24 @@ class FirestoreDocumentRepository(DocumentRepository):
         # order_by("start") により複合 COLLECTION_GROUP インデックス (family_id, start) を使用
         query = (
             self._db.collection_group(_EVENTS)
-            .where("family_id", "==", uid)
+            .where(filter=FieldFilter("family_id", "==", uid))
             .order_by("start")
         )
         if from_date:
-            query = query.where("start", ">=", from_date)
+            query = query.where(filter=FieldFilter("start", ">=", from_date))
         if to_date:
-            query = query.where("start", "<=", to_date + "T23:59:59")
+            query = query.where(
+                filter=FieldFilter("start", "<=", to_date + "T23:59:59")
+            )
 
         return [
             EventData(
-                summary=d.get("summary", ""),
-                start=d.get("start", ""),
-                end=d.get("end", ""),
-                location=d.get("location", ""),
-                description=d.get("description", ""),
-                confidence=d.get("confidence", "HIGH"),
+                summary=d.get("summary") or "",
+                start=d.get("start") or "",
+                end=d.get("end") or "",
+                location=d.get("location") or "",
+                description=d.get("description") or "",
+                confidence=d.get("confidence") or "HIGH",
             )
             for snap in query.stream()
             for d in (snap.to_dict() or {},)
@@ -284,11 +287,11 @@ class FirestoreDocumentRepository(DocumentRepository):
         # order_by("completed") により複合 COLLECTION_GROUP インデックス (family_id, completed) を使用
         query = (
             self._db.collection_group(_TASKS)
-            .where("family_id", "==", uid)
+            .where(filter=FieldFilter("family_id", "==", uid))
             .order_by("completed")
         )
         if completed is not None:
-            query = query.where("completed", "==", completed)
+            query = query.where(filter=FieldFilter("completed", "==", completed))
 
         return [
             StoredTaskData(
@@ -305,7 +308,11 @@ class FirestoreDocumentRepository(DocumentRepository):
 
     def update_task_completed(self, uid: str, task_id: str, completed: bool) -> None:
         """タスクの完了状態を更新"""
-        snaps = self._db.collection_group(_TASKS).where("family_id", "==", uid).stream()
+        snaps = (
+            self._db.collection_group(_TASKS)
+            .where(filter=FieldFilter("family_id", "==", uid))
+            .stream()
+        )
         for snap in snaps:
             if snap.id == task_id:
                 snap.reference.update({"completed": completed})
@@ -526,7 +533,7 @@ class FirestoreFamilyRepository(FamilyRepository):
         """招待トークンで招待情報を取得"""
         snaps = (
             self._db.collection_group(_INVITATIONS)
-            .where("token", "==", token)
+            .where(filter=FieldFilter("token", "==", token))
             .limit(1)
             .stream()
         )
