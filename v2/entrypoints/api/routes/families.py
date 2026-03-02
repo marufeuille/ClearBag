@@ -80,7 +80,7 @@ class JoinResponse(BaseModel):
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=FamilyResponse)
-async def create_family(
+def create_family(
     body: FamilyCreateRequest,
     ctx: FamilyContext = Depends(get_family_context),
     family_repo: FirestoreFamilyRepository = Depends(get_family_repo),
@@ -106,7 +106,7 @@ async def create_family(
 
 
 @router.get("/me", response_model=FamilyResponse)
-async def get_my_family(
+def get_my_family(
     ctx: FamilyContext = Depends(get_family_context),
     family_repo: FirestoreFamilyRepository = Depends(get_family_repo),
 ) -> FamilyResponse:
@@ -127,7 +127,7 @@ async def get_my_family(
 
 
 @router.get("/members", response_model=list[MemberResponse])
-async def list_members(
+def list_members(
     ctx: FamilyContext = Depends(get_family_context),
     family_repo: FirestoreFamilyRepository = Depends(get_family_repo),
 ) -> list[MemberResponse]:
@@ -147,7 +147,7 @@ async def list_members(
 @router.post(
     "/invite", status_code=status.HTTP_201_CREATED, response_model=InviteResponse
 )
-async def invite_member(
+def invite_member(
     body: InviteRequest,
     ctx: FamilyContext = Depends(require_owner),
     family_repo: FirestoreFamilyRepository = Depends(get_family_repo),
@@ -181,7 +181,7 @@ async def invite_member(
 
 
 @router.post("/join", response_model=JoinResponse)
-async def join_family(
+def join_family(
     body: JoinRequest,
     auth_info: AuthInfo = Depends(get_auth_info),
     family_repo: FirestoreFamilyRepository = Depends(get_family_repo),
@@ -271,7 +271,7 @@ async def join_family(
 
 
 @router.delete("/members/{member_uid}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_member(
+def remove_member(
     member_uid: str,
     ctx: FamilyContext = Depends(require_owner),
     family_repo: FirestoreFamilyRepository = Depends(get_family_repo),

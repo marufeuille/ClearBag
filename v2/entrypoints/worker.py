@@ -29,6 +29,7 @@ import vertexai
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from firebase_admin import credentials as fb_creds
 from google.cloud import firestore
+from pydantic import BaseModel
 from vertexai.generative_models import GenerativeModel
 
 from v2.adapters.cloud_storage import GCSBlobStorage
@@ -139,23 +140,30 @@ def run_analysis_sync(
 router = APIRouter(dependencies=[Depends(verify_worker_token)])
 
 
+class AnalyzePayload(BaseModel):
+    uid: str
+    family_id: str
+    document_id: str
+    storage_path: str
+    mime_type: str
+
+
 @router.post("/analyze", status_code=status.HTTP_200_OK)
-async def analyze_document(request: Request) -> dict:
+def analyze_document(payload: AnalyzePayload) -> dict:
     """
     Cloud Tasks から呼び出されるドキュメント解析エンドポイント。
 
     OIDC トークン検証は verify_worker_token Depends によりアプリレベルで実施済み。
     """
-    payload = await request.json()
-    uid: str = payload["uid"]
-    family_id: str = payload["family_id"]
-    document_id: str = payload["document_id"]
-    storage_path: str = payload["storage_path"]
-    mime_type: str = payload["mime_type"]
-
     try:
-        run_analysis_sync(uid, family_id, document_id, storage_path, mime_type)
-        return {"status": "completed", "document_id": document_id}
+        run_analysis_sync(
+            payload.uid,
+            payload.family_id,
+            payload.document_id,
+            payload.storage_path,
+            payload.mime_type,
+        )
+        return {"status": "completed", "document_id": payload.document_id}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -164,7 +172,7 @@ async def analyze_document(request: Request) -> dict:
 
 
 @router.post("/morning-digest", status_code=status.HTTP_200_OK)
-async def morning_digest(request: Request) -> dict:
+def morning_digest(request: Request) -> dict:
     """
     朝のダイジェスト WebPush 送信エンドポイント（Cloud Scheduler から呼び出し）。
 
@@ -262,7 +270,7 @@ async def morning_digest(request: Request) -> dict:
 
 
 @router.post("/event-reminder", status_code=status.HTTP_200_OK)
-async def event_reminder(request: Request) -> dict:
+def event_reminder(request: Request) -> dict:
     """
     翌日イベントリマインダー WebPush 送信エンドポイント（Cloud Scheduler から呼び出し）。
 

@@ -35,7 +35,7 @@ class ProfileResponse(BaseModel):
 
 
 @router.get("", response_model=list[ProfileResponse])
-async def list_profiles(
+def list_profiles(
     ctx: FamilyContext = Depends(get_family_context),
     repo: FirestoreFamilyRepository = Depends(get_family_repo),
 ) -> list[ProfileResponse]:
@@ -48,7 +48,7 @@ async def list_profiles(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ProfileResponse)
-async def create_profile(
+def create_profile(
     body: ProfileRequest,
     ctx: FamilyContext = Depends(get_family_context),
     repo: FirestoreFamilyRepository = Depends(get_family_repo),
@@ -67,7 +67,7 @@ async def create_profile(
 
 
 @router.put("/{profile_id}", response_model=ProfileResponse)
-async def update_profile(
+def update_profile(
     profile_id: str,
     body: ProfileRequest,
     ctx: FamilyContext = Depends(get_family_context),
@@ -93,7 +93,7 @@ async def update_profile(
 
 
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_profile(
+def delete_profile(
     profile_id: str,
     ctx: FamilyContext = Depends(get_family_context),
     repo: FirestoreFamilyRepository = Depends(get_family_repo),

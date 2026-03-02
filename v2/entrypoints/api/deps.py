@@ -68,7 +68,7 @@ class AuthInfo:
 _bearer = HTTPBearer()
 
 
-async def get_auth_info(
+def get_auth_info(
     creds: HTTPAuthorizationCredentials = Depends(_bearer),
 ) -> AuthInfo:
     """
@@ -97,7 +97,7 @@ async def get_auth_info(
     )
 
 
-async def get_current_uid(
+def get_current_uid(
     auth_info: AuthInfo = Depends(get_auth_info),
 ) -> str:
     """
@@ -119,7 +119,7 @@ class FamilyContext:
     role: str  # "owner" | "member"
 
 
-async def get_family_context(
+def get_family_context(
     auth_info: AuthInfo = Depends(get_auth_info),
 ) -> FamilyContext:
     """
@@ -204,7 +204,7 @@ async def get_family_context(
     return FamilyContext(uid=uid, family_id=family_id, role=role)
 
 
-async def require_owner(
+def require_owner(
     ctx: FamilyContext = Depends(get_family_context),
 ) -> FamilyContext:
     """

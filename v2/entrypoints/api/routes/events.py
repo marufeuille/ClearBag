@@ -24,7 +24,7 @@ class EventResponse(BaseModel):
 
 
 @router.get("", response_model=list[EventResponse])
-async def list_events(
+def list_events(
     from_date: str | None = None,
     to_date: str | None = None,
     profile_id: str | None = None,

@@ -43,7 +43,7 @@ class SettingsUpdateRequest(BaseModel):
 
 
 @router.get("", response_model=SettingsResponse)
-async def get_settings(
+def get_settings(
     ctx: FamilyContext = Depends(get_family_context),
     user_repo: FirestoreUserConfigRepository = Depends(get_user_config_repo),
     family_repo: FirestoreFamilyRepository = Depends(get_family_repo),
@@ -72,7 +72,7 @@ async def get_settings(
 
 
 @router.patch("", response_model=SettingsResponse)
-async def update_settings(
+def update_settings(
     body: SettingsUpdateRequest,
     ctx: FamilyContext = Depends(get_family_context),
     user_repo: FirestoreUserConfigRepository = Depends(get_user_config_repo),
@@ -87,4 +87,4 @@ async def update_settings(
         user_repo.update_user(ctx.uid, update)
         logger.info("Settings updated: uid=%s, fields=%s", ctx.uid, list(update.keys()))
 
-    return await get_settings(ctx=ctx, user_repo=user_repo, family_repo=family_repo)
+    return get_settings(ctx=ctx, user_repo=user_repo, family_repo=family_repo)

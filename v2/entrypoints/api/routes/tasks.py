@@ -33,7 +33,7 @@ class TaskUpdateResponse(BaseModel):
 
 
 @router.get("", response_model=list[TaskResponse])
-async def list_tasks(
+def list_tasks(
     completed: bool | None = None,
     ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
@@ -59,7 +59,7 @@ async def list_tasks(
 
 
 @router.patch("/{task_id}", response_model=TaskUpdateResponse)
-async def update_task(
+def update_task(
     task_id: str,
     body: TaskUpdateRequest,
     ctx: FamilyContext = Depends(get_family_context),

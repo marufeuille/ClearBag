@@ -83,7 +83,7 @@ def _to_response(record: DocumentRecord) -> DocumentResponse:
 @router.post(
     "/upload", status_code=status.HTTP_202_ACCEPTED, response_model=UploadResponse
 )
-async def upload_document(
+def upload_document(
     file: UploadFile,
     background_tasks: BackgroundTasks,
     ctx: FamilyContext = Depends(get_family_context),
@@ -122,7 +122,7 @@ async def upload_document(
             detail=f"ファイルサイズが上限（{_MAX_UPLOAD_SIZE_MB}MB）を超えています。",
         )
 
-    content = await file.read()
+    content = file.file.read()
 
     # ── ファイルサイズ事後チェック（file.size が None だったケースのフォールバック） ─
     if len(content) > _MAX_UPLOAD_SIZE_BYTES:
@@ -217,7 +217,7 @@ async def upload_document(
 
 
 @router.get("", response_model=list[DocumentResponse])
-async def list_documents(
+def list_documents(
     ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
 ) -> list[DocumentResponse]:
@@ -227,7 +227,7 @@ async def list_documents(
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-async def get_document(
+def get_document(
     document_id: str,
     ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
@@ -242,7 +242,7 @@ async def get_document(
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_document(
+def delete_document(
     document_id: str,
     ctx: FamilyContext = Depends(get_family_context),
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),

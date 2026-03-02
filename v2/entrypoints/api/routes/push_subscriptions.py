@@ -50,7 +50,7 @@ class UnsubscribeRequest(BaseModel):
 
 
 @router.post("", status_code=204)
-async def register_push_subscription(
+def register_push_subscription(
     body: PushSubscriptionRequest,
     ctx: FamilyContext = Depends(get_family_context),
     user_repo: FirestoreUserConfigRepository = Depends(get_user_config_repo),
@@ -70,7 +70,7 @@ async def register_push_subscription(
 
 
 @router.post("/unsubscribe", status_code=204)
-async def unregister_push_subscription(
+def unregister_push_subscription(
     body: UnsubscribeRequest | None = None,
     ctx: FamilyContext = Depends(get_family_context),
     user_repo: FirestoreUserConfigRepository = Depends(get_user_config_repo),
