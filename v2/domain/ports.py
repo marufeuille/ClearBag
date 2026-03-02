@@ -110,6 +110,16 @@ class DocumentRepository(ABC):
         """タスクの完了状態を更新"""
         pass
 
+    @abstractmethod
+    def list_events_by_document(self, uid: str, document_id: str) -> list[EventData]:
+        """指定ドキュメントのイベント一覧を取得（サブコレクション直接アクセス）"""
+        pass
+
+    @abstractmethod
+    def list_tasks_by_document(self, uid: str, document_id: str) -> list:
+        """指定ドキュメントのタスク一覧を取得（サブコレクション直接アクセス）"""
+        pass
+
 
 class UserConfigRepository(ABC):
     """ユーザー個人設定の永続化（Firestore等）"""
@@ -221,6 +231,11 @@ class BlobStorage(ABC):
     @abstractmethod
     def delete(self, blob_path: str) -> None:
         """ファイルを削除"""
+        pass
+
+    @abstractmethod
+    def generate_signed_url(self, blob_path: str, expiration_minutes: int = 15) -> str:
+        """一時的な署名付きダウンロード URL を生成して返す"""
         pass
 
 

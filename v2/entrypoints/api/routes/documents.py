@@ -40,6 +40,8 @@ from v2.entrypoints.api.deps import (
     get_family_repo,
     get_task_queue,
 )
+from v2.entrypoints.api.routes.events import EventResponse
+from v2.entrypoints.api.routes.tasks import TaskResponse
 from v2.entrypoints.api.usage import ensure_monthly_reset
 
 logger = logging.getLogger(__name__)
@@ -65,6 +67,18 @@ class DocumentResponse(BaseModel):
     category: str
     archive_filename: str
     error_message: str | None
+    created_at: str | None  # ISO 8601 形式
+
+
+class DocumentDetailResponse(BaseModel):
+    events: list[EventResponse]
+    tasks: list[TaskResponse]
+
+
+class DocumentUrlResponse(BaseModel):
+    url: str
+    mime_type: str
+    filename: str
 
 
 def _to_response(record: DocumentRecord) -> DocumentResponse:
@@ -77,6 +91,7 @@ def _to_response(record: DocumentRecord) -> DocumentResponse:
         category=record.category,
         archive_filename=record.archive_filename,
         error_message=record.error_message,
+        created_at=record.created_at.isoformat() if record.created_at else None,
     )
 
 
@@ -239,6 +254,67 @@ def get_document(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
     return _to_response(record)
+
+
+@router.get("/{document_id}/detail", response_model=DocumentDetailResponse)
+def get_document_detail(
+    document_id: str,
+    ctx: FamilyContext = Depends(get_family_context),
+    doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
+) -> DocumentDetailResponse:
+    """指定ドキュメントの関連イベント・タスクを返す（アコーディオン展開用）"""
+    record = doc_repo.get(ctx.family_id, document_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
+
+    events = doc_repo.list_events_by_document(ctx.family_id, document_id)
+    tasks = doc_repo.list_tasks_by_document(ctx.family_id, document_id)
+
+    return DocumentDetailResponse(
+        events=[
+            EventResponse(
+                summary=e.summary,
+                start=e.start,
+                end=e.end,
+                location=e.location,
+                description=e.description,
+                confidence=e.confidence,
+            )
+            for e in events
+        ],
+        tasks=[
+            TaskResponse(
+                id=t.id,
+                title=t.title,
+                due_date=t.due_date,
+                assignee=t.assignee,
+                note=t.note,
+                completed=t.completed,
+            )
+            for t in tasks
+        ],
+    )
+
+
+@router.get("/{document_id}/url", response_model=DocumentUrlResponse)
+def get_document_url(
+    document_id: str,
+    ctx: FamilyContext = Depends(get_family_context),
+    doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
+    storage: GCSBlobStorage = Depends(get_blob_storage),
+) -> DocumentUrlResponse:
+    """アップロード済みファイルの署名付きダウンロード URL を返す（15 分有効）"""
+    record = doc_repo.get(ctx.family_id, document_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
+
+    url = storage.generate_signed_url(record.storage_path)
+    filename = record.archive_filename or record.original_filename
+    return DocumentUrlResponse(url=url, mime_type=record.mime_type, filename=filename)
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

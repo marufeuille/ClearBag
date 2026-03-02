@@ -47,6 +47,18 @@ export interface DocumentRecord {
   category: string;
   archive_filename: string;
   error_message: string | null;
+  created_at: string | null;
+}
+
+export interface DocumentDetail {
+  events: EventData[];
+  tasks: TaskData[];
+}
+
+export interface DocumentUrl {
+  url: string;
+  mime_type: string;
+  filename: string;
 }
 
 export interface EventData {
@@ -142,6 +154,10 @@ export async function uploadDocument(
 export const getDocuments = () => get<DocumentRecord[]>("/api/documents");
 export const getDocument = (id: string) =>
   get<DocumentRecord>(`/api/documents/${id}`);
+export const getDocumentDetail = (id: string) =>
+  get<DocumentDetail>(`/api/documents/${id}/detail`);
+export const getDocumentUrl = (id: string) =>
+  get<DocumentUrl>(`/api/documents/${id}/url`);
 export const deleteDocument = (id: string) =>
   del(`/api/documents/${id}`);
 

@@ -6,7 +6,9 @@ BlobStorage ABC の Google Cloud Storage 実装。
 
 from __future__ import annotations
 
+import datetime
 import logging
+import os
 
 from google.cloud import storage
 
@@ -98,3 +100,36 @@ class GCSBlobStorage(BlobStorage):
                 self._bucket_name,
                 blob_path,
             )
+
+    def generate_signed_url(self, blob_path: str, expiration_minutes: int = 15) -> str:
+        """
+        GCS オブジェクトへの一時的な署名付き URL を生成する。
+
+        GCS エミュレーター環境では signed URL 非対応のため直接 URL を返す。
+        本番環境では V4 署名（HMAC-SHA256）を使用する。
+
+        Args:
+            blob_path: GCS 上のパス
+            expiration_minutes: URL の有効期限（分、デフォルト 15）
+
+        Returns:
+            ダウンロード用の一時 URL
+        """
+        blob = self._bucket.blob(blob_path)
+        emulator_host = os.environ.get("STORAGE_EMULATOR_HOST")
+        if emulator_host:
+            # エミュレーターは signed URL 非対応 → 直接アクセス URL を返す
+            encoded_path = blob_path.replace("/", "%2F")
+            return f"{emulator_host}/storage/v1/b/{self._bucket_name}/o/{encoded_path}?alt=media"
+        url = blob.generate_signed_url(
+            version="v4",
+            expiration=datetime.timedelta(minutes=expiration_minutes),
+            method="GET",
+        )
+        logger.info(
+            "Generated signed URL: bucket=%s, path=%s, expires=%dm",
+            self._bucket_name,
+            blob_path,
+            expiration_minutes,
+        )
+        return url
