@@ -69,7 +69,14 @@ export async function signOut() {
  * API リクエストの Authorization ヘッダーに使う。
  */
 export async function getIdToken(): Promise<string> {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated");
+  let user = auth.currentUser;
+  if (!user) {
+    // Firebase SDK がセッション復元を完了するまで待機する。
+    // ページリロードやバックグラウンド復帰時に auth.currentUser が
+    // まだ null の間に API コールが発生するレースコンディションを防ぐ。
+    await auth.authStateReady();
+    user = auth.currentUser;
+    if (!user) throw new Error("Not authenticated");
+  }
   return user.getIdToken();
 }
