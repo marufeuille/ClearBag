@@ -17,53 +17,12 @@ permissions:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
-        with:
-          enable-cache: true
-
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
-        with:
-          python-version: "3.13"
-
-      - name: Install dependencies
-        run: uv sync --extra dev
-
-      - name: Ruff lint
-        run: uv run ruff check v2/
-
-      - name: Ruff format check
-        run: uv run ruff format --check v2/
+    uses: ./.github/workflows/_lint-python.yml
 
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
-        with:
-          enable-cache: true
-
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
-        with:
-          python-version: "3.13"
-
-      - name: Install dependencies
-        run: uv sync --extra dev
-
-      - name: Run tests
-        run: >
-          uv run pytest
-          tests/unit/
-          -m "not manual"
-          --cov=v2
-          --cov-report=term-missing
-
-      - name: Security audit (pip-audit)
-        run: uv export --no-hashes | uvx pip-audit -r /dev/stdin
+    uses: ./.github/workflows/_test-python.yml
+    with:
+      run_audit: true
 
   e2e:
     runs-on: ubuntu-latest
@@ -83,18 +42,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
-        with:
-          distribution: "temurin"
-          java-version: "21"
-
-      - uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a # v2.1.4
-        with:
-          install_components: "cloud-firestore-emulator"
-
-      - name: Start Firestore Emulator
+      - name: Start Firestore Emulator (Docker)
         run: |
-          gcloud emulators firestore start --host-port=0.0.0.0:8080 &
+          docker run -d --name firestore-emulator -p 8080:8080 \
+            google/cloud-sdk:emulators \
+            gcloud emulators firestore start --host-port=0.0.0.0:8080
           # エミュレーターの起動を待機（最大 30 秒）
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8080/ 2>/dev/null; then
