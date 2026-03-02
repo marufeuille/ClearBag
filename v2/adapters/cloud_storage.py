@@ -10,6 +10,8 @@ import datetime
 import logging
 import os
 
+import google.auth
+from google.auth.transport import requests as auth_requests
 from google.cloud import storage
 
 from v2.domain.ports import BlobStorage
@@ -121,10 +123,23 @@ class GCSBlobStorage(BlobStorage):
             # エミュレーターは signed URL 非対応 → 直接アクセス URL を返す
             encoded_path = blob_path.replace("/", "%2F")
             return f"{emulator_host}/storage/v1/b/{self._bucket_name}/o/{encoded_path}?alt=media"
+
+        signing_kwargs: dict[str, str] = {}
+        sa_email = os.environ.get("SERVICE_ACCOUNT_EMAIL")
+        if sa_email:
+            # Cloud Run: compute_engine.Credentials はローカル秘密鍵を持たないため
+            # IAM signBlob API を使うよう service_account_email + access_token を渡す
+            credentials, _ = google.auth.default()
+            if not credentials.valid:
+                credentials.refresh(auth_requests.Request())
+            signing_kwargs["service_account_email"] = sa_email
+            signing_kwargs["access_token"] = credentials.token
+
         url = blob.generate_signed_url(
             version="v4",
             expiration=datetime.timedelta(minutes=expiration_minutes),
             method="GET",
+            **signing_kwargs,
         )
         logger.info(
             "Generated signed URL: bucket=%s, path=%s, expires=%dm",
