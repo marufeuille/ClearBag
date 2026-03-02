@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { getFamily } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import { FullScreenLoading } from "@/components/FullScreenLoading";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -40,21 +41,13 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }, [user]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-gray-500">読み込み中...</p>
-      </div>
-    );
+    return <FullScreenLoading />;
   }
 
   if (!user) return null;
 
   if (activationStatus === "checking") {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-gray-500">読み込み中...</p>
-      </div>
-    );
+    return <FullScreenLoading />;
   }
 
   if (activationStatus === "not_activated") {

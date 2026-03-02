@@ -45,7 +45,12 @@ function InviteContent() {
   }
 
   if (loading) {
-    return <p className="text-gray-400 text-sm text-center">読み込み中...</p>;
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        <p className="text-gray-400 text-sm text-center">読み込み中...</p>
+      </div>
+    );
   }
 
   if (!user) {
@@ -115,7 +120,10 @@ export default function InvitePage() {
         </h1>
         <Suspense
           fallback={
-            <p className="text-gray-400 text-sm text-center">読み込み中...</p>
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+              <p className="text-gray-400 text-sm text-center">読み込み中...</p>
+            </div>
           }
         >
           <InviteContent />
