@@ -23,7 +23,7 @@ router = APIRouter(prefix="/ical", tags=["ical"])
 
 
 @router.get("/{token}", response_class=PlainTextResponse)
-async def get_ical_feed(
+def get_ical_feed(
     token: str,
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
     renderer: ICalRenderer = Depends(get_ical_renderer),
