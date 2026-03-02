@@ -21,7 +21,7 @@ variable "sa_account_id" {
 }
 
 variable "ref_condition" {
-  description = "WIF attribute_condition に使用する ref 制限の条件式（assertion.ref に対する条件）"
+  description = "WIF attribute_condition に使用する ref 制限の条件式（assertion.ref に対する条件）。pull_request イベントはモジュール側で自動的に許可される。"
   type        = string
   default     = "assertion.ref == 'refs/heads/main'"
 }
