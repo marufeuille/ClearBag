@@ -325,6 +325,54 @@ class FirestoreDocumentRepository(DocumentRepository):
                 return
         logger.warning("Task not found: family_id=%s, task_id=%s", uid, task_id)
 
+    def list_events_by_document(self, uid: str, document_id: str) -> list[EventData]:
+        """指定ドキュメントのイベントサブコレクションを直接取得"""
+        snaps = (
+            self._db.collection(_FAMILIES)
+            .document(uid)
+            .collection(_DOCUMENTS)
+            .document(document_id)
+            .collection(_EVENTS)
+            .stream()
+        )
+        return [
+            EventData(
+                summary=d.get("summary") or "",
+                start=d.get("start") or "",
+                end=d.get("end") or "",
+                location=d.get("location") or "",
+                description=d.get("description") or "",
+                confidence=d.get("confidence") or "HIGH",
+            )
+            for snap in snaps
+            for d in (snap.to_dict() or {},)
+        ]
+
+    def list_tasks_by_document(
+        self, uid: str, document_id: str
+    ) -> list[StoredTaskData]:
+        """指定ドキュメントのタスクサブコレクションを直接取得"""
+        snaps = (
+            self._db.collection(_FAMILIES)
+            .document(uid)
+            .collection(_DOCUMENTS)
+            .document(document_id)
+            .collection(_TASKS)
+            .stream()
+        )
+        return [
+            StoredTaskData(
+                id=snap.id,
+                title=d.get("title") or "",
+                due_date=d.get("due_date") or "",
+                assignee=d.get("assignee") or "PARENT",
+                note=d.get("note") or "",
+                completed=bool(d.get("completed", False)),
+            )
+            for snap in snaps
+            for d in (snap.to_dict() or {},)
+        ]
+
     # ── 変換ヘルパー ──────────────────────────────────────────────────────────
 
     @staticmethod
@@ -358,6 +406,9 @@ class FirestoreDocumentRepository(DocumentRepository):
             category=data.get("category", ""),
             archive_filename=data.get("archive_filename", ""),
             error_message=data.get("error_message"),
+            created_at=data.get(
+                "created_at"
+            ),  # Firestore DatetimeWithNanoseconds は datetime のサブクラス
         )
 
 

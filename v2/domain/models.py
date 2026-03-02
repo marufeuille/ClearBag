@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 
 
@@ -64,6 +65,7 @@ class DocumentRecord:
     category: str = ""  # "EVENT" | "TASK" | "INFO" | "IGNORE"
     archive_filename: str = ""  # Gemini が生成した意味のあるファイル名
     error_message: str | None = None
+    created_at: datetime | None = None  # アップロード日時（後方互換のためオプショナル）
 
 
 @dataclass(frozen=True)
