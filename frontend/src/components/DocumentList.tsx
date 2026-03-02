@@ -17,8 +17,25 @@ const STATUS_CONFIG: Record<
   error:      { label: "エラー",  color: "text-red-600 bg-red-50 border-red-100",         dot: "bg-red-400" },
 };
 
+const CACHE_KEY = "clearbag_docs_cache";
+
+function loadCache(): DocumentRecord[] {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as DocumentRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCache(docs: DocumentRecord[]) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(docs));
+  } catch {}
+}
+
 export function DocumentList({ refreshKey }: DocumentListProps) {
-  const [docs, setDocs] = useState<DocumentRecord[]>([]);
+  const [docs, setDocs] = useState<DocumentRecord[]>(() => loadCache());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -29,6 +46,7 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
     try {
       const data = await getDocuments();
       setDocs(data);
+      saveCache(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -45,7 +63,11 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
     setDeletingId(id);
     try {
       await deleteDocument(id);
-      setDocs((prev) => prev.filter((d) => d.id !== id));
+      setDocs((prev) => {
+        const next = prev.filter((d) => d.id !== id);
+        saveCache(next);
+        return next;
+      });
     } finally {
       setDeletingId(null);
     }
