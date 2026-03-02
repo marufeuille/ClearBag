@@ -23,51 +23,11 @@ env:
 jobs:
   lint:
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
-        with:
-          enable-cache: true
-
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
-        with:
-          python-version: "3.13"
-
-      - name: Install dependencies
-        run: uv sync --extra dev
-
-      - name: Ruff lint
-        run: uv run ruff check v2/
-
-      - name: Ruff format check
-        run: uv run ruff format --check v2/
+    uses: ./.github/workflows/_lint-python.yml
 
   test:
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
-        with:
-          enable-cache: true
-
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
-        with:
-          python-version: "3.13"
-
-      - name: Install dependencies
-        run: uv sync --extra dev
-
-      - name: Run tests
-        run: >
-          uv run pytest
-          tests/unit/
-          -m "not manual"
-          --cov=v2
-          --cov-report=term-missing
+    uses: ./.github/workflows/_test-python.yml
 
   build-push:
     needs: [lint, test]
@@ -101,32 +61,27 @@ jobs:
       # 通常デプロイ (tag push): ビルド → SHA / release / latest-prod タグで push
       # ---------------------------------------------------------------------------
 
-      - name: Set up uv
+      - name: Compute image tags (normal deploy)
         if: github.event_name == 'push'
-        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
-      - name: Export requirements.txt
+      - name: Set up Docker Buildx
         if: github.event_name == 'push'
-        run: uv export -o requirements.txt --no-hashes
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       - name: Build and push Docker image (normal deploy)
         if: github.event_name == 'push'
-        run: |
-          IMAGE_TAG="${GITHUB_SHA::7}"
-          RELEASE_TAG="${GITHUB_REF_NAME}"
-          BASE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}"
-
-          SHA_URL="${BASE}:${IMAGE_TAG}"
-          RELEASE_URL="${BASE}:${RELEASE_TAG}"
-          LATEST_PROD_URL="${BASE}:latest-prod"
-
-          docker build --platform linux/amd64 -t "${SHA_URL}" .
-          docker tag "${SHA_URL}" "${RELEASE_URL}"
-          docker tag "${SHA_URL}" "${LATEST_PROD_URL}"
-
-          docker push "${SHA_URL}"
-          docker push "${RELEASE_URL}"
-          docker push "${LATEST_PROD_URL}"
+        uses: docker/build-push-action@471d1dc4e07e5cddb65df6f2d18a02e9e0666bc8 # v6.15.0
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY_ID }}/${{ env.IMAGE_NAME }}:latest-prod
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # ---------------------------------------------------------------------------
       # ロールバック (workflow_dispatch): 既存イメージを latest-prod として再タグ付け
