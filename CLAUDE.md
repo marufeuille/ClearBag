@@ -134,6 +134,18 @@ npm run build       # プロダクションビルド
 npm run test:e2e    # Playwright E2E テスト（next dev を自動起動）
 ```
 
+### 運用スクリプト（scripts/）
+
+| スクリプト | 用途 | 実行例 |
+|---|---|---|
+| `activate_existing_users.py` | ユーザーに `is_activated: True` を付与 | `PROJECT_ID=clearbag-dev uv run python scripts/activate_existing_users.py --email user@example.com` |
+| `migrate_to_families.py` | 既存ユーザーデータをファミリー構造に移行 | `PROJECT_ID=clearbag-dev uv run python scripts/migrate_to_families.py --dry-run` |
+| `reset_dev_data.py` | dev 環境の Firestore/GCS を初期化しデモデータをシード | `PROJECT_ID=clearbag-dev uv run python scripts/reset_dev_data.py --email you@gmail.com` |
+| `bootstrap_wif.sh` | WIF (Workload Identity Federation) のゼロからセットアップ | `bash scripts/bootstrap_wif.sh` |
+| `verify_worker_auth.sh` | Worker エンドポイントの OIDC 認証を検証 | `bash scripts/verify_worker_auth.sh [BASE_URL]` |
+| `test_firestore_rules.sh` | Firestore セキュリティルールの検証 | `bash scripts/test_firestore_rules.sh` |
+| `setup_github_project.sh` | GitHub Projects V2 のセットアップ | `bash scripts/setup_github_project.sh` |
+
 ---
 
 ## 5. テストルール

@@ -49,7 +49,9 @@ class TestGenerateSignedUrlCloudRun:
     def test_passes_service_account_email_and_token(self, monkeypatch):
         """SERVICE_ACCOUNT_EMAIL が設定されている場合は IAM signBlob API を使う。"""
         monkeypatch.delenv("STORAGE_EMULATOR_HOST", raising=False)
-        monkeypatch.setenv("SERVICE_ACCOUNT_EMAIL", "sa@project.iam.gserviceaccount.com")
+        monkeypatch.setenv(
+            "SERVICE_ACCOUNT_EMAIL", "sa@project.iam.gserviceaccount.com"
+        )
 
         mock_credentials = MagicMock()
         mock_credentials.valid = True
@@ -60,7 +62,9 @@ class TestGenerateSignedUrlCloudRun:
         mock_bucket.blob.return_value = mock_blob
         mock_blob.generate_signed_url.return_value = "https://signed.url/path"
 
-        with patch("google.auth.default", return_value=(mock_credentials, "project-id")):
+        with patch(
+            "google.auth.default", return_value=(mock_credentials, "project-id")
+        ):
             url = storage_adapter.generate_signed_url("uploads/uid/doc.pdf")
 
         assert url == "https://signed.url/path"
@@ -73,7 +77,9 @@ class TestGenerateSignedUrlCloudRun:
     def test_refreshes_expired_credentials(self, monkeypatch):
         """credentials が期限切れの場合は refresh() を呼ぶ。"""
         monkeypatch.delenv("STORAGE_EMULATOR_HOST", raising=False)
-        monkeypatch.setenv("SERVICE_ACCOUNT_EMAIL", "sa@project.iam.gserviceaccount.com")
+        monkeypatch.setenv(
+            "SERVICE_ACCOUNT_EMAIL", "sa@project.iam.gserviceaccount.com"
+        )
 
         mock_credentials = MagicMock()
         mock_credentials.valid = False
@@ -95,7 +101,9 @@ class TestGenerateSignedUrlCloudRun:
     def test_skips_refresh_for_valid_credentials(self, monkeypatch):
         """credentials が有効な場合は refresh() を呼ばない。"""
         monkeypatch.delenv("STORAGE_EMULATOR_HOST", raising=False)
-        monkeypatch.setenv("SERVICE_ACCOUNT_EMAIL", "sa@project.iam.gserviceaccount.com")
+        monkeypatch.setenv(
+            "SERVICE_ACCOUNT_EMAIL", "sa@project.iam.gserviceaccount.com"
+        )
 
         mock_credentials = MagicMock()
         mock_credentials.valid = True
@@ -106,7 +114,9 @@ class TestGenerateSignedUrlCloudRun:
         mock_bucket.blob.return_value = mock_blob
         mock_blob.generate_signed_url.return_value = "https://signed.url/path"
 
-        with patch("google.auth.default", return_value=(mock_credentials, "project-id")):
+        with patch(
+            "google.auth.default", return_value=(mock_credentials, "project-id")
+        ):
             storage_adapter.generate_signed_url("uploads/uid/doc.pdf")
 
         mock_credentials.refresh.assert_not_called()
