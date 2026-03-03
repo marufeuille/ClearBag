@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   {
-    href: "/dashboard",
+    href: "/dashboard/",
     label: "ホーム",
     icon: (active: boolean) => (
       <svg className="w-6 h-6" fill={active ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
@@ -15,7 +15,7 @@ const navItems = [
     ),
   },
   {
-    href: "/calendar",
+    href: "/calendar/",
     label: "カレンダー",
     icon: (active: boolean) => (
       <svg className="w-6 h-6" fill={active ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
@@ -24,7 +24,7 @@ const navItems = [
     ),
   },
   {
-    href: "/tasks",
+    href: "/tasks/",
     label: "タスク",
     icon: (active: boolean) => (
       <svg className="w-6 h-6" fill={active ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
@@ -33,7 +33,7 @@ const navItems = [
     ),
   },
   {
-    href: "/profiles",
+    href: "/profiles/",
     label: "家族",
     icon: (active: boolean) => (
       <svg className="w-6 h-6" fill={active ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
@@ -42,7 +42,7 @@ const navItems = [
     ),
   },
   {
-    href: "/settings",
+    href: "/settings/",
     label: "設定",
     icon: (active: boolean) => (
       <svg className="w-6 h-6" fill={active ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
@@ -62,7 +62,7 @@ export function NavBar() {
       {/* トップヘッダー */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/dashboard" className="font-extrabold text-xl tracking-tight text-gray-900">
+          <Link href="/dashboard/" className="font-extrabold text-xl tracking-tight text-gray-900">
             Clear<span className="text-blue-600">Bag</span>
           </Link>
           <button
@@ -83,6 +83,7 @@ export function NavBar() {
               <Link
                 key={href}
                 href={href}
+                aria-current={active ? "page" : undefined}
                 className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
                   active ? "text-blue-600" : "text-gray-400 hover:text-gray-600"
                 }`}

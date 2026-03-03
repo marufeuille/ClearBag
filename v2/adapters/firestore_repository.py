@@ -306,11 +306,12 @@ class FirestoreDocumentRepository(DocumentRepository):
             for d in (snap.to_dict() or {},)
         ]
 
-    def update_task_completed(self, uid: str, task_id: str, completed: bool) -> None:
+    def update_task_completed(self, uid: str, task_id: str, completed: bool) -> bool:
         """タスクの完了状態を更新"""
         snaps = (
             self._db.collection_group(_TASKS)
             .where(filter=FieldFilter("family_id", "==", uid))
+            .order_by("completed")
             .stream()
         )
         for snap in snaps:
@@ -322,8 +323,9 @@ class FirestoreDocumentRepository(DocumentRepository):
                     task_id,
                     completed,
                 )
-                return
+                return True
         logger.warning("Task not found: family_id=%s, task_id=%s", uid, task_id)
+        return False
 
     def list_events_by_document(self, uid: str, document_id: str) -> list[EventData]:
         """指定ドキュメントのイベントサブコレクションを直接取得"""

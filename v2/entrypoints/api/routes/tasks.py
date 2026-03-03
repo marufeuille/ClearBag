@@ -6,7 +6,7 @@ PATCH /api/tasks/{id}             → 200 { completed: true }
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from v2.adapters.firestore_repository import FirestoreDocumentRepository
@@ -66,5 +66,7 @@ def update_task(
     doc_repo: FirestoreDocumentRepository = Depends(get_document_repo),
 ) -> TaskUpdateResponse:
     """タスクの完了状態を更新する"""
-    doc_repo.update_task_completed(ctx.family_id, task_id, body.completed)
+    found = doc_repo.update_task_completed(ctx.family_id, task_id, body.completed)
+    if not found:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     return TaskUpdateResponse(completed=body.completed)
