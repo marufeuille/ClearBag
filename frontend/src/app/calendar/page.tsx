@@ -14,6 +14,14 @@ function formatDate(iso: string): string {
   });
 }
 
+function formatTimeRange(start: string, end: string): string {
+  // 終日イベントは "T" を含まない ISO 日付文字列
+  if (!start.includes("T")) return "終日";
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleTimeString("ja-JP", { hour: "numeric", minute: "2-digit" });
+  return `${fmt(start)}〜${fmt(end)}`;
+}
+
 export default function CalendarPage() {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +90,7 @@ export default function CalendarPage() {
                       <p className="text-sm font-medium text-gray-800">
                         {ev.summary}
                       </p>
+                      <p className="text-xs text-gray-500 mt-0.5">{formatTimeRange(ev.start, ev.end)}</p>
                       {ev.location && (
                         <p className="text-xs text-gray-500 mt-0.5">
                           📍 {ev.location}

@@ -51,7 +51,7 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [details, setDetails] = useState<Record<string, DocumentDetail>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
   const [urlLoading, setUrlLoading] = useState<string | null>(null);
@@ -75,11 +75,15 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
   }, [refreshKey]);
 
   const handleToggle = async (id: string) => {
-    if (expandedId === id) {
-      setExpandedId(null);
+    if (expandedIds.has(id)) {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       return;
     }
-    setExpandedId(id);
+    setExpandedIds((prev) => new Set([...prev, id]));
     if (details[id]) return; // キャッシュ済み
 
     setDetailLoading(id);
@@ -103,7 +107,11 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
         saveCache(next);
         return next;
       });
-      if (expandedId === id) setExpandedId(null);
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } finally {
       setDeletingId(null);
     }
@@ -173,7 +181,7 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
       )}
       {docs.map((doc) => {
         const cfg = STATUS_CONFIG[doc.status];
-        const isExpanded = expandedId === doc.id;
+        const isExpanded = expandedIds.has(doc.id);
         const detail = details[doc.id];
         const isNew = isToday(doc.created_at);
 

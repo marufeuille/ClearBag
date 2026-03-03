@@ -106,7 +106,7 @@ class DocumentRepository(ABC):
         pass
 
     @abstractmethod
-    def update_task_completed(self, uid: str, task_id: str, completed: bool) -> None:
+    def update_task_completed(self, uid: str, task_id: str, completed: bool) -> bool:
         """タスクの完了状態を更新"""
         pass
 

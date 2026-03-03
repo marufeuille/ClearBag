@@ -128,3 +128,74 @@ class TestListEventsNullFallback:
         assert event.location == ""
         assert event.description == ""
         assert event.confidence == "HIGH"
+
+
+class TestUpdateTaskCompleted:
+    """update_task_completed() のユニットテスト"""
+
+    def _make_repo_and_mock(self, snaps: list):
+        """モック Firestore を使った repo と mock_db を返す"""
+        mock_db = MagicMock()
+        mock_query = MagicMock()
+        mock_db.collection_group.return_value.where.return_value.order_by.return_value = mock_query
+        mock_query.stream.return_value = snaps
+        repo = FirestoreDocumentRepository(mock_db)
+        return repo, mock_db
+
+    def test_found_task_returns_true(self):
+        """対象タスクが見つかった場合 True を返し update が呼ばれる"""
+        # Arrange
+        snap = MagicMock()
+        snap.id = "task-1"
+        snap.reference = MagicMock()
+        repo, _ = self._make_repo_and_mock([snap])
+
+        # Act
+        result = repo.update_task_completed("fam1", "task-1", True)
+
+        # Assert
+        assert result is True
+        snap.reference.update.assert_called_once_with({"completed": True})
+
+    def test_not_found_task_returns_false(self):
+        """対象タスクが見つからない場合 False を返す"""
+        # Arrange
+        snap = MagicMock()
+        snap.id = "other-task"
+        snap.reference = MagicMock()
+        repo, _ = self._make_repo_and_mock([snap])
+
+        # Act
+        result = repo.update_task_completed("fam1", "task-1", True)
+
+        # Assert
+        assert result is False
+        snap.reference.update.assert_not_called()
+
+    def test_empty_stream_returns_false(self):
+        """ストリームが空の場合 False を返す"""
+        # Arrange
+        repo, _ = self._make_repo_and_mock([])
+
+        # Act
+        result = repo.update_task_completed("fam1", "task-1", False)
+
+        # Assert
+        assert result is False
+
+    def test_order_by_completed_is_called(self):
+        """order_by("completed") がクエリチェーンに含まれることを検証"""
+        # Arrange
+        mock_db = MagicMock()
+        mock_where = MagicMock()
+        mock_order = MagicMock()
+        mock_db.collection_group.return_value.where.return_value = mock_where
+        mock_where.order_by.return_value = mock_order
+        mock_order.stream.return_value = []
+        repo = FirestoreDocumentRepository(mock_db)
+
+        # Act
+        repo.update_task_completed("fam1", "task-1", True)
+
+        # Assert
+        mock_where.order_by.assert_called_once_with("completed")
