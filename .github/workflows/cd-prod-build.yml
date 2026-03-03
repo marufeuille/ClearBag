@@ -71,7 +71,7 @@ jobs:
 
       - name: Build and push Docker image (normal deploy)
         if: github.event_name == 'push'
-        uses: docker/build-push-action@471d1dc4e07e5cddb65df6f2d18a02e9e0666bc8 # v6.15.0
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
           context: .
           push: true
