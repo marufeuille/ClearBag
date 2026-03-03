@@ -64,9 +64,7 @@
 │   │   │   ├── app.py             # FastAPIアプリ定義
 │   │   │   ├── deps.py            # DI・認証（Firebase Auth検証）
 │   │   │   └── routes/            # APIルート（documents/events/tasks/profiles/settings/ical）
-│   │   ├── worker.py              # Cloud Tasksワーカー（解析実行）
-│   │   └── cli.py                 # バッチCLI（Cloud Run Jobs用）
-│   ├── config.py
+│   │   └── worker.py              # Cloud Tasksワーカー（解析実行）
 │   └── logging_config.py
 ├── frontend/                  # PWAフロントエンド
 │   ├── src/
@@ -132,7 +130,6 @@ cp frontend/.env.local.example frontend/.env.local
 LOCAL_MODE=true                          # BackgroundTasksで解析実行（Cloud Tasks不要）
 DISABLE_RATE_LIMIT=true                  # 月間5枚制限をスキップ
 PROJECT_ID=your-gcp-project-id           # Vertex AI用GCPプロジェクト
-FIREBASE_PROJECT_ID=your-firebase-project-id  # Firebase認証プロジェクト（GCPと異なる場合）
 FIRESTORE_EMULATOR_HOST=localhost:8089   # Firestoreエミュレーター
 STORAGE_EMULATOR_HOST=http://localhost:4443  # GCSエミュレーター
 GCS_BUCKET_NAME=clearbag-local
@@ -257,8 +254,6 @@ uv run pytest tests/ --cov=v2 --cov-report=term-missing
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase App ID |
 
-> **補足**: `TF_VAR_SPREADSHEET_ID`、`TF_VAR_INBOX_FOLDER_ID`、`TF_VAR_ARCHIVE_FOLDER_ID` は旧バッチ（school-agent-v2）用。B2C のみ使うなら不要（Terraform 変数のデフォルト値 `""` で OK）。
-
 #### 4. Firebase Hosting のプロジェクト設定
 
 GCP プロジェクト = Firebase プロジェクト（`clearbag-dev` / `clearbag-prod`）に統一されているため、クロスプロジェクト権限の付与は不要です。
@@ -300,8 +295,7 @@ git push origin v1.0.0
 
 ## ドキュメント
 
-- [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) - アーキテクチャ詳細
-- [SPECIFICATION.md](SPECIFICATION.md) - システム仕様書
+- [docs/specification.md](docs/specification.md) - システム仕様書
 - [docs/plan/commercialization-mvp.md](docs/plan/commercialization-mvp.md) - B2C化実装プラン
 - [docs/review/nonfunctional-analysis-2026-02-23.md](docs/review/nonfunctional-analysis-2026-02-23.md) - 非機能要件分析
 

@@ -22,6 +22,16 @@ tests/manual/fixtures/over_limit_*.bin
 .takt/.runtime/
 .takt/runs/
 
+# macOS
+.DS_Store
+
+# Firebase
+firebase-debug.log
+
+# Frontend build artifacts
+frontend/test-results/
+frontend/tsconfig.tsbuildinfo
+
 # Terraform provider cache
 terraform/.terraform/
 terraform/environments/**/.terraform/
