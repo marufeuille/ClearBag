@@ -68,5 +68,7 @@ def update_task(
     """タスクの完了状態を更新する"""
     found = doc_repo.update_task_completed(ctx.family_id, task_id, body.completed)
     if not found:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
     return TaskUpdateResponse(completed=body.completed)
