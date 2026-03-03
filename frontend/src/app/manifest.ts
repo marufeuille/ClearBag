@@ -4,10 +4,12 @@ export const dynamic = "force-static";
 
 export default function manifest(): MetadataRoute.Manifest {
   const isDev = process.env.NEXT_PUBLIC_APP_ENV === "dev";
-  const themeColor = isDev ? "#CA8A04" : "#3b82f6";
+  const themeColor = isDev ? "#CA8A04" : "#2563EB";
   const namePrefix = isDev ? "[DEV] " : "";
+  const appId = isDev ? "/?app=clearbag-dev" : "/?app=clearbag-prod";
 
   return {
+    id: appId,
     name: `${namePrefix}ClearBag - 学校配布物AIアシスタント`,
     short_name: `${namePrefix}ClearBag`,
     description: "学校のお便りをAIが自動解析。カレンダー・タスクに一括登録。",
