@@ -1,43 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { NavBar } from "@/components/NavBar";
+import { CalendarGrid } from "@/components/CalendarGrid";
+import { EventList } from "@/components/EventList";
+import { MonthNavigator } from "@/components/MonthNavigator";
+import { ViewToggle } from "@/components/ViewToggle";
 import { EventData, getEvents } from "@/lib/api";
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("ja-JP", {
-    month: "short",
-    day: "numeric",
-    weekday: "short",
-  });
-}
-
-function formatTimeRange(start: string, end: string): string {
-  // 終日イベントは "T" を含まない ISO 日付文字列
-  if (!start.includes("T")) return "終日";
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleTimeString("ja-JP", { hour: "numeric", minute: "2-digit" });
-  return `${fmt(start)}〜${fmt(end)}`;
-}
+type ViewMode = "calendar" | "list";
 
 export default function CalendarPage() {
+  const now = new Date();
+  const [currentMonth, setCurrentMonth] = useState({
+    year: now.getFullYear(),
+    month: now.getMonth(),
+  });
+  const [viewMode, setViewMode] = useState<ViewMode>("calendar");
+  const [focusDate, setFocusDate] = useState<string | null>(null);
+
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 今月の範囲を取得
   const { from, to } = useMemo(() => {
-    const now = new Date();
-    const from = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString()
-      .slice(0, 10);
-    const to = new Date(now.getFullYear(), now.getMonth() + 2, 0)
-      .toISOString()
-      .slice(0, 10);
+    const { year, month } = currentMonth;
+    const from = new Date(year, month, 1).toISOString().slice(0, 10);
+    const to = new Date(year, month + 1, 0).toISOString().slice(0, 10);
     return { from, to };
-  }, []);
+  }, [currentMonth]);
 
   useEffect(() => {
     setLoading(true);
@@ -47,7 +39,6 @@ export default function CalendarPage() {
       .finally(() => setLoading(false));
   }, [from, to]);
 
-  // 日付でグループ化
   const grouped = useMemo(() => {
     const map: Record<string, EventData[]> = {};
     for (const ev of events) {
@@ -57,56 +48,78 @@ export default function CalendarPage() {
     return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
   }, [events]);
 
+  const eventDates = useMemo(
+    () => new Set(events.map((ev) => ev.start.slice(0, 10))),
+    [events]
+  );
+
+  const handlePrevMonth = () => {
+    setCurrentMonth(({ year, month }) => {
+      if (month === 0) return { year: year - 1, month: 11 };
+      return { year, month: month - 1 };
+    });
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(({ year, month }) => {
+      if (month === 11) return { year: year + 1, month: 0 };
+      return { year, month: month + 1 };
+    });
+  };
+
+  const handleDateTap = (dateStr: string) => {
+    setViewMode("list");
+    setFocusDate(dateStr);
+  };
+
+  const handleClearFocus = useCallback(() => setFocusDate(null), []);
+
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gray-50">
         <NavBar />
         <main className="max-w-2xl mx-auto px-4 py-6">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">
-            今後の予定
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <MonthNavigator
+              year={currentMonth.year}
+              month={currentMonth.month}
+              onPrev={handlePrevMonth}
+              onNext={handleNextMonth}
+            />
+            <ViewToggle mode={viewMode} onChange={setViewMode} />
+          </div>
 
           {loading && <p className="text-gray-400 text-sm">読み込み中...</p>}
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
-          {!loading && grouped.length === 0 && (
-            <p className="text-gray-400 text-sm text-center py-8">
-              予定はありません
-            </p>
-          )}
-
-          <div className="flex flex-col gap-4">
-            {grouped.map(([date, evs]) => (
-              <div key={date}>
-                <p className="text-xs font-semibold text-gray-400 uppercase mb-2">
-                  {formatDate(date)}
+          {viewMode === "calendar" ? (
+            <>
+              <CalendarGrid
+                year={currentMonth.year}
+                month={currentMonth.month}
+                eventDates={eventDates}
+                onDateTap={handleDateTap}
+              />
+              {!loading && events.length === 0 && (
+                <p className="text-gray-400 text-sm text-center py-4">
+                  予定はありません
                 </p>
-                <ul className="flex flex-col gap-2">
-                  {evs.map((ev, i) => (
-                    <li
-                      key={i}
-                      className="bg-white rounded-xl shadow-sm p-3 border-l-4 border-blue-400"
-                    >
-                      <p className="text-sm font-medium text-gray-800">
-                        {ev.summary}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">{formatTimeRange(ev.start, ev.end)}</p>
-                      {ev.location && (
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          📍 {ev.location}
-                        </p>
-                      )}
-                      {ev.description && (
-                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">
-                          {ev.description}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+              )}
+            </>
+          ) : (
+            <>
+              {!loading && grouped.length === 0 && (
+                <p className="text-gray-400 text-sm text-center py-8">
+                  予定はありません
+                </p>
+              )}
+              <EventList
+                grouped={grouped}
+                focusDate={focusDate}
+                onClearFocus={handleClearFocus}
+              />
+            </>
+          )}
         </main>
       </div>
     </AuthGuard>

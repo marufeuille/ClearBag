@@ -77,7 +77,9 @@ test.describe("スモークテスト: 各ページでエラーが出ない", () 
     await mockAllApis(page);
     await page.goto("/calendar");
 
-    await expect(page.getByText("今後の予定")).toBeVisible();
+    // カレンダーグリッドの曜日ヘッダーが表示されること
+    await expect(page.getByText("日").first()).toBeVisible();
+    await expect(page.getByText("月").first()).toBeVisible();
     await expect(page.getByText("予定はありません")).toBeVisible();
 
     // エラーテキストが出ていないこと
