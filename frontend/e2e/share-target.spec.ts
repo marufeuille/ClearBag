@@ -173,6 +173,6 @@ test("共有完了後に URL パラメータが削除される", async ({ page }
     page.getByText("共有ファイルを解析キューに登録しました。数分後に結果が表示されます。")
   ).toBeVisible({ timeout: 10000 });
 
-  // URL パラメータが除去されていること
-  expect(page.url()).not.toContain("shared=true");
+  // URL パラメータが除去されていること（router.replace は非同期のため toHaveURL で待機）
+  await expect(page).not.toHaveURL(/shared=true/);
 });
