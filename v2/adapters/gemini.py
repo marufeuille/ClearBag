@@ -25,10 +25,12 @@ from tenacity import (
 from vertexai.generative_models import GenerativeModel, Part
 
 from v2.domain.models import (
+    AnalysisResult,
     Category,
     DocumentAnalysis,
     EventData,
     TaskData,
+    TokenUsage,
     UserProfile,
 )
 from v2.domain.ports import DocumentAnalyzer
@@ -66,7 +68,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
         mime_type: str,
         profiles: dict[str, UserProfile],
         rules: list | None = None,
-    ) -> DocumentAnalysis:
+    ) -> AnalysisResult:
         """
         文書を解析して構造化データを抽出。
 
@@ -110,14 +112,20 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
                 document_part, user_prompt, generation_config, safety_settings
             )
 
-            # トークン使用量をログに記録
+            # トークン使用量を取得
+            token_usage: TokenUsage | None = None
             usage = getattr(responses, "usage_metadata", None)
             if usage:
+                token_usage = TokenUsage(
+                    prompt_tokens=usage.prompt_token_count,
+                    candidates_tokens=usage.candidates_token_count,
+                    total_tokens=usage.total_token_count,
+                )
                 logger.info(
                     "Gemini token usage: input=%d, output=%d, total=%d",
-                    usage.prompt_token_count,
-                    usage.candidates_token_count,
-                    usage.total_token_count,
+                    token_usage.prompt_tokens,
+                    token_usage.candidates_tokens,
+                    token_usage.total_tokens,
                 )
 
             # JSONレスポンスをパース
@@ -131,7 +139,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
                 len(analysis.tasks),
             )
 
-            return analysis
+            return AnalysisResult(analysis=analysis, token_usage=token_usage)
 
         except Exception:
             logger.exception("Failed to analyze document")

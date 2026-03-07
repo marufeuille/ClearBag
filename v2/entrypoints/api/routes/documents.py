@@ -31,6 +31,7 @@ from v2.adapters.firestore_repository import (
     FirestoreDocumentRepository,
     FirestoreFamilyRepository,
 )
+from v2.analytics import log_event
 from v2.domain.models import DocumentRecord
 from v2.entrypoints.api.deps import (
     FamilyContext,
@@ -160,6 +161,7 @@ def upload_document(
         return UploadResponse(id=existing.id, status=existing.status)
 
     # ── PDF ページ数チェック ───────────────────────────────────────────────
+    num_pages: int | None = None
     if mime_type == "application/pdf":
         try:
             reader = PdfReader(io.BytesIO(content))
@@ -227,6 +229,15 @@ def upload_document(
         ctx.family_id,
         ctx.uid,
         document_id,
+    )
+    log_event(
+        "document_uploaded",
+        family_id=ctx.family_id,
+        uid=ctx.uid,
+        document_id=document_id,
+        file_size=len(content),
+        mime_type=mime_type,
+        num_pages=num_pages,
     )
     return UploadResponse(id=document_id, status="pending")
 
@@ -334,6 +345,12 @@ def delete_document(
     storage.delete(record.storage_path)
     doc_repo.delete(ctx.family_id, document_id)
     logger.info("Document deleted: family_id=%s, doc_id=%s", ctx.family_id, document_id)
+    log_event(
+        "document_deleted",
+        family_id=ctx.family_id,
+        uid=ctx.uid,
+        document_id=document_id,
+    )
 
 
 def _ext_from_mime(mime_type: str) -> str:

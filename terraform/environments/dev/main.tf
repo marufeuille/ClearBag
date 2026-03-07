@@ -138,6 +138,8 @@ locals {
     "roles/cloudtasks.admin",                # Cloud Tasks キュー管理 (B2C)
     "roles/firebasehosting.admin",           # Firebase Hosting デプロイ
     "roles/firebaserules.admin",             # Firestore セキュリティルール デプロイ
+    "roles/bigquery.admin",                  # BigQuery データセット・テーブル管理 (analytics)
+    "roles/logging.configWriter",            # Cloud Logging Sink 管理 (analytics)
   ]
 }
 
@@ -266,6 +268,8 @@ module "api_service" {
     FRONTEND_BASE_URL       = "https://${var.project_id}.web.app"
     # Web Push VAPID クレームに使用する連絡先メールアドレス（非機密）
     VAPID_CLAIMS_EMAIL      = var.vapid_claims_email
+    # 分析イベントログのプロダクト識別子
+    PRODUCT_ID              = "clearbag"
   }
 
   secret_env_vars = {
@@ -277,7 +281,19 @@ module "api_service" {
     module.cloud_storage_uploads,
     module.cloud_tasks_analysis,
     module.secret_vapid_private_key,
+    module.analytics,
   ]
+}
+
+module "analytics" {
+  source = "../../modules/analytics"
+
+  project_id            = var.project_id
+  environment           = "dev"
+  location              = var.region
+  table_expiration_days = 90
+
+  depends_on = [google_project_iam_member.github_actions]
 }
 
 # ---------------------------------------------------------------------------

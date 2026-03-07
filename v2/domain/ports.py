@@ -15,6 +15,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from v2.domain.models import (
+    AnalysisResult,
     DocumentAnalysis,
     DocumentRecord,
     EventData,
@@ -33,8 +34,8 @@ class DocumentAnalyzer(ABC):
         mime_type: str,
         profiles: dict[str, UserProfile],
         rules: list | None = None,
-    ) -> DocumentAnalysis:
-        """文書を解析して構造化データを抽出"""
+    ) -> AnalysisResult:
+        """文書を解析して構造化データを抽出（トークン使用量含む）"""
         pass
 
 

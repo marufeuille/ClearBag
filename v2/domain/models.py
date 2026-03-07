@@ -97,3 +97,24 @@ class Invitation:
     token: str  # UUID v4（URLに埋め込む）
     status: str  # "pending" | "accepted" | "expired"
     invited_by_uid: str
+
+
+@dataclass(frozen=True)
+class TokenUsage:
+    """Gemini API のトークン使用量（ドキュメント単位のコスト追跡用）"""
+
+    prompt_tokens: int = 0
+    candidates_tokens: int = 0
+    total_tokens: int = 0
+
+
+@dataclass(frozen=True)
+class AnalysisResult:
+    """DocumentProcessor.process() の戻り値。
+
+    DocumentAnalysis（ドメインモデル）をインフラ情報（トークン数等）で汚さないよう、
+    ラッパーとして機能する。
+    """
+
+    analysis: DocumentAnalysis
+    token_usage: TokenUsage | None = None
