@@ -165,6 +165,8 @@ def seed_demo_data(
     email: str,
     dry_run: bool,
     bucket_name: str | None = None,
+    member_uid: str | None = None,
+    member_email: str | None = None,
 ) -> None:
     """デモデータをシードする。
 
@@ -176,10 +178,14 @@ def seed_demo_data(
       - documents × 2 (completed) + events × 2 + tasks × 3
       - documents × 1 (completed, archive_filename=None): 旧スキーマ互換性テスト用
       - documents × 1 (pending): 処理中状態の UI テスト用
+      - families/{familyId}/members/{member_uid}: member（--member-email 指定時のみ）
+      - users/{member_uid}: is_activated, family_id（--member-email 指定時のみ）
 
     Args:
         bucket_name: GCS バケット名。指定した場合は各ドキュメントの PDF も GCS にアップロードする。
                      未指定の場合は Firestore レコードのみ作成（storage_path は記録される）。
+        member_uid: 2人目メンバーの UID。指定した場合、ファミリーにメンバーとして追加する。
+        member_email: 2人目メンバーのメールアドレス（ログ・Firestore 保存用）。
     """
     family_id = str(uuid.uuid4())
     ical_token = str(uuid.uuid4())
@@ -197,9 +203,11 @@ def seed_demo_data(
     )
 
     if dry_run:
+        member_note = f", member uid={member_uid}" if member_uid else ""
         logger.info(
-            "DRY RUN: Would create users/%s, families/%s, 1 profile, 4 documents (2 completed + 1 legacy-null + 1 pending), 2 events, 3 tasks%s",
+            "DRY RUN: Would create users/%s%s, families/%s, 1 profile, 4 documents (2 completed + 1 legacy-null + 1 pending), 2 events, 3 tasks%s",
             uid,
+            member_note,
             family_id,
             f" + upload PDFs to gs://{bucket_name}" if bucket_name else "",
         )
@@ -235,7 +243,7 @@ def seed_demo_data(
     )
     logger.info("Created families/%s", family_id)
 
-    # families/{familyId}/members/{uid}
+    # families/{familyId}/members/{uid} (owner)
     db.collection(_FAMILIES).document(family_id).collection(_MEMBERS).document(uid).set(
         {
             "role": "owner",
@@ -244,7 +252,33 @@ def seed_demo_data(
             "joined_at": firestore.SERVER_TIMESTAMP,
         }
     )
-    logger.info("Created families/%s/members/%s", family_id, uid)
+    logger.info("Created families/%s/members/%s (owner)", family_id, uid)
+
+    # families/{familyId}/members/{member_uid} (member) — --member-email 指定時のみ
+    if member_uid and member_email:
+        db.collection(_FAMILIES).document(family_id).collection(_MEMBERS).document(
+            member_uid
+        ).set(
+            {
+                "role": "member",
+                "display_name": member_email.split("@")[0],
+                "email": member_email,
+                "joined_at": firestore.SERVER_TIMESTAMP,
+            }
+        )
+        db.collection(_USERS).document(member_uid).set(
+            {
+                "is_activated": True,
+                "ical_token": str(uuid.uuid4()),
+                "family_id": family_id,
+            }
+        )
+        logger.info(
+            "Created families/%s/members/%s (member) + users/%s",
+            family_id,
+            member_uid,
+            member_uid,
+        )
 
     # profiles × 1: 太郎（小学3年生）
     profile_ref = (
@@ -268,7 +302,11 @@ def seed_demo_data(
     _seed_document_legacy_null_archive(db, family_id, uid, gcs_bucket)
     _seed_document_pending(db, family_id, uid, gcs_bucket)
 
-    logger.info("Seed complete: 1 profile, 4 documents (2 completed + 1 legacy-null + 1 pending), 2 events, 3 tasks")
+    member_log = f" + member uid={member_uid}" if member_uid else ""
+    logger.info(
+        "Seed complete: 1 profile, 4 documents (2 completed + 1 legacy-null + 1 pending), 2 events, 3 tasks%s",
+        member_log,
+    )
 
 
 def _seed_document_sports_day(
@@ -521,7 +559,13 @@ def main() -> None:
         "--email",
         type=str,
         required=True,
-        help="デモデータを紐づける Firebase Auth ユーザーのメールアドレス",
+        help="デモデータを紐づける Firebase Auth ユーザーのメールアドレス（オーナーになる）",
+    )
+    parser.add_argument(
+        "--member-email",
+        type=str,
+        default=None,
+        help="ファミリーに追加する2人目メンバーのメールアドレス（アカウント削除テスト 13.3/13.12/13.13 用）",
     )
     parser.add_argument(
         "--dry-run",
@@ -545,6 +589,12 @@ def main() -> None:
 
     _init_firebase(project_id)  # type: ignore[arg-type]
     uid = resolve_uid_by_email(args.email)
+
+    # --member-email が指定された場合、Firebase Auth から UID を解決する
+    member_uid: str | None = None
+    if args.member_email:
+        member_uid = resolve_uid_by_email(args.member_email)
+        logger.info("Member email resolved: uid=%s", member_uid)
 
     db = firestore.Client(project=project_id)
     logger.info("Firestore client initialized: project=%s", project_id)
@@ -571,6 +621,8 @@ def main() -> None:
             args.email,
             dry_run=args.dry_run,
             bucket_name=os.environ.get("GCS_BUCKET_NAME"),
+            member_uid=member_uid,
+            member_email=args.member_email,
         )
 
     if args.dry_run:
