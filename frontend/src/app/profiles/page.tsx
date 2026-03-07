@@ -10,6 +10,7 @@ import {
   updateProfile,
   deleteProfile,
 } from "@/lib/api";
+import { sendEvent } from "@/lib/analytics";
 
 const EMPTY_FORM = { name: "", grade: "", keywords: "" };
 
@@ -60,6 +61,7 @@ export default function ProfilesPage() {
         await updateProfile(editing.id, form);
       } else {
         await createProfile(form);
+        sendEvent({ action: "profile_create", category: "profile" });
       }
       await load();
       cancel();

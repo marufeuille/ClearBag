@@ -9,6 +9,7 @@ import {
   getDocumentUrl,
   deleteDocument,
 } from "@/lib/api";
+import { sendEvent } from "@/lib/analytics";
 
 interface DocumentListProps {
   refreshKey?: number;
@@ -84,6 +85,7 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
       return;
     }
     setExpandedIds((prev) => new Set([...prev, id]));
+    sendEvent({ action: "document_view", category: "document", label: id });
     if (details[id]) return; // キャッシュ済み
 
     setDetailLoading(id);

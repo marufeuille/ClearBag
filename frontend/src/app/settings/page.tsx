@@ -14,6 +14,7 @@ import {
   subscribePush,
   unsubscribePush,
 } from "@/lib/pushSubscription";
+import { sendEvent } from "@/lib/analytics";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -57,6 +58,7 @@ export default function SettingsPage() {
           setPushPermission(getPermissionState());
           setSaved(true);
           setTimeout(() => setSaved(false), 2000);
+          sendEvent({ action: "push_subscribe", category: "notification" });
         } else {
           setPushPermission(getPermissionState());
         }
@@ -67,6 +69,7 @@ export default function SettingsPage() {
         setSettings(updated);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+        sendEvent({ action: "push_unsubscribe", category: "notification" });
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : "通知の設定に失敗しました";
@@ -97,6 +100,7 @@ export default function SettingsPage() {
       const result = await inviteMember(inviteEmail);
       setInviteUrl(result.invite_url);
       setInviteEmail("");
+      sendEvent({ action: "family_invite", category: "family" });
     } finally {
       setInviting(false);
     }
@@ -115,6 +119,7 @@ export default function SettingsPage() {
   const copyIcal = () => {
     if (!settings?.ical_url) return;
     navigator.clipboard.writeText(settings.ical_url);
+    sendEvent({ action: "ical_copy", category: "settings" });
   };
 
   return (

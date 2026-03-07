@@ -1,3 +1,5 @@
+import { sendEvent } from "@/lib/analytics";
+
 type Props = {
   year: number;
   month: number;
@@ -6,10 +8,19 @@ type Props = {
 };
 
 export function MonthNavigator({ year, month, onPrev, onNext }: Props) {
+  const handlePrev = () => {
+    sendEvent({ action: "calendar_navigate", category: "calendar", label: "prev" });
+    onPrev();
+  };
+  const handleNext = () => {
+    sendEvent({ action: "calendar_navigate", category: "calendar", label: "next" });
+    onNext();
+  };
+
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={onPrev}
+        onClick={handlePrev}
         aria-label="前の月"
         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
       >
@@ -21,7 +32,7 @@ export function MonthNavigator({ year, month, onPrev, onNext }: Props) {
         {year}年{month + 1}月
       </span>
       <button
-        onClick={onNext}
+        onClick={handleNext}
         aria-label="次の月"
         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
       >
