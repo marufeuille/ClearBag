@@ -24,8 +24,11 @@ Cloud Run Service として動作し、Firebase Auth で認証する。
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import os
+import time
 from collections.abc import Callable
 
 from fastapi import FastAPI, Request
@@ -33,6 +36,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
+from v2.analytics import log_event
 from v2.entrypoints import worker
 from v2.entrypoints.api.routes import (
     documents,
@@ -57,13 +61,66 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# ── グローバル例外ミドルウェア ──────────────────────────────────────────────────
-# 【登録順の注意】
-#   add_middleware は後から登録したものが外側になる（insert(0, ...) のため）。
-#   このミドルウェアを CORSMiddleware より先に登録することで内側に配置し、
-#   500 レスポンスが CORSMiddleware を通過して CORS ヘッダーが付与される。
+# ── ミドルウェア登録順の注意 ────────────────────────────────────────────────────
+# add_middleware は後から登録したものが外側になる（insert(0, ...) のため）。
+# @app.middleware デコレータは定義順に登録されるため、後に定義されたものが外側になる。
 #
-# スタック: ServerErrorMiddleware → CORSMiddleware → このMW → ExceptionMiddleware → Routes
+# スタック:
+#   ServerErrorMiddleware
+#     → CORSMiddleware          (後から add_middleware で最外側に配置)
+#       → _catch_unhandled_exceptions  (後定義 = 外側)
+#         → _log_access               (先定義 = 内側: HTTPException は正常レスポンスとして記録)
+#           → ExceptionMiddleware → Routes
+
+
+def _extract_uid_from_bearer(request: Request) -> str | None:
+    """Authorization: Bearer <JWT> から UID を取得する（署名検証なし・ログ用途のみ）。
+
+    JWT payload を Base64url デコードするだけで、署名検証は行わない。
+    ルートの get_auth_info による full verify とは独立している。
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    parts = auth_header[7:].split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        payload_b64 = parts[1]
+        # Base64url のパディング補完
+        padding = 4 - len(payload_b64) % 4
+        if padding != 4:
+            payload_b64 += "=" * padding
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        # Firebase JWT は "user_id" (Firebase) または "sub" (標準) に UID を格納する
+        return payload.get("user_id") or payload.get("sub")
+    except Exception:
+        return None
+
+
+@app.middleware("http")
+async def _log_access(
+    request: Request, call_next: Callable[[Request], Response]
+) -> Response:
+    """アクセスログミドルウェア（内側配置: ExceptionMiddleware より外、例外キャッチMWより内）。
+
+    /health と /worker/* は除外する。
+    """
+    start = time.monotonic()
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/health" or path.startswith("/worker/"):
+        return response
+    uid = _extract_uid_from_bearer(request)
+    log_event(
+        "access_log",
+        uid=uid,
+        method=request.method,
+        path=path,
+        status_code=response.status_code,
+        response_time_ms=round((time.monotonic() - start) * 1000),
+    )
+    return response
 
 
 @app.middleware("http")

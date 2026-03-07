@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from v2.domain.models import DocumentAnalysis, UserProfile
+from v2.domain.models import AnalysisResult, UserProfile
 from v2.domain.ports import DocumentAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -37,9 +37,9 @@ class DocumentProcessor:
         mime_type: str,
         profiles: dict[str, UserProfile],
         rules: list | None = None,
-    ) -> DocumentAnalysis:
+    ) -> AnalysisResult:
         """
-        ファイル内容を解析して DocumentAnalysis を返す。
+        ファイル内容を解析して AnalysisResult を返す。
 
         Args:
             content: ファイルのバイナリ内容
@@ -48,7 +48,7 @@ class DocumentProcessor:
             rules: 適用するルールのリスト（省略可）
 
         Returns:
-            DocumentAnalysis: 解析結果（category/events/tasks/summary 等）
+            AnalysisResult: 解析結果（DocumentAnalysis + TokenUsage）
 
         Raises:
             Exception: 解析に失敗した場合（ログ記録後に再送出）
@@ -61,14 +61,14 @@ class DocumentProcessor:
         )
 
         try:
-            analysis = self._analyzer.analyze(content, mime_type, profiles, rules)
+            result = self._analyzer.analyze(content, mime_type, profiles, rules)
             logger.info(
                 "Processing complete: category=%s, events=%d, tasks=%d",
-                analysis.category.value,
-                len(analysis.events),
-                len(analysis.tasks),
+                result.analysis.category.value,
+                len(result.analysis.events),
+                len(result.analysis.tasks),
             )
-            return analysis
+            return result
         except Exception:
             logger.exception("Document processing failed: mime_type=%s", mime_type)
             raise

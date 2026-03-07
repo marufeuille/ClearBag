@@ -4,16 +4,16 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
-from v2.domain.models import UserProfile
+from v2.domain.models import AnalysisResult, UserProfile
 from v2.domain.ports import DocumentAnalyzer
 from v2.services.document_processor import DocumentProcessor
 
 
 @pytest.fixture
-def mock_analyzer(sample_analysis) -> MagicMock:
+def mock_analyzer(sample_analysis_result) -> MagicMock:
     """DocumentAnalyzer のモック（DocumentProcessorテスト用）"""
     mock = MagicMock(spec=DocumentAnalyzer)
-    mock.analyze.return_value = sample_analysis
+    mock.analyze.return_value = sample_analysis_result
     return mock
 
 
@@ -26,16 +26,17 @@ def processor(mock_analyzer) -> DocumentProcessor:
 class TestDocumentProcessor:
     """DocumentProcessor の単体テスト"""
 
-    def test_process_returns_document_analysis(
+    def test_process_returns_analysis_result(
         self, processor, mock_analyzer, sample_profiles, sample_analysis
     ):
-        """process() が DocumentAnalysis を返す"""
+        """process() が AnalysisResult を返し、analysis フィールドに DocumentAnalysis を持つ"""
         content = b"fake-pdf-content"
         mime_type = "application/pdf"
 
         result = processor.process(content, mime_type, sample_profiles)
 
-        assert result == sample_analysis
+        assert isinstance(result, AnalysisResult)
+        assert result.analysis == sample_analysis
         mock_analyzer.analyze.assert_called_once_with(
             content, mime_type, sample_profiles, None
         )
@@ -71,8 +72,9 @@ class TestDocumentProcessor:
     ):
         """process() が開始ログと完了ログを出力する"""
         with caplog.at_level(logging.INFO, logger="v2.services.document_processor"):
-            processor.process(b"test", "application/pdf", sample_profiles)
+            result = processor.process(b"test", "application/pdf", sample_profiles)
 
+        assert isinstance(result, AnalysisResult)
         messages = [r.getMessage() for r in caplog.records]
         # 開始ログ
         assert any("Processing document" in m for m in messages)

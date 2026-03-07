@@ -39,6 +39,7 @@ from v2.adapters.firestore_repository import (
     FirestoreUserConfigRepository,
 )
 from v2.adapters.gemini import GeminiDocumentAnalyzer
+from v2.analytics import log_event
 from v2.entrypoints.api.worker_auth import verify_worker_token
 from v2.services.document_processor import DocumentProcessor
 
@@ -114,7 +115,8 @@ def run_analysis_sync(
         profiles = {p.id: p for p in user_profiles}
 
         processor = _build_processor()
-        analysis = processor.process(content, mime_type, profiles)
+        result = processor.process(content, mime_type, profiles)
+        analysis = result.analysis
 
         doc_repo.save_analysis(family_id, document_id, analysis)
         logger.info(
@@ -122,6 +124,22 @@ def run_analysis_sync(
             family_id,
             document_id,
             analysis.category.value,
+        )
+
+        tu = result.token_usage
+        log_event(
+            "document_analysis_completed",
+            family_id=family_id,
+            uid=uid,
+            document_id=document_id,
+            file_size=len(content),
+            mime_type=mime_type,
+            category=analysis.category.value,
+            events_count=len(analysis.events),
+            tasks_count=len(analysis.tasks),
+            prompt_tokens=tu.prompt_tokens if tu else None,
+            candidates_tokens=tu.candidates_tokens if tu else None,
+            total_tokens=tu.total_tokens if tu else None,
         )
 
         # 通知はアップロードした個人の設定に従って送信
@@ -132,6 +150,13 @@ def run_analysis_sync(
             "Worker failed: family_id=%s, doc_id=%s", family_id, document_id
         )
         doc_repo.update_status(family_id, document_id, "error", error_message=str(e))
+        log_event(
+            "document_analysis_failed",
+            family_id=family_id,
+            uid=uid,
+            document_id=document_id,
+            error=str(e),
+        )
         raise
 
 

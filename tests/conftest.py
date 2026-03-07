@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from v2.domain.models import (
+    AnalysisResult,
     Category,
     DocumentAnalysis,
     EventData,
@@ -101,8 +102,14 @@ def sample_analysis(
 
 
 @pytest.fixture
-def mock_analyzer(sample_analysis) -> MagicMock:
-    """DocumentAnalyzer のモック"""
+def sample_analysis_result(sample_analysis) -> AnalysisResult:
+    """サンプル解析結果（AnalysisResult ラッパー）"""
+    return AnalysisResult(analysis=sample_analysis)
+
+
+@pytest.fixture
+def mock_analyzer(sample_analysis_result) -> MagicMock:
+    """DocumentAnalyzer のモック（AnalysisResult を返す）"""
     mock = MagicMock(spec=DocumentAnalyzer)
-    mock.analyze.return_value = sample_analysis
+    mock.analyze.return_value = sample_analysis_result
     return mock
