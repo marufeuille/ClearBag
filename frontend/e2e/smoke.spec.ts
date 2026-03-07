@@ -107,7 +107,7 @@ test.describe("スモークテスト: 各ページでエラーが出ない", () 
     await page.goto("/settings");
 
     await expect(page.getByRole("heading", { name: "設定" })).toBeVisible();
-    await expect(page.getByText("無料プラン")).toBeVisible();
+    await expect(page.getByText("今月の解析数")).toBeVisible();
     await expect(page.getByRole("heading", { name: "ファミリー" })).toBeVisible();
     await expect(page.locator('input').first()).toHaveValue("テストファミリー");
   });

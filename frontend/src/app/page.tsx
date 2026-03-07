@@ -74,9 +74,6 @@ export default function HomePage() {
           </button>
 
           <p className="text-xs text-gray-400">
-            無料プランで月5枚まで解析できます
-          </p>
-          <p className="text-xs text-gray-400">
             <a href="/terms" className="hover:text-gray-600 transition-colors">利用規約</a>
             <span className="mx-1.5">·</span>
             <a href="/privacy" className="hover:text-gray-600 transition-colors">プライバシーポリシー</a>

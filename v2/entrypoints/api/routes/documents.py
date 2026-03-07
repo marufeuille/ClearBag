@@ -48,7 +48,7 @@ from v2.entrypoints.api.usage import ensure_monthly_reset
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-_FREE_PLAN_LIMIT = 5  # 無料プランの月間解析枚数上限
+_FREE_PLAN_LIMIT = 20  # 月間解析枚数上限
 _MAX_UPLOAD_SIZE_MB = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "10"))
 _MAX_UPLOAD_SIZE_BYTES = _MAX_UPLOAD_SIZE_MB * 1024 * 1024
 _MAX_PDF_PAGES = int(os.environ.get("MAX_PDF_PAGES", "3"))
@@ -111,7 +111,7 @@ def upload_document(
     """
     PDF / 画像ファイルをアップロードし、非同期解析をキューに追加する。
 
-    - 無料プランは月 5 枚まで（ファミリー単位でカウント）
+    - 月 20 枚まで（ファミリー単位でカウント）
     - コンテンツハッシュによる重複アップロードを検出（冪等性）
     - GCS にファイルを保存し、Firestore にステータスを記録
     - Cloud Tasks に解析ジョブをキューイング
@@ -128,7 +128,7 @@ def upload_document(
     ):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=f"無料プランの月間上限（{_FREE_PLAN_LIMIT}枚）に達しました。プレミアムプランへのアップグレードをご検討ください。",
+            detail=f"月間上限（{_FREE_PLAN_LIMIT}枚）に達しました。",
         )
 
     # ── ファイルサイズ事前チェック（file.size が取得できる場合） ──────────────
