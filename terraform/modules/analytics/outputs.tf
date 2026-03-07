@@ -9,11 +9,11 @@ output "sink_name" {
 }
 
 output "views" {
-  description = "作成した BigQuery VIEW の table_id 一覧"
+  description = "作成した BigQuery VIEW の table_id 一覧（create_views.sh で管理）"
   value = [
-    google_bigquery_table.v_access_logs.table_id,
-    google_bigquery_table.v_document_events.table_id,
-    google_bigquery_table.v_daily_active_families.table_id,
-    google_bigquery_table.v_monthly_cost_by_family.table_id,
+    "v_access_logs",
+    "v_document_events",
+    "v_daily_active_families",
+    "v_monthly_cost_by_family",
   ]
 }
