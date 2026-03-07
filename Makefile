@@ -9,7 +9,7 @@
 #   make test          Python テスト実行
 #   make lint          リント実行
 
-.PHONY: dev-infra dev-backend dev-frontend dev stop test lint help
+.PHONY: dev-infra dev-backend dev-frontend dev stop test lint setup lint-all help
 
 # ── インフラ (エミュレーター) ────────────────────────────────────────────────
 dev-infra:
@@ -78,6 +78,16 @@ lint:
 	uv run ruff check v2/ tests/
 	uv run ruff format --check v2/ tests/
 
+# ── セットアップ ──────────────────────────────────────────────────────────────
+setup:
+	uv sync --extra dev
+	uv run pre-commit install
+	@echo "==> pre-commit フックをインストールしました"
+
+# ── pre-commit 全ファイル実行 ─────────────────────────────────────────────────
+lint-all:
+	uv run pre-commit run --all-files
+
 # ── ヘルプ ───────────────────────────────────────────────────────────────────
 help:
 	@echo "利用可能なコマンド:"
@@ -91,3 +101,5 @@ help:
 	@echo "  stop                 エミュレーター停止"
 	@echo "  test                 Python テスト実行"
 	@echo "  lint                 リント実行"
+	@echo "  setup                依存インストール + pre-commit フック設定（初回のみ）"
+	@echo "  lint-all             pre-commit を全ファイルに実行"

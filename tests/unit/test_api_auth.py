@@ -48,9 +48,13 @@ class TestRegisterWithCode:
         # Arrange: コードが存在しない
         code_snap = _make_code_snap(None, exists=False)
         mock_db = MagicMock()
-        mock_db.collection.return_value.document.return_value.get.return_value = code_snap
+        mock_db.collection.return_value.document.return_value.get.return_value = (
+            code_snap
+        )
 
-        with patch("v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db):
+        with patch(
+            "v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db
+        ):
             # Act
             response = client.post("/api/auth/register", json={"code": "INVALID"})
 
@@ -60,11 +64,17 @@ class TestRegisterWithCode:
 
     def test_expired_code_returns_400(self, client: TestClient):
         # Arrange: 期限切れコード
-        code_snap = _make_code_snap({"expires_at": _PAST, "used_count": 0, "max_uses": 10})
+        code_snap = _make_code_snap(
+            {"expires_at": _PAST, "used_count": 0, "max_uses": 10}
+        )
         mock_db = MagicMock()
-        mock_db.collection.return_value.document.return_value.get.return_value = code_snap
+        mock_db.collection.return_value.document.return_value.get.return_value = (
+            code_snap
+        )
 
-        with patch("v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db):
+        with patch(
+            "v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db
+        ):
             response = client.post("/api/auth/register", json={"code": _VALID_CODE})
 
         assert response.status_code == 400
@@ -72,11 +82,17 @@ class TestRegisterWithCode:
 
     def test_exhausted_code_returns_400(self, client: TestClient):
         # Arrange: 上限到達コード
-        code_snap = _make_code_snap({"expires_at": _FUTURE, "used_count": 5, "max_uses": 5})
+        code_snap = _make_code_snap(
+            {"expires_at": _FUTURE, "used_count": 5, "max_uses": 5}
+        )
         mock_db = MagicMock()
-        mock_db.collection.return_value.document.return_value.get.return_value = code_snap
+        mock_db.collection.return_value.document.return_value.get.return_value = (
+            code_snap
+        )
 
-        with patch("v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db):
+        with patch(
+            "v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db
+        ):
             response = client.post("/api/auth/register", json={"code": _VALID_CODE})
 
         assert response.status_code == 400
@@ -84,7 +100,9 @@ class TestRegisterWithCode:
 
     def test_already_activated_is_idempotent(self, client: TestClient):
         # Arrange: 有効コード + 既アクティベート済みユーザー
-        code_snap = _make_code_snap({"expires_at": _FUTURE, "used_count": 1, "max_uses": 10})
+        code_snap = _make_code_snap(
+            {"expires_at": _FUTURE, "used_count": 1, "max_uses": 10}
+        )
         user_snap = _make_user_snap(is_activated=True)
 
         mock_db = MagicMock()
@@ -94,7 +112,9 @@ class TestRegisterWithCode:
         mock_db.collection.return_value = mock_coll
         mock_coll.document.return_value.get.side_effect = [code_snap, user_snap]
 
-        with patch("v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db):
+        with patch(
+            "v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db
+        ):
             response = client.post("/api/auth/register", json={"code": _VALID_CODE})
 
         assert response.status_code == 200
@@ -103,19 +123,30 @@ class TestRegisterWithCode:
 
     def test_successful_activation(self, client: TestClient):
         # Arrange: 有効コード + 未アクティベートユーザー
-        code_snap = _make_code_snap({"expires_at": _FUTURE, "used_count": 0, "max_uses": 10})
+        code_snap = _make_code_snap(
+            {"expires_at": _FUTURE, "used_count": 0, "max_uses": 10}
+        )
         user_snap = _make_user_snap(is_activated=False)
 
         mock_db = MagicMock()
         mock_coll = MagicMock()
         mock_db.collection.return_value = mock_coll
         # トランザクション内でも code_ref.get() が呼ばれるため 3 エントリ
-        mock_coll.document.return_value.get.side_effect = [code_snap, user_snap, code_snap]
+        mock_coll.document.return_value.get.side_effect = [
+            code_snap,
+            user_snap,
+            code_snap,
+        ]
         mock_db.transaction.return_value = MagicMock()
 
         with (
-            patch("v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db),
-            patch("v2.entrypoints.api.routes.auth.firestore.transactional", lambda fn: fn),
+            patch(
+                "v2.entrypoints.api.routes.auth._get_firestore_client",
+                return_value=mock_db,
+            ),
+            patch(
+                "v2.entrypoints.api.routes.auth.firestore.transactional", lambda fn: fn
+            ),
         ):
             response = client.post("/api/auth/register", json={"code": _VALID_CODE})
 
@@ -124,19 +155,30 @@ class TestRegisterWithCode:
 
     def test_unlimited_code_succeeds(self, client: TestClient):
         # Arrange: max_uses=None（無制限コード）
-        code_snap = _make_code_snap({"expires_at": _FUTURE, "used_count": 9999, "max_uses": None})
+        code_snap = _make_code_snap(
+            {"expires_at": _FUTURE, "used_count": 9999, "max_uses": None}
+        )
         user_snap = _make_user_snap(is_activated=False)
 
         mock_db = MagicMock()
         mock_coll = MagicMock()
         mock_db.collection.return_value = mock_coll
         # トランザクション内でも code_ref.get() が呼ばれるため 3 エントリ
-        mock_coll.document.return_value.get.side_effect = [code_snap, user_snap, code_snap]
+        mock_coll.document.return_value.get.side_effect = [
+            code_snap,
+            user_snap,
+            code_snap,
+        ]
         mock_db.transaction.return_value = MagicMock()
 
         with (
-            patch("v2.entrypoints.api.routes.auth._get_firestore_client", return_value=mock_db),
-            patch("v2.entrypoints.api.routes.auth.firestore.transactional", lambda fn: fn),
+            patch(
+                "v2.entrypoints.api.routes.auth._get_firestore_client",
+                return_value=mock_db,
+            ),
+            patch(
+                "v2.entrypoints.api.routes.auth.firestore.transactional", lambda fn: fn
+            ),
         ):
             response = client.post("/api/auth/register", json={"code": _VALID_CODE})
 
