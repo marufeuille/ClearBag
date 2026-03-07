@@ -286,9 +286,7 @@ class TestRemoveMember:
             member_uid, {"family_id": "", "is_activated": False}
         )
         # Custom Claims がクリアされていることを確認
-        mock_set_claims.assert_called_once_with(
-            member_uid, {"is_activated": False}
-        )
+        mock_set_claims.assert_called_once_with(member_uid, {"is_activated": False})
 
     def test_cannot_remove_self(self, owner_client):
         """オーナー自身は削除できない（400）"""

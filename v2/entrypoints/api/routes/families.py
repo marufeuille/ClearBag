@@ -263,7 +263,9 @@ def join_family(
     try:
         fb_auth.set_custom_user_claims(auth_info.uid, {"is_activated": True})
     except Exception:
-        logger.warning("Failed to set custom claims for uid=%s (non-fatal)", auth_info.uid)
+        logger.warning(
+            "Failed to set custom claims for uid=%s (non-fatal)", auth_info.uid
+        )
 
     # 招待を accepted に更新
     family_repo.accept_invitation(invitation["id"], new_family_id)
@@ -312,6 +314,8 @@ def remove_member(
     try:
         fb_auth.set_custom_user_claims(member_uid, {"is_activated": False})
     except Exception:
-        logger.warning("Failed to clear custom claims for uid=%s (non-fatal)", member_uid)
+        logger.warning(
+            "Failed to clear custom claims for uid=%s (non-fatal)", member_uid
+        )
 
     logger.info("Member removed: family_id=%s, uid=%s", ctx.family_id, member_uid)
