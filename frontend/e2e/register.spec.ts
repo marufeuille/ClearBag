@@ -66,6 +66,26 @@ test.describe("/register ページ", () => {
     await expect(page.getByText("有効期限が切れています")).toBeVisible();
   });
 
+  test("既アクティベート済みユーザーは「すでに登録済みです」が表示される", async ({
+    page,
+  }) => {
+    await page.route("**/api/auth/register", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          activated: true,
+          already_activated: true,
+          message: "登録済みです",
+        }),
+      })
+    );
+
+    await page.goto("/register?code=SPRING2026");
+    await expect(page.getByText("すでに登録済みです")).toBeVisible();
+    await page.waitForURL("**/dashboard**", { timeout: 5000 });
+  });
+
   test("上限超過コード (400 CODE_EXHAUSTED) でエラーメッセージが表示される", async ({
     page,
   }) => {
