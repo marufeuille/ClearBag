@@ -35,7 +35,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 _SERVICE_CODES = "service_codes"
-_DEFAULT_FRONTEND_URL = "https://clearbag.web.app"
+_DEFAULT_FRONTEND_URL = "https://clearbag-dev.firebaseapp.com"
 
 
 def _init_firebase() -> None:
