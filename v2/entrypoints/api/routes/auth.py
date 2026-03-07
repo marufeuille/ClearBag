@@ -27,6 +27,7 @@ class RegisterRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     activated: bool
+    already_activated: bool = False
     message: str
 
 
@@ -84,7 +85,9 @@ def register_with_code(
             auth_info.uid,
             body.code,
         )
-        return RegisterResponse(activated=True, message="登録済みです")
+        return RegisterResponse(
+            activated=True, already_activated=True, message="登録済みです"
+        )
 
     # Firestore トランザクションで used_count インクリメント + is_activated セット
     @firestore.transactional

@@ -119,6 +119,7 @@ class TestRegisterWithCode:
 
         assert response.status_code == 200
         assert response.json()["activated"] is True
+        assert response.json()["already_activated"] is True
         assert "登録済み" in response.json()["message"]
 
     def test_successful_activation(self, client: TestClient):
@@ -152,6 +153,7 @@ class TestRegisterWithCode:
 
         assert response.status_code == 200
         assert response.json()["activated"] is True
+        assert response.json()["already_activated"] is False
 
     def test_unlimited_code_succeeds(self, client: TestClient):
         # Arrange: max_uses=None（無制限コード）
