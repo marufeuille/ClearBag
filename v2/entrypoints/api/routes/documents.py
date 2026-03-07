@@ -90,7 +90,7 @@ def _to_response(record: DocumentRecord) -> DocumentResponse:
         mime_type=record.mime_type,
         summary=record.summary,
         category=record.category,
-        archive_filename=record.archive_filename,
+        archive_filename=record.archive_filename or "",
         error_message=record.error_message,
         created_at=record.created_at.isoformat() if record.created_at else None,
     )

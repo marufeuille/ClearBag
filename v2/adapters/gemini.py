@@ -316,5 +316,5 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
             related_profile_ids=raw_json.get("related_profile_ids", []),
             events=events,
             tasks=tasks,
-            archive_filename=raw_json.get("archive_filename", ""),
+            archive_filename=raw_json.get("archive_filename") or "",
         )

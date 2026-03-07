@@ -144,8 +144,8 @@ class TestPdfUploadToGcs:
                 bucket_name="test-bucket",
             )
 
-        # ドキュメント2件分のアップロードが呼ばれること
-        assert mock_blob.upload_from_string.call_count == 2
+        # ドキュメント4件分のアップロードが呼ばれること（通常2件 + 互換性テスト用2件）
+        assert mock_blob.upload_from_string.call_count == 4
         # content_type が application/pdf であること
         for call_args in mock_blob.upload_from_string.call_args_list:
             assert call_args.kwargs["content_type"] == "application/pdf"

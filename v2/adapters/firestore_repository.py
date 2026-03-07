@@ -406,7 +406,7 @@ class FirestoreDocumentRepository(DocumentRepository):
             mime_type=data.get("mime_type", "application/octet-stream"),
             summary=data.get("summary", ""),
             category=data.get("category", ""),
-            archive_filename=data.get("archive_filename", ""),
+            archive_filename=data.get("archive_filename") or "",
             error_message=data.get("error_message"),
             created_at=data.get(
                 "created_at"
