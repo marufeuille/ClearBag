@@ -56,6 +56,19 @@ Max uses: 50
 ダッシュボードの設定ページ → ファミリー管理 → 「メンバーを招待」から実施。
 招待先のメールアドレスが必要。招待を受けた側は `/invite?token=...` でファミリーに参加する。
 
+### 1-C. コードの管理（一覧・revoke）
+
+```bash
+# 一覧表示
+PROJECT_ID=clearbag-dev uv run python scripts/manage_service_codes.py list
+
+# コードを即時無効化
+PROJECT_ID=clearbag-dev uv run python scripts/manage_service_codes.py revoke A3kX9mP2
+
+# dry-run で確認
+PROJECT_ID=clearbag-dev uv run python scripts/manage_service_codes.py revoke A3kX9mP2 --dry-run
+```
+
 ---
 
 ## 2. 既存ユーザーを手動でアクティベートする

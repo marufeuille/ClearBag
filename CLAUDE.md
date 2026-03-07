@@ -149,6 +149,7 @@ npm run test:e2e    # Playwright E2E テスト（next dev を自動起動）
 | スクリプト | 用途 | 実行例 |
 |---|---|---|
 | `create_service_code.py` | サービス招待コード生成（URL 共有で新規登録を案内） | `PROJECT_ID=clearbag-dev uv run python scripts/create_service_code.py --expires-in-days 30` |
+| `manage_service_codes.py` | 招待コードの一覧表示・無効化（revoke） | `PROJECT_ID=clearbag-dev uv run python scripts/manage_service_codes.py list` |
 | `activate_existing_users.py` | ユーザーに `is_activated: True` を付与 | `PROJECT_ID=clearbag-dev uv run python scripts/activate_existing_users.py --email user@example.com` |
 | `migrate_to_families.py` | 既存ユーザーデータをファミリー構造に移行 | `PROJECT_ID=clearbag-dev uv run python scripts/migrate_to_families.py --dry-run` |
 | `reset_dev_data.py` | dev 環境の Firestore/GCS を初期化しデモデータをシード | `PROJECT_ID=clearbag-dev uv run python scripts/reset_dev_data.py --email you@gmail.com` |
