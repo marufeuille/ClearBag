@@ -22,6 +22,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { uploadDocument } from "@/lib/api";
+import { sendEvent } from "@/lib/analytics";
 import {
   SHARE_TARGET_CACHE_NAME,
   SHARE_TARGET_CACHE_KEY,
@@ -112,6 +113,7 @@ export function useShareTarget(): ShareTargetState {
         await cache.delete(SHARE_TARGET_CACHE_KEY);
 
         const result = await uploadDocument(file);
+        sendEvent({ action: "share_target_upload", category: "document", label: file.type });
         setState({ processing: false, documentId: result.id, error: null });
       } catch (err) {
         const message =

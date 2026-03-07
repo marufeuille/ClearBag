@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { NavBar } from "@/components/NavBar";
 import { TaskData, getTasks, completeTask } from "@/lib/api";
+import { sendEvent } from "@/lib/analytics";
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskData[]>([]);
@@ -25,6 +26,9 @@ export default function TasksPage() {
     );
     try {
       await completeTask(task.id, next);
+      if (next) {
+        sendEvent({ action: "task_complete", category: "task", label: task.id });
+      }
       // 未完了フィルター中は完了したタスクをリストから除去
       if (!showCompleted && next) {
         setTasks((prev) => prev.filter((t) => t.id !== task.id));

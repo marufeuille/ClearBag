@@ -9,6 +9,7 @@
 
 import { useRef, useState } from "react";
 import { uploadDocument, ApiError } from "@/lib/api";
+import { sendEvent } from "@/lib/analytics";
 
 const MAX_UPLOAD_SIZE_MB = 10;
 const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
@@ -47,17 +48,22 @@ export function UploadArea({ onUploaded, onError }: UploadAreaProps) {
     setUploading(true);
     try {
       const result = await uploadDocument(file);
+      sendEvent({ action: "document_upload", category: "document", label: file.type });
       onUploaded?.(result.id);
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.status === 402) {
+          sendEvent({ action: "document_upload_error", category: "document", label: "quota_exceeded" });
           onError?.("無料プランの月間上限（5枚）に達しました。プレミアムプランへのアップグレードをご検討ください。");
         } else if (e.status === 413 || e.status === 422) {
+          sendEvent({ action: "document_upload_error", category: "document", label: `api_${e.status}` });
           onError?.(e.detail || "ファイルの処理に失敗しました。");
         } else {
+          sendEvent({ action: "document_upload_error", category: "document", label: `api_${e.status}` });
           onError?.("アップロードに失敗しました。もう一度お試しください。");
         }
       } else {
+        sendEvent({ action: "document_upload_error", category: "document", label: "unknown" });
         onError?.("アップロードに失敗しました。もう一度お試しください。");
       }
     } finally {

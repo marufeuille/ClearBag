@@ -11,6 +11,7 @@ import { User, onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
 
 import { auth, getGoogleRedirectResult, signInWithGoogle, signOut } from "@/lib/firebase";
+import { sendEvent } from "@/lib/analytics";
 
 interface AuthState {
   user: User | null;
@@ -35,9 +36,15 @@ export function useAuth(): AuthState & {
   useEffect(() => {
     if (IS_E2E) return;
     // モバイルリダイレクト認証後の結果を処理する
-    getGoogleRedirectResult().catch((error) => {
-      console.error("[Auth] getRedirectResult failed:", error?.code, error?.message);
-    });
+    getGoogleRedirectResult()
+      .then((result) => {
+        if (result?.user) {
+          sendEvent({ action: "sign_in", category: "auth", label: "redirect" });
+        }
+      })
+      .catch((error) => {
+        console.error("[Auth] getRedirectResult failed:", error?.code, error?.message);
+      });
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setState({ user, loading: false });
     });
@@ -45,7 +52,11 @@ export function useAuth(): AuthState & {
   }, []);
 
   const handleSignIn = async () => {
-    await signInWithGoogle();
+    const result = await signInWithGoogle();
+    // signInWithPopup は UserCredential を返す（redirect は null）
+    if (result?.user) {
+      sendEvent({ action: "sign_in", category: "auth", label: "popup" });
+    }
   };
 
   const handleSignOut = async () => {
