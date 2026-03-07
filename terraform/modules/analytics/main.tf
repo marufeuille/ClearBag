@@ -1,9 +1,8 @@
-"""Analytics モジュール - BigQuery + Cloud Logging Sink
-
-Cloud Run stdout → Cloud Logging → Log Sink → BigQuery のパイプラインを構築する。
-jsonPayload.log_type フィールドが存在するログのみをキャプチャし、
-通常のアプリログは除外される。
-"""
+# Analytics モジュール - BigQuery + Cloud Logging Sink
+#
+# Cloud Run stdout → Cloud Logging → Log Sink → BigQuery のパイプラインを構築する。
+# jsonPayload.log_type フィールドが存在するログのみをキャプチャし、
+# 通常のアプリログは除外される。
 
 resource "google_project_service" "bigquery" {
   project            = var.project_id
