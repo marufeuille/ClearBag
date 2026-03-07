@@ -62,7 +62,7 @@ SELECT
   CAST(jsonPayload.prompt_tokens AS INT64)     AS prompt_tokens,
   CAST(jsonPayload.candidates_tokens AS INT64) AS candidates_tokens,
   CAST(jsonPayload.total_tokens AS INT64)      AS total_tokens,
-  jsonPayload.error                            AS error
+  JSON_VALUE(TO_JSON_STRING(jsonPayload), '$.error') AS error
 FROM \`${PROJECT_ID}.${DATASET}.run_googleapis_com_stdout\`
 WHERE jsonPayload.log_type IN (
   'document_uploaded',
