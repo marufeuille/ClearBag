@@ -263,3 +263,4 @@ export const updateFamilyName = (name: string) => post<FamilyInfo>("/api/familie
 export const inviteMember = (email: string) => post<InviteResult>("/api/families/invite", { email });
 export const joinFamily = (token: string) => post<JoinResult>("/api/families/join", { token });
 export const removeMember = (uid: string) => del(`/api/families/members/${uid}`);
+export const deleteAccount = () => del("/api/account");

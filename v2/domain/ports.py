@@ -135,6 +135,11 @@ class UserConfigRepository(ABC):
         """ユーザー設定を更新"""
         pass
 
+    @abstractmethod
+    def delete_user(self, uid: str) -> None:
+        """users/{uid} ドキュメントを削除"""
+        pass
+
 
 class FamilyRepository(ABC):
     """ファミリー・プロファイルの永続化（Firestore等）"""
@@ -215,6 +220,11 @@ class FamilyRepository(ABC):
         """プロファイルを削除"""
         pass
 
+    @abstractmethod
+    def delete_family_cascade(self, family_id: str) -> None:
+        """ファミリーと全サブコレクション（members, invitations, profiles, documents（events/tasks含む））を削除"""
+        pass
+
 
 class BlobStorage(ABC):
     """バイナリファイルのアップロード・ダウンロード（GCS等）"""
@@ -237,6 +247,11 @@ class BlobStorage(ABC):
     @abstractmethod
     def generate_signed_url(self, blob_path: str, expiration_minutes: int = 15) -> str:
         """一時的な署名付きダウンロード URL を生成して返す"""
+        pass
+
+    @abstractmethod
+    def delete_by_prefix(self, prefix: str) -> None:
+        """指定プレフィックス配下の全ファイルを一括削除"""
         pass
 
 

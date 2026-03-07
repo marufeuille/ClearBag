@@ -451,6 +451,11 @@ class FirestoreUserConfigRepository(UserConfigRepository):
             doc_ref.set(data, merge=True)
         logger.info("Updated user settings: uid=%s", uid)
 
+    def delete_user(self, uid: str) -> None:
+        """users/{uid} ドキュメントを削除"""
+        self._db.collection(_USERS).document(uid).delete()
+        logger.info("Deleted user: uid=%s", uid)
+
 
 class FirestoreFamilyRepository(FamilyRepository):
     """
@@ -666,3 +671,25 @@ class FirestoreFamilyRepository(FamilyRepository):
         logger.info(
             "Deleted profile: family_id=%s, profile_id=%s", family_id, profile_id
         )
+
+    def delete_family_cascade(self, family_id: str) -> None:
+        """ファミリーと全サブコレクションを再帰的に削除"""
+        family_ref = self._db.collection(_FAMILIES).document(family_id)
+
+        # documents とそのサブコレクション (events, tasks) を削除
+        for doc_snap in family_ref.collection(_DOCUMENTS).stream():
+            doc_ref = doc_snap.reference
+            for event_snap in doc_ref.collection(_EVENTS).stream():
+                event_snap.reference.delete()
+            for task_snap in doc_ref.collection(_TASKS).stream():
+                task_snap.reference.delete()
+            doc_ref.delete()
+
+        # profiles, invitations, members を削除
+        for sub in (_PROFILES, _INVITATIONS, _MEMBERS):
+            for snap in family_ref.collection(sub).stream():
+                snap.reference.delete()
+
+        # ファミリー本体を削除
+        family_ref.delete()
+        logger.info("Deleted family cascade: family_id=%s", family_id)

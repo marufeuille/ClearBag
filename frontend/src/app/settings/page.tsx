@@ -7,6 +7,7 @@ import {
   Settings, getSettings, updateSettings,
   FamilyInfo, FamilyMember,
   getFamily, getFamilyMembers, updateFamilyName, inviteMember, removeMember,
+  deleteAccount,
 } from "@/lib/api";
 import {
   isPushSupported,
@@ -30,6 +31,7 @@ export default function SettingsPage() {
   const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
   const [pushSupported, setPushSupported] = useState(true);
   const [pushError, setPushError] = useState<string | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     setPushSupported(isPushSupported());
@@ -114,6 +116,23 @@ export default function SettingsPage() {
 
   const copyInviteUrl = () => {
     navigator.clipboard.writeText(inviteUrl);
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = confirm(
+      "アカウントを削除しますか？\n\nすべてのデータ（文書・イベント・タスク・プロファイル）が完全に削除されます。この操作は取り消せません。"
+    );
+    if (!confirmed) return;
+    setDeletingAccount(true);
+    try {
+      await deleteAccount();
+      // 削除成功 → ページリロード（Firebase Auth セッションも切れる）
+      window.location.href = "/";
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "削除に失敗しました";
+      alert(message);
+      setDeletingAccount(false);
+    }
   };
 
   const copyIcal = () => {
@@ -339,6 +358,33 @@ export default function SettingsPage() {
                   <p className="text-xs text-green-500 mt-2">保存しました</p>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* アカウント削除 */}
+          {settings && family && (
+            <div className="bg-white rounded-2xl shadow-sm p-4 border border-red-100">
+              <h3 className="text-sm font-semibold text-red-600 mb-3">
+                アカウント削除
+              </h3>
+              {family.role === "owner" && members.filter(m => m.role !== "owner").length > 0 ? (
+                <p className="text-xs text-gray-500">
+                  他のメンバーがいるため削除できません。先にメンバーを削除してください。
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-500 mb-3">
+                    アカウントを削除すると、すべてのデータが完全に削除されます。この操作は取り消せません。
+                  </p>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deletingAccount}
+                    className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 disabled:opacity-50"
+                  >
+                    {deletingAccount ? "削除中..." : "アカウントを削除"}
+                  </button>
+                </>
+              )}
             </div>
           )}
         </main>

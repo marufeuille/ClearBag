@@ -133,6 +133,6 @@ test.describe("設定ページ: ファミリー管理", () => {
 
     await expect(page.getByText("テストファミリー")).toBeVisible();
     await expect(page.getByPlaceholder("メールアドレス")).not.toBeVisible();
-    await expect(page.getByRole("button", { name: "削除" })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "削除", exact: true })).not.toBeVisible();
   });
 });

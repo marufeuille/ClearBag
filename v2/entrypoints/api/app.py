@@ -20,6 +20,7 @@ Cloud Run Service として動作し、Firebase Auth で認証する。
   PATCH  /api/settings
   POST   /api/push-subscriptions
   POST   /api/push-subscriptions/unsubscribe
+  DELETE /api/account
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from starlette.responses import Response
 from v2.analytics import log_event
 from v2.entrypoints import worker
 from v2.entrypoints.api.routes import (
+    account,
     documents,
     events,
     families,
@@ -168,6 +170,7 @@ app.include_router(families.router, prefix=_PREFIX)
 app.include_router(ical.router, prefix=_PREFIX)
 app.include_router(settings.router, prefix=_PREFIX)
 app.include_router(push_subscriptions.router, prefix=_PREFIX)
+app.include_router(account.router, prefix=_PREFIX)
 
 # ── Cloud Tasks ワーカールート（/worker/*）────────────────────────────────────
 # Firebase Auth なし。アプリレベルの OIDC トークン検証（verify_worker_token）で保護される。
