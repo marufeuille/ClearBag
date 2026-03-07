@@ -54,133 +54,27 @@ resource "google_bigquery_dataset_iam_member" "sink_writer" {
 # BigQuery VIEWs (Phase 2)
 #
 # Log Sink が自動作成するパーティションテーブルは jsonPayload.* のネスト構造。
-# これらの VIEW でフラット化し、Looker Studio から直接クエリできるようにする。
+# create_views.sh で CREATE OR REPLACE VIEW DDL を実行してフラット化する。
 #
-# 参照テーブル名: `{project_id}.analytics_{env}.run_googleapis_com_stdout_*`
+# google_bigquery_table の view ブロックではなく bq query DDL を使う理由:
+# BigQuery API はワイルドカードテーブルが存在しない状態での VIEW 作成を
+# 400 エラーで拒否するため。Log Sink テーブルは最初のログ到着後に自動作成
+# されるため、初回デプロイ時は常にテーブルが存在しない。
+#
+# VIEW の SQL は create_views.sh に記述してコード管理する。
+# テーブルが存在しない場合はスクリプト内で警告を出してスキップする。
 # ---------------------------------------------------------------------------
 
-locals {
-  # 各 VIEW が参照するワイルドカードテーブルのフルパス
-  log_table = "`${var.project_id}.analytics_${var.environment}.run_googleapis_com_stdout_*`"
-}
+resource "terraform_data" "bq_views" {
+  # create_views.sh の内容が変わると再実行
+  triggers_replace = filesha256("${path.module}/create_views.sh")
 
-# アクセスログフラット化
-resource "google_bigquery_table" "v_access_logs" {
-  project             = var.project_id
-  dataset_id          = google_bigquery_dataset.analytics.dataset_id
-  table_id            = "v_access_logs"
-  deletion_protection = false
-
-  view {
-    query          = <<-SQL
-      SELECT
-        timestamp,
-        DATE(timestamp)                        AS date,
-        jsonPayload.product_id                 AS product_id,
-        jsonPayload.uid                        AS uid,
-        jsonPayload.method                     AS method,
-        jsonPayload.path                       AS path,
-        CAST(jsonPayload.status_code AS INT64) AS status_code,
-        CAST(jsonPayload.response_time_ms AS INT64) AS response_time_ms
-      FROM ${local.log_table}
-      WHERE jsonPayload.log_type = 'access_log'
-    SQL
-    use_legacy_sql = false
-  }
-
-  depends_on = [google_logging_project_sink.analytics]
-}
-
-# ドキュメントイベント統合（uploaded / completed / failed / deleted）
-resource "google_bigquery_table" "v_document_events" {
-  project             = var.project_id
-  dataset_id          = google_bigquery_dataset.analytics.dataset_id
-  table_id            = "v_document_events"
-  deletion_protection = false
-
-  view {
-    query          = <<-SQL
-      SELECT
-        timestamp,
-        DATE(timestamp)                              AS date,
-        jsonPayload.log_type                         AS event_type,
-        jsonPayload.product_id                       AS product_id,
-        jsonPayload.family_id                        AS family_id,
-        jsonPayload.uid                              AS uid,
-        jsonPayload.document_id                      AS document_id,
-        CAST(jsonPayload.file_size AS INT64)         AS file_size,
-        jsonPayload.mime_type                        AS mime_type,
-        CAST(jsonPayload.num_pages AS INT64)         AS num_pages,
-        jsonPayload.category                         AS category,
-        CAST(jsonPayload.events_count AS INT64)      AS events_count,
-        CAST(jsonPayload.tasks_count AS INT64)       AS tasks_count,
-        CAST(jsonPayload.prompt_tokens AS INT64)     AS prompt_tokens,
-        CAST(jsonPayload.candidates_tokens AS INT64) AS candidates_tokens,
-        CAST(jsonPayload.total_tokens AS INT64)      AS total_tokens,
-        jsonPayload.error                            AS error
-      FROM ${local.log_table}
-      WHERE jsonPayload.log_type IN (
-        'document_uploaded',
-        'document_analysis_completed',
-        'document_analysis_failed',
-        'document_deleted'
-      )
-    SQL
-    use_legacy_sql = false
-  }
-
-  depends_on = [google_logging_project_sink.analytics]
-}
-
-# DAU / active family 集計（日次）
-resource "google_bigquery_table" "v_daily_active_families" {
-  project             = var.project_id
-  dataset_id          = google_bigquery_dataset.analytics.dataset_id
-  table_id            = "v_daily_active_families"
-  deletion_protection = false
-
-  view {
-    query          = <<-SQL
-      SELECT
-        DATE(timestamp)                      AS date,
-        jsonPayload.product_id               AS product_id,
-        COUNT(DISTINCT jsonPayload.uid)      AS active_users,
-        COUNT(DISTINCT jsonPayload.family_id) AS active_families
-      FROM ${local.log_table}
-      WHERE jsonPayload.log_type = 'access_log'
-        AND jsonPayload.uid IS NOT NULL
-      GROUP BY date, product_id
-    SQL
-    use_legacy_sql = false
-  }
-
-  depends_on = [google_logging_project_sink.analytics]
-}
-
-# 月次 family 別 Gemini APIコスト集計
-resource "google_bigquery_table" "v_monthly_cost_by_family" {
-  project             = var.project_id
-  dataset_id          = google_bigquery_dataset.analytics.dataset_id
-  table_id            = "v_monthly_cost_by_family"
-  deletion_protection = false
-
-  view {
-    query          = <<-SQL
-      SELECT
-        FORMAT_TIMESTAMP('%Y-%m', timestamp)          AS month,
-        jsonPayload.product_id                        AS product_id,
-        jsonPayload.family_id                         AS family_id,
-        COUNT(*)                                      AS analysis_count,
-        SUM(CAST(jsonPayload.total_tokens AS INT64))  AS total_tokens,
-        SUM(CAST(jsonPayload.prompt_tokens AS INT64)) AS prompt_tokens,
-        SUM(CAST(jsonPayload.candidates_tokens AS INT64)) AS candidates_tokens,
-        SUM(CAST(jsonPayload.file_size AS INT64))     AS total_file_size_bytes,
-        AVG(CAST(jsonPayload.file_size AS INT64))     AS avg_file_size_bytes
-      FROM ${local.log_table}
-      WHERE jsonPayload.log_type = 'document_analysis_completed'
-      GROUP BY month, product_id, family_id
-    SQL
-    use_legacy_sql = false
+  provisioner "local-exec" {
+    command = "bash ${path.module}/create_views.sh"
+    environment = {
+      PROJECT_ID  = var.project_id
+      ENVIRONMENT = var.environment
+    }
   }
 
   depends_on = [google_logging_project_sink.analytics]
