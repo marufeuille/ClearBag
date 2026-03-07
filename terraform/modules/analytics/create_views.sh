@@ -2,7 +2,7 @@
 # BigQuery VIEW 作成スクリプト
 #
 # google_bigquery_table リソースで VIEW を作成しようとすると、
-# ワイルドカードテーブル (run_googleapis_com_stdout_*) が存在しない場合に
+# ワイルドカードテーブル (run_googleapis_com_stdout) が存在しない場合に
 # BigQuery API が 400 エラーを返すため、このスクリプトで CREATE OR REPLACE VIEW を
 # 直接実行する。テーブルが存在しない場合のエラーは警告として扱いスキップする。
 #
@@ -40,7 +40,7 @@ SELECT
   jsonPayload.path                       AS path,
   CAST(jsonPayload.status_code AS INT64) AS status_code,
   CAST(jsonPayload.response_time_ms AS INT64) AS response_time_ms
-FROM \`${PROJECT_ID}.${DATASET}.run_googleapis_com_stdout_*\`
+FROM \`${PROJECT_ID}.${DATASET}.run_googleapis_com_stdout\`
 WHERE jsonPayload.log_type = 'access_log'"
 
 # v_document_events: ドキュメントイベント統合
@@ -63,7 +63,7 @@ SELECT
   CAST(jsonPayload.candidates_tokens AS INT64) AS candidates_tokens,
   CAST(jsonPayload.total_tokens AS INT64)      AS total_tokens,
   jsonPayload.error                            AS error
-FROM \`${PROJECT_ID}.${DATASET}.run_googleapis_com_stdout_*\`
+FROM \`${PROJECT_ID}.${DATASET}.run_googleapis_com_stdout\`
 WHERE jsonPayload.log_type IN (
   'document_uploaded',
   'document_analysis_completed',
@@ -78,7 +78,7 @@ SELECT
   jsonPayload.product_id               AS product_id,
   COUNT(DISTINCT jsonPayload.uid)      AS active_users,
   COUNT(DISTINCT jsonPayload.family_id) AS active_families
-FROM \`${PROJECT_ID}.${DATASET}.run_googleapis_com_stdout_*\`
+FROM \`${PROJECT_ID}.${DATASET}.run_googleapis_com_stdout\`
 WHERE jsonPayload.log_type = 'access_log'
   AND jsonPayload.uid IS NOT NULL
 GROUP BY date, product_id"
@@ -95,6 +95,6 @@ SELECT
   SUM(CAST(jsonPayload.candidates_tokens AS INT64)) AS candidates_tokens,
   SUM(CAST(jsonPayload.file_size AS INT64))     AS total_file_size_bytes,
   AVG(CAST(jsonPayload.file_size AS INT64))     AS avg_file_size_bytes
-FROM \`${PROJECT_ID}.${DATASET}.run_googleapis_com_stdout_*\`
+FROM \`${PROJECT_ID}.${DATASET}.run_googleapis_com_stdout\`
 WHERE jsonPayload.log_type = 'document_analysis_completed'
 GROUP BY month, product_id, family_id"
