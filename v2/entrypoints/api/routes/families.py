@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import uuid
 
+import firebase_admin.auth as fb_auth
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
@@ -257,6 +258,13 @@ def join_family(
         auth_info.uid, {"family_id": new_family_id, "is_activated": True}
     )
 
+    # ① Custom Claims を設定 — 次回 JWT 取得時にフロントエンドが API 呼び出し不要で
+    #    is_activated を確認できるようにする（Cold Start 回避）
+    try:
+        fb_auth.set_custom_user_claims(auth_info.uid, {"is_activated": True})
+    except Exception:
+        logger.warning("Failed to set custom claims for uid=%s (non-fatal)", auth_info.uid)
+
     # 招待を accepted に更新
     family_repo.accept_invitation(invitation["id"], new_family_id)
 
@@ -299,4 +307,11 @@ def remove_member(
 
     family_repo.remove_member(ctx.family_id, member_uid)
     user_repo.update_user(member_uid, {"family_id": "", "is_activated": False})
+
+    # ① Custom Claims をクリア — 削除されたメンバーがキャッシュ済み JWT でアクセスできないようにする
+    try:
+        fb_auth.set_custom_user_claims(member_uid, {"is_activated": False})
+    except Exception:
+        logger.warning("Failed to clear custom claims for uid=%s (non-fatal)", member_uid)
+
     logger.info("Member removed: family_id=%s, uid=%s", ctx.family_id, member_uid)

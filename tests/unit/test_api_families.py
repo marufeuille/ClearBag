@@ -3,7 +3,7 @@
 dependency_overrides を使ってリポジトリをモックに差し替える。
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -233,7 +233,7 @@ class TestJoinFamily:
     def test_successful_join_activates_user(
         self, join_client, mock_family_repo, mock_user_repo
     ):
-        """正常な join で is_activated: True がセットされる"""
+        """正常な join で is_activated: True がセットされ Custom Claims も更新される"""
         mock_family_repo.get_invitation_by_token.return_value = {
             "id": "inv-id",
             "family_id": _FAMILY_ID,
@@ -246,15 +246,22 @@ class TestJoinFamily:
             "plan": "free",
             "documents_this_month": 0,
         }
-        response = join_client.post(
-            "/api/families/join",
-            json={"token": "valid-token"},
-        )
+        with patch(
+            "v2.entrypoints.api.routes.families.fb_auth.set_custom_user_claims"
+        ) as mock_set_claims:
+            response = join_client.post(
+                "/api/families/join",
+                json={"token": "valid-token"},
+            )
         assert response.status_code == 200
         # is_activated: True が update_user に渡されていることを確認
         mock_user_repo.update_user.assert_called_once_with(
             _JOIN_AUTH_INFO.uid,
             {"family_id": _FAMILY_ID, "is_activated": True},
+        )
+        # Custom Claims が設定されていることを確認
+        mock_set_claims.assert_called_once_with(
+            _JOIN_AUTH_INFO.uid, {"is_activated": True}
         )
 
 
@@ -264,16 +271,23 @@ class TestRemoveMember:
     def test_removes_member_and_clears_activation(
         self, owner_client, mock_family_repo, mock_user_repo
     ):
-        """メンバー削除時に is_activated: False が設定される"""
+        """メンバー削除時に is_activated: False が設定され Custom Claims もクリアされる"""
         member_uid = "member-to-remove"
         mock_family_repo.list_members.return_value = [
             {"uid": _UID, "role": "owner"},
             {"uid": member_uid, "role": "member"},
         ]
-        response = owner_client.delete(f"/api/families/members/{member_uid}")
+        with patch(
+            "v2.entrypoints.api.routes.families.fb_auth.set_custom_user_claims"
+        ) as mock_set_claims:
+            response = owner_client.delete(f"/api/families/members/{member_uid}")
         assert response.status_code == 204
         mock_user_repo.update_user.assert_called_once_with(
             member_uid, {"family_id": "", "is_activated": False}
+        )
+        # Custom Claims がクリアされていることを確認
+        mock_set_claims.assert_called_once_with(
+            member_uid, {"is_activated": False}
         )
 
     def test_cannot_remove_self(self, owner_client):
