@@ -54,7 +54,7 @@ export function UploadArea({ onUploaded, onError }: UploadAreaProps) {
       if (e instanceof ApiError) {
         if (e.status === 402) {
           sendEvent({ action: "document_upload_error", category: "document", label: "quota_exceeded" });
-          onError?.("無料プランの月間上限（5枚）に達しました。プレミアムプランへのアップグレードをご検討ください。");
+          onError?.("月間の解析上限に達しました。来月までお待ちください。");
         } else if (e.status === 413 || e.status === 422) {
           sendEvent({ action: "document_upload_error", category: "document", label: `api_${e.status}` });
           onError?.(e.detail || "ファイルの処理に失敗しました。");

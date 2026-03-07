@@ -157,24 +157,9 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-gray-600 mb-3">
                   プラン
                 </h3>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-800">
-                      {settings.plan === "premium"
-                        ? "プレミアムプラン"
-                        : "無料プラン"}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      今月の解析数: {settings.documents_this_month}枚
-                      {settings.plan === "free" && " / 5枚"}
-                    </p>
-                  </div>
-                  {settings.plan === "free" && (
-                    <span className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-medium">
-                      ¥300/月でアップグレード
-                    </span>
-                  )}
-                </div>
+                <p className="text-xs text-gray-400">
+                  今月の解析数: {settings.documents_this_month}枚
+                </p>
               </div>
 
               {/* ファミリー管理 */}

@@ -146,10 +146,10 @@ class TestUploadDocument:
         mock_doc_repo.create.assert_not_called()
 
     def test_upload_rate_limit_free_plan(self, client, mock_family_repo):
-        """無料プランの月 5 枚制限を超えると 402 を返す"""
+        """月 20 枚制限を超えると 402 を返す"""
         mock_family_repo.get_family.return_value = {
             "plan": "free",
-            "documents_this_month": 5,
+            "documents_this_month": 20,
         }
         response = client.post(
             "/api/documents/upload",
