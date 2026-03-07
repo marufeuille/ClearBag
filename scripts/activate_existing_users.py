@@ -81,6 +81,14 @@ def activate_user(
 
     if not dry_run:
         db.collection(_USERS).document(uid).set({"is_activated": True}, merge=True)
+        # ① Custom Claims を設定 — 次回 JWT 取得時にフロントエンドが
+        #    API 呼び出し不要で is_activated を確認できるようにする
+        _init_firebase()
+        try:
+            fb_auth.set_custom_user_claims(uid, {"is_activated": True})
+            logger.info("Custom claims set: uid=%s", uid)
+        except Exception:
+            logger.warning("Failed to set custom claims for uid=%s (non-fatal)", uid)
 
     return True
 
