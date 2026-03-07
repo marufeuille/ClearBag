@@ -261,6 +261,7 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
 
 export interface RegisterResult {
   activated: boolean;
+  already_activated?: boolean;
   message: string;
 }
 

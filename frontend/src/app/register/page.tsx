@@ -9,6 +9,7 @@ type RegisterStatus =
   | "idle"
   | "registering"
   | "success"
+  | "already_activated"
   | "invalid_code"
   | "expired"
   | "exhausted"
@@ -25,8 +26,12 @@ function RegisterContent() {
     if (!code || !user || regStatus !== "idle") return;
     setRegStatus("registering");
     registerWithCode(code)
-      .then(() => {
-        setRegStatus("success");
+      .then((result) => {
+        if (result.already_activated) {
+          setRegStatus("already_activated");
+        } else {
+          setRegStatus("success");
+        }
         setTimeout(() => router.push("/dashboard"), 2000);
       })
       .catch((err: unknown) => {
@@ -76,6 +81,15 @@ function RegisterContent() {
 
   if (regStatus === "registering") {
     return <p className="text-gray-400 text-sm text-center">登録処理中...</p>;
+  }
+
+  if (regStatus === "already_activated") {
+    return (
+      <div className="text-center">
+        <p className="text-blue-600 text-sm font-medium">すでに登録済みです</p>
+        <p className="text-gray-400 text-xs mt-1">ダッシュボードに移動します...</p>
+      </div>
+    );
   }
 
   if (regStatus === "success") {
