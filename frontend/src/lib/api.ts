@@ -257,6 +257,18 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
 
 // ── ファミリー ────────────────────────────────────────────────────────────────
 
+// ── 認証・アクティベーション ─────────────────────────────────────────────────
+
+export interface RegisterResult {
+  activated: boolean;
+  message: string;
+}
+
+export const registerWithCode = (code: string) =>
+  post<RegisterResult>("/api/auth/register", { code });
+
+// ── ファミリー ────────────────────────────────────────────────────────────────
+
 export const getFamily = () => get<FamilyInfo>("/api/families/me");
 export const getFamilyMembers = () => get<FamilyMember[]>("/api/families/members");
 export const updateFamilyName = (name: string) => post<FamilyInfo>("/api/families", { name });
