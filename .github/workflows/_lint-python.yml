@@ -21,7 +21,7 @@ jobs:
         run: uv sync --extra dev
 
       - name: Ruff lint
-        run: uv run ruff check v2/
+        run: uv run ruff check v2/ tests/
 
       - name: Ruff format check
-        run: uv run ruff format --check v2/
+        run: uv run ruff format --check v2/ tests/

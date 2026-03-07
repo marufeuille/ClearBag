@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: ESLint
+        run: npm run lint
+
       - name: Security audit (npm audit)
         # next-pwa の transitive dep (serialize-javascript) に既知の high CVE があり
         # npm audit fix --force で破壊的変更が必要なため critical のみチェック

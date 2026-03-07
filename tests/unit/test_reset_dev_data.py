@@ -163,11 +163,6 @@ class TestMemberSeeding:
                 member_email=None,
             )
 
-        # users コレクションへの書き込みはオーナー1回のみ
-        users_set_calls = [
-            c
-            for c in mock_db.collection.return_value.document.return_value.set.call_args_list
-        ]
         # member_uid=None なのでファミリーへの2人目追加は起きない
         # （厳密な呼び出し回数検証は mock の連鎖構造に依存するため、
         #   ここでは dry_run=False で例外なく完了することを主に検証する）
