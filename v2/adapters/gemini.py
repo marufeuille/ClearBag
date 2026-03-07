@@ -265,7 +265,11 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
             return json.loads(text)
         except json.JSONDecodeError as e:
             logger.error("Failed to parse JSON response: %s", e)
-            logger.error("Raw response: %s", response_text)
+            logger.error(
+                "Failed to parse response (length=%d): %.100s...",
+                len(response_text),
+                response_text,
+            )
             raise
 
     def _convert_to_domain_model(self, raw_json: dict) -> DocumentAnalysis:

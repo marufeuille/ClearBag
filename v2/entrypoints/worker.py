@@ -149,13 +149,14 @@ def run_analysis_sync(
         logger.exception(
             "Worker failed: family_id=%s, doc_id=%s", family_id, document_id
         )
-        doc_repo.update_status(family_id, document_id, "error", error_message=str(e))
+        error_msg = str(e)[:200]
+        doc_repo.update_status(family_id, document_id, "error", error_message=error_msg)
         log_event(
             "document_analysis_failed",
             family_id=family_id,
             uid=uid,
             document_id=document_id,
-            error=str(e),
+            error=error_msg,
         )
         raise
 

@@ -103,6 +103,21 @@ class GCSBlobStorage(BlobStorage):
                 blob_path,
             )
 
+    def delete_by_prefix(self, prefix: str) -> None:
+        """指定プレフィックス配下の全ファイルを一括削除"""
+        blobs = list(self._client.list_blobs(self._bucket_name, prefix=prefix))
+        if not blobs:
+            logger.info("No blobs found for prefix: %s", prefix)
+            return
+        for blob in blobs:
+            blob.delete()
+        logger.info(
+            "Deleted %d blobs with prefix: bucket=%s, prefix=%s",
+            len(blobs),
+            self._bucket_name,
+            prefix,
+        )
+
     def generate_signed_url(self, blob_path: str, expiration_minutes: int = 15) -> str:
         """
         GCS オブジェクトへの一時的な署名付き URL を生成する。
