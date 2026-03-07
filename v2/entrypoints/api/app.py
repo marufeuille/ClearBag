@@ -41,6 +41,7 @@ from v2.analytics import log_event
 from v2.entrypoints import worker
 from v2.entrypoints.api.routes import (
     account,
+    auth,
     documents,
     events,
     families,
@@ -162,6 +163,7 @@ app.add_middleware(
 # ── ルーター登録 ─────────────────────────────────────────────────────────────
 _PREFIX = "/api"
 
+app.include_router(auth.router, prefix=_PREFIX)
 app.include_router(documents.router, prefix=_PREFIX)
 app.include_router(events.router, prefix=_PREFIX)
 app.include_router(tasks.router, prefix=_PREFIX)
