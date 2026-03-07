@@ -109,4 +109,6 @@ def register_with_code(
         auth_info.uid,
         body.code,
     )
-    return RegisterResponse(activated=True, message="登録が完了しました。ダッシュボードへ移動します。")
+    return RegisterResponse(
+        activated=True, message="登録が完了しました。ダッシュボードへ移動します。"
+    )
