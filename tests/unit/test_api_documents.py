@@ -272,6 +272,24 @@ class TestListDocuments:
         assert response.status_code == 200
         assert response.json() == []
 
+    def test_list_with_null_archive_filename_returns_200(self, client, mock_doc_repo):
+        """archive_filename が None のドキュメントが存在しても 500 にならず空文字で返る"""
+        mock_doc_repo.list.return_value = [
+            DocumentRecord(
+                id=_DOC_ID,
+                uid=_UID,
+                status="pending",
+                content_hash=_HASH,
+                storage_path=f"uploads/{_FAMILY_ID}/{_DOC_ID}.pdf",
+                original_filename="test.pdf",
+                mime_type="application/pdf",
+                archive_filename=None,  # type: ignore[arg-type]  # Firestoreから null が来るケース
+            )
+        ]
+        response = client.get("/api/documents")
+        assert response.status_code == 200
+        assert response.json()[0]["archive_filename"] == ""
+
 
 class TestGetDocument:
     """GET /api/documents/{id} のテスト"""

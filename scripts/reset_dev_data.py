@@ -174,6 +174,8 @@ def seed_demo_data(
       - families/{familyId}/members/{uid}: owner
       - profiles × 1: 太郎（小学3年生）
       - documents × 2 (completed) + events × 2 + tasks × 3
+      - documents × 1 (completed, archive_filename=None): 旧スキーマ互換性テスト用
+      - documents × 1 (pending): 処理中状態の UI テスト用
 
     Args:
         bucket_name: GCS バケット名。指定した場合は各ドキュメントの PDF も GCS にアップロードする。
@@ -196,7 +198,7 @@ def seed_demo_data(
 
     if dry_run:
         logger.info(
-            "DRY RUN: Would create users/%s, families/%s, 1 profile, 2 documents, 2 events, 3 tasks%s",
+            "DRY RUN: Would create users/%s, families/%s, 1 profile, 4 documents (2 completed + 1 legacy-null + 1 pending), 2 events, 3 tasks%s",
             uid,
             family_id,
             f" + upload PDFs to gs://{bucket_name}" if bucket_name else "",
@@ -258,11 +260,15 @@ def seed_demo_data(
     )
     logger.info("Created profile: %s", profile_ref.id)
 
-    # documents × 2
+    # documents × 2（正常データ）
     _seed_document_sports_day(db, family_id, uid, date_30d, date_29d, gcs_bucket)
     _seed_document_parent_meeting(db, family_id, uid, date_14d, date_7d, gcs_bucket)
 
-    logger.info("Seed complete: 1 profile, 2 documents, 2 events, 3 tasks")
+    # documents × 2（互換性テスト用：旧スキーマ・処理中状態）
+    _seed_document_legacy_null_archive(db, family_id, uid, gcs_bucket)
+    _seed_document_pending(db, family_id, uid, gcs_bucket)
+
+    logger.info("Seed complete: 1 profile, 4 documents (2 completed + 1 legacy-null + 1 pending), 2 events, 3 tasks")
 
 
 def _seed_document_sports_day(
@@ -410,6 +416,101 @@ def _seed_document_parent_meeting(
         }
     )
     logger.info("Created document: %s (doc_id=%s)", title, doc_id)
+
+
+def _seed_document_legacy_null_archive(
+    db: firestore.Client,
+    family_id: str,
+    uid: str,
+    gcs_bucket: storage.Bucket | None = None,
+) -> None:
+    """ドキュメント3: archive_filename が null の旧形式データ（互換性テスト用）。
+
+    archive_filename フィールドが導入される前に解析が完了したドキュメントを模倣する。
+    Firestore に archive_filename: null が保存されている状態で GET /api/documents が
+    500 にならないことを検証するためのシードデータ。
+    """
+    title = "給食だより"
+    doc_id = str(uuid.uuid4())
+    storage_path = f"uploads/{uid}/{doc_id}.pdf"
+
+    if gcs_bucket is not None:
+        gcs_bucket.blob(storage_path).upload_from_string(
+            _minimal_pdf(title), content_type="application/pdf"
+        )
+        logger.info("Uploaded PDF to GCS: %s", storage_path)
+
+    doc_ref = (
+        db.collection(_FAMILIES)
+        .document(family_id)
+        .collection(_DOCUMENTS)
+        .document(doc_id)
+    )
+    doc_ref.set(
+        {
+            "uid": uid,
+            "status": "completed",
+            "content_hash": str(uuid.uuid4()),
+            "storage_path": storage_path,
+            "original_filename": f"{title}.pdf",
+            "mime_type": "application/pdf",
+            "summary": "今月の給食の献立です。アレルギー対応の案内も含まれています。",
+            "category": "INFO",
+            "archive_filename": None,  # 旧スキーマ: archive_filename 導入前のデータを模倣
+            "error_message": None,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        }
+    )
+    logger.info(
+        "Created legacy document (archive_filename=None): %s (doc_id=%s)", title, doc_id
+    )
+
+
+def _seed_document_pending(
+    db: firestore.Client,
+    family_id: str,
+    uid: str,
+    gcs_bucket: storage.Bucket | None = None,
+) -> None:
+    """ドキュメント4: 解析待ち（status=pending）のドキュメント（UI表示テスト用）。
+
+    アップロード直後で AI 解析がまだ完了していない状態を模倣する。
+    summary / category / archive_filename が空文字の状態でも一覧表示がクラッシュしないことを検証する。
+    """
+    title = "学年だより"
+    doc_id = str(uuid.uuid4())
+    storage_path = f"uploads/{uid}/{doc_id}.pdf"
+
+    if gcs_bucket is not None:
+        gcs_bucket.blob(storage_path).upload_from_string(
+            _minimal_pdf(title), content_type="application/pdf"
+        )
+        logger.info("Uploaded PDF to GCS: %s", storage_path)
+
+    doc_ref = (
+        db.collection(_FAMILIES)
+        .document(family_id)
+        .collection(_DOCUMENTS)
+        .document(doc_id)
+    )
+    doc_ref.set(
+        {
+            "uid": uid,
+            "status": "pending",
+            "content_hash": str(uuid.uuid4()),
+            "storage_path": storage_path,
+            "original_filename": f"{title}.pdf",
+            "mime_type": "application/pdf",
+            "summary": "",
+            "category": "",
+            "archive_filename": "",
+            "error_message": None,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        }
+    )
+    logger.info("Created pending document: %s (doc_id=%s)", title, doc_id)
 
 
 def main() -> None:
