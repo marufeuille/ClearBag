@@ -59,14 +59,25 @@ Max uses: 50
 ### 1-C. コードの管理（一覧・revoke）
 
 ```bash
-# 一覧表示
+# 一覧表示（dev）
 PROJECT_ID=clearbag-dev uv run python scripts/manage_service_codes.py list
+
+# 一覧表示（prod）
+PROJECT_ID=clearbag-prod uv run python scripts/manage_service_codes.py list
 
 # コードを即時無効化
 PROJECT_ID=clearbag-dev uv run python scripts/manage_service_codes.py revoke A3kX9mP2
 
-# dry-run で確認
+# dry-run で確認してから revoke
 PROJECT_ID=clearbag-dev uv run python scripts/manage_service_codes.py revoke A3kX9mP2 --dry-run
+```
+
+list 出力例：
+```
+CODE       DESCRIPTION   USED  MAX  REMAINING  EXPIRES           STATUS
+A3kX9mP2  友人招待用       3     50   47         2026-04-07 09:00  active
+B9zQ1rT5  テスト用         5     5    0          2026-03-01 00:00  exhausted
+C4mW7yK1  期限切れ         1     10   9          2026-02-01 00:00  expired
 ```
 
 ---
@@ -95,20 +106,23 @@ PROJECT_ID=clearbag-dev uv run python scripts/activate_existing_users.py
 
 ## 3. ユーザーを停止する
 
-サービスへのアクセスを即時ブロックする（次回APIアクセスで403）。
+サービスへのアクセスを即時ブロックする（次回APIアクセスで403 ACTIVATION_REQUIRED）。
 
 ```bash
-# メールアドレスで指定
+# メールアドレスで指定（dev）
 PROJECT_ID=clearbag-dev uv run python scripts/deactivate_user.py --email user@example.com
 
-# UID で指定
-PROJECT_ID=clearbag-dev uv run python scripts/deactivate_user.py --uid <uid>
+# メールアドレスで指定（prod）
+PROJECT_ID=clearbag-prod uv run python scripts/deactivate_user.py --email user@example.com
+
+# UID で直接指定
+PROJECT_ID=clearbag-dev uv run python scripts/deactivate_user.py --uid <firebase-uid>
 
 # dry-run で確認してから実行
 PROJECT_ID=clearbag-dev uv run python scripts/deactivate_user.py --email user@example.com --dry-run
 ```
 
-停止を解除するには `activate_existing_users.py` を使う。
+停止を解除（再アクティベート）するには `activate_existing_users.py` を使う（セクション2参照）。
 
 ---
 
