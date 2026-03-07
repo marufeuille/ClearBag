@@ -23,7 +23,7 @@ variable "billing_account_id" {
 variable "budget_amount" {
   description = "月次予算金額（currency_code で指定した通貨建て）"
   type        = number
-  default     = 50
+  default     = 5000
 }
 
 variable "currency_code" {

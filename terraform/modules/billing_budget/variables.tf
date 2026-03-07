@@ -12,7 +12,7 @@ variable "project_id" {
 variable "budget_amount" {
   description = "月次予算金額 (USD)"
   type        = number
-  default     = 50
+  default     = 5000
 }
 
 variable "alert_thresholds" {
