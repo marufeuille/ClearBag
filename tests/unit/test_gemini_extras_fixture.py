@@ -26,7 +26,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from v2.adapters.gemini import GeminiDocumentAnalyzer
 from v2.domain.models import DocumentExtras
 
@@ -261,8 +260,8 @@ class TestRecordGeminiResponse:
 
         # レスポンスをフィクスチャとして保存するため、再度 JSON を取得する必要がある。
         # analyze() は内部で JSON をパースするので、ここでは直接 Gemini を呼んでrawを取る。
-        from vertexai.generative_models import Part
         import vertexai.preview.generative_models as generative_models
+        from vertexai.generative_models import Part
 
         document_part = Part.from_data(data=content, mime_type="application/pdf")
         user_prompt = analyzer._build_user_prompt({}, [])

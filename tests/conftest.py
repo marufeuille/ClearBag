@@ -13,12 +13,6 @@
 
 from unittest.mock import MagicMock
 
-
-def pytest_addoption(parser):
-    """カスタム pytest オプションを追加"""
-    parser.addoption("--pdf-path", default=None, help="録画対象のPDFパス（TestRecordGeminiResponse用）")
-    parser.addoption("--fixture-name", default=None, help="保存するフィクスチャ名（TestRecordGeminiResponse用）")
-
 import pytest
 from v2.domain.models import (
     AnalysisResult,
@@ -31,6 +25,13 @@ from v2.domain.models import (
 from v2.domain.ports import (
     DocumentAnalyzer,
 )
+
+
+def pytest_addoption(parser):
+    """カスタム pytest オプションを追加"""
+    parser.addoption("--pdf-path", default=None, help="録画対象のPDFパス（TestRecordGeminiResponse用）")
+    parser.addoption("--fixture-name", default=None, help="保存するフィクスチャ名（TestRecordGeminiResponse用）")
+
 
 # ========== サンプルデータ ==========
 
