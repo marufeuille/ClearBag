@@ -314,6 +314,85 @@ export function DocumentList({ refreshKey }: DocumentListProps) {
                       </div>
                     )}
 
+                    {/* 持ち物 */}
+                    {detail?.extras && detail.extras.items_to_bring.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 mb-1.5">持ち物</p>
+                        <ul className="space-y-1">
+                          {detail.extras.items_to_bring.map((it, i) => {
+                            const eventName = it.event_index >= 0
+                              ? detail.events[it.event_index]?.summary
+                              : undefined;
+                            return (
+                              <li key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                                <svg className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                </svg>
+                                <span>
+                                  {it.item}
+                                  {eventName && (
+                                    <span className="text-gray-400"> ({eventName})</span>
+                                  )}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* 服装 */}
+                    {detail?.extras && detail.extras.dress_code.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 mb-1.5">服装</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {detail.extras.dress_code.map((d, i) => (
+                            <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-purple-50 text-purple-700 border border-purple-100">
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 費用 */}
+                    {detail?.extras && detail.extras.costs.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 mb-1.5">費用</p>
+                        <ul className="space-y-1">
+                          {detail.extras.costs.map((c, i) => (
+                            <li key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                              <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>
+                                {c.description}
+                                {c.amount != null && <span className="font-medium"> ¥{c.amount.toLocaleString()}</span>}
+                                {c.due_date && <span className="text-gray-400"> ({c.due_date}まで)</span>}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* 注意事項 */}
+                    {detail?.extras && detail.extras.notes.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 mb-1.5">注意事項</p>
+                        <ul className="space-y-1">
+                          {detail.extras.notes.map((note, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                              <svg className="w-3.5 h-3.5 mt-0.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {note}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     {/* イベント・タスクなし */}
                     {detail && detail.events.length === 0 && detail.tasks.length === 0 && (
                       <p className="text-xs text-gray-400">関連するイベント・タスクはありません</p>

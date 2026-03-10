@@ -1,0 +1,4 @@
+{
+  "description": "行事予定のみ：extrasが空になるパターン（extras=Noneも許容）",
+  "extras": null
+}

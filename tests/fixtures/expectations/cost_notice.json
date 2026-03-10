@@ -1,0 +1,20 @@
+{
+  "description": "集金のお知らせ：複数費用の抽出パターン",
+  "extras": {
+    "must_contain_items": [],
+    "must_contain_dress_code_keywords": [],
+    "costs": [
+      {
+        "description_contains": "教材",
+        "amount_range": [1000, 2000],
+        "due_date_prefix": "2026-05"
+      },
+      {
+        "description_contains": "給食",
+        "amount_range": [4000, 6000],
+        "due_date_prefix": "2026-05"
+      }
+    ],
+    "must_contain_note_keywords": []
+  }
+}

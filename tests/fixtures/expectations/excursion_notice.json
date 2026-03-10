@@ -1,0 +1,15 @@
+{
+  "description": "遠足のお知らせ：持ち物・服装・費用・注意事項がすべて含まれるパターン",
+  "extras": {
+    "must_contain_items": ["水筒", "お弁当"],
+    "must_contain_dress_code_keywords": ["体操服"],
+    "costs": [
+      {
+        "description_contains": "遠足",
+        "amount_range": [400, 600],
+        "due_date_prefix": "2026-04"
+      }
+    ],
+    "must_contain_note_keywords": ["雨天"]
+  }
+}

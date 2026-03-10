@@ -27,8 +27,11 @@ from vertexai.generative_models import GenerativeModel, Part
 from v2.domain.models import (
     AnalysisResult,
     Category,
+    CostInfo,
     DocumentAnalysis,
+    DocumentExtras,
     EventData,
+    PrepItem,
     TaskData,
     TokenUsage,
     UserProfile,
@@ -235,7 +238,27 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
       "note": "メモ"
     }}
   ],
-  "archive_filename": "リネーム後のファイル名 (例: YYYYMMDD_タイトル_対象.pdf)"
+  "archive_filename": "リネーム後のファイル名 (例: YYYYMMDD_タイトル_対象.pdf)",
+  "extras": {{
+    "items_to_bring": [
+      {{
+        "item": "持ち物名 (例: 水筒, 体操服)",
+        "event_index": -1,
+        "source_text": "原文抜粋"
+      }}
+    ],
+    "dress_code": ["服装指定 (例: 体操服, 白い靴下)"],
+    "costs": [
+      {{
+        "description": "費用名 (例: 遠足代, 教材費)",
+        "amount": 500,
+        "due_date": "YYYY-MM-DD",
+        "source_text": "原文抜粋"
+      }}
+    ],
+    "notes": ["注意事項・その他の情報 (例: 雨天中止)"],
+    "source_texts": ["関連する原文抜粋"]
+  }}
 }}
 
 ## Instructions
@@ -243,6 +266,7 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
 1. 文書の日付、イベントの日時を正確に読み取ってください。年は文書内の情報や現在の日付から推測してください。
 2. Rulesにあるルールを適用して、タスクの期限や無視するかどうかを判断してください。
 3. ファイル名は `YYYYMMDD_タイトル` の形式にしてください。
+4. extrasには持ち物・服装・費用・注意事項を抽出してください。event_indexはeventsリストの0始まりインデックスを指定し、ドキュメント全体に関係する場合は-1としてください。amount は数値（整数）で、不明な場合はnullとしてください。
 """
 
     def _parse_response(self, response_text: str) -> dict:
@@ -314,6 +338,9 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
             for t in raw_json.get("tasks", [])
         ]
 
+        # Extras変換
+        extras = self._parse_extras(raw_json.get("extras"))
+
         return DocumentAnalysis(
             summary=raw_json.get("summary", ""),
             category=category,
@@ -321,4 +348,54 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
             events=events,
             tasks=tasks,
             archive_filename=raw_json.get("archive_filename") or "",
+            extras=extras,
+        )
+
+    def _parse_extras(self, raw: dict | None) -> DocumentExtras | None:
+        """生のJSON辞書からDocumentExtrasに変換。欠損・不正値はスキップ。"""
+        if not raw or not isinstance(raw, dict):
+            return None
+
+        items_to_bring = [
+            PrepItem(
+                item=i.get("item", ""),
+                event_index=int(i.get("event_index", -1)),
+                source_text=i.get("source_text", ""),
+            )
+            for i in raw.get("items_to_bring", [])
+            if isinstance(i, dict) and i.get("item")
+        ]
+
+        dress_code = [s for s in raw.get("dress_code", []) if isinstance(s, str) and s]
+
+        costs = []
+        for c in raw.get("costs", []):
+            if not isinstance(c, dict) or not c.get("description"):
+                continue
+            amount_raw = c.get("amount")
+            amount = int(amount_raw) if isinstance(amount_raw, (int, float)) else None
+            costs.append(
+                CostInfo(
+                    description=c.get("description", ""),
+                    amount=amount,
+                    due_date=c.get("due_date", ""),
+                    source_text=c.get("source_text", ""),
+                )
+            )
+
+        notes = [s for s in raw.get("notes", []) if isinstance(s, str) and s]
+        source_texts = [
+            s for s in raw.get("source_texts", []) if isinstance(s, str) and s
+        ]
+
+        # すべて空の場合はNoneを返す（UI側での空チェックを省略できる）
+        if not any([items_to_bring, dress_code, costs, notes, source_texts]):
+            return None
+
+        return DocumentExtras(
+            items_to_bring=items_to_bring,
+            dress_code=dress_code,
+            costs=costs,
+            notes=notes,
+            source_texts=source_texts,
         )

@@ -39,6 +39,36 @@ class TaskData:
 
 
 @dataclass(frozen=True)
+class PrepItem:
+    """持ち物・準備物"""
+
+    item: str  # 例: "水筒", "体操服"
+    event_index: int = -1  # 紐づくeventsのインデックス (-1=ドキュメント全体)
+    source_text: str = ""  # 原文抜粋 (将来RAG用)
+
+
+@dataclass(frozen=True)
+class CostInfo:
+    """費用情報"""
+
+    description: str  # 例: "遠足代", "教材費"
+    amount: int | None = None  # 円単位
+    due_date: str = ""  # YYYY-MM-DD
+    source_text: str = ""  # 原文抜粋 (将来RAG用)
+
+
+@dataclass(frozen=True)
+class DocumentExtras:
+    """ドキュメントから抽出した付加情報"""
+
+    items_to_bring: list[PrepItem] = field(default_factory=list)
+    dress_code: list[str] = field(default_factory=list)
+    costs: list[CostInfo] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+    source_texts: list[str] = field(default_factory=list)  # 原文抜粋 (RAG用)
+
+
+@dataclass(frozen=True)
 class DocumentAnalysis:
     """文書解析結果"""
 
@@ -48,6 +78,7 @@ class DocumentAnalysis:
     events: list[EventData] = field(default_factory=list)
     tasks: list[TaskData] = field(default_factory=list)
     archive_filename: str = ""  # 例: "20251025_遠足_長男.pdf"
+    extras: DocumentExtras | None = None  # 付加情報（持ち物・費用・服装・注意事項）
 
 
 @dataclass(frozen=True)

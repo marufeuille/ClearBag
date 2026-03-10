@@ -71,9 +71,28 @@ class DocumentResponse(BaseModel):
     created_at: str | None  # ISO 8601 形式
 
 
+class PrepItemResponse(BaseModel):
+    item: str
+    event_index: int = -1
+
+
+class CostInfoResponse(BaseModel):
+    description: str
+    amount: int | None = None
+    due_date: str = ""
+
+
+class ExtrasResponse(BaseModel):
+    items_to_bring: list[PrepItemResponse] = []
+    dress_code: list[str] = []
+    costs: list[CostInfoResponse] = []
+    notes: list[str] = []
+
+
 class DocumentDetailResponse(BaseModel):
     events: list[EventResponse]
     tasks: list[TaskResponse]
+    extras: ExtrasResponse | None = None
 
 
 class DocumentUrlResponse(BaseModel):
@@ -282,6 +301,33 @@ def get_document_detail(
 
     events = doc_repo.list_events_by_document(ctx.family_id, document_id)
     tasks = doc_repo.list_tasks_by_document(ctx.family_id, document_id)
+    extras_raw = doc_repo.get_document_extras_raw(ctx.family_id, document_id)
+
+    extras: ExtrasResponse | None = None
+    if extras_raw and isinstance(extras_raw, dict):
+        extras = ExtrasResponse(
+            items_to_bring=[
+                PrepItemResponse(
+                    item=i.get("item", ""),
+                    event_index=int(i.get("event_index", -1)),
+                )
+                for i in extras_raw.get("items_to_bring", [])
+                if isinstance(i, dict) and i.get("item")
+            ],
+            dress_code=[
+                s for s in extras_raw.get("dress_code", []) if isinstance(s, str)
+            ],
+            costs=[
+                CostInfoResponse(
+                    description=c.get("description", ""),
+                    amount=c.get("amount"),
+                    due_date=c.get("due_date", ""),
+                )
+                for c in extras_raw.get("costs", [])
+                if isinstance(c, dict) and c.get("description")
+            ],
+            notes=[s for s in extras_raw.get("notes", []) if isinstance(s, str)],
+        )
 
     return DocumentDetailResponse(
         events=[
@@ -306,6 +352,7 @@ def get_document_detail(
             )
             for t in tasks
         ],
+        extras=extras,
     )
 
 

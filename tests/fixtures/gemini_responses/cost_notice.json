@@ -1,0 +1,40 @@
+{
+  "summary": "5月の教材費・給食費の集金についてのお知らせです。",
+  "category": "TASK",
+  "related_profile_ids": ["CHILD1", "CHILD2"],
+  "events": [],
+  "tasks": [
+    {
+      "title": "5月分教材費・給食費の提出",
+      "due_date": "2026-05-10",
+      "assignee": "PARENT",
+      "note": "おつりのないようにご用意ください"
+    }
+  ],
+  "extras": {
+    "items_to_bring": [],
+    "dress_code": [],
+    "costs": [
+      {
+        "description": "教材費",
+        "amount": 1500,
+        "due_date": "2026-05-10",
+        "source_text": "教材費として1,500円"
+      },
+      {
+        "description": "給食費",
+        "amount": 4800,
+        "due_date": "2026-05-10",
+        "source_text": "給食費として4,800円"
+      }
+    ],
+    "notes": [
+      "おつりのないようにご準備ください",
+      "封筒に名前・クラスを記入してください"
+    ],
+    "source_texts": [
+      "教材費1,500円・給食費4,800円を封筒に入れて5月10日（月）までに担任へ提出"
+    ]
+  },
+  "archive_filename": "20260510_教材費給食費集金.pdf"
+}

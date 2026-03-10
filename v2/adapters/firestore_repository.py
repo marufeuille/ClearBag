@@ -154,17 +154,45 @@ class FirestoreDocumentRepository(DocumentRepository):
         # バッチ書き込み
         batch = self._db.batch()
 
+        # extras mapを構築（Noneの場合は保存しない）
+        extras_dict: dict | None = None
+        if analysis.extras is not None:
+            extras = analysis.extras
+            extras_dict = {
+                "items_to_bring": [
+                    {
+                        "item": it.item,
+                        "event_index": it.event_index,
+                        "source_text": it.source_text,
+                    }
+                    for it in extras.items_to_bring
+                ],
+                "dress_code": list(extras.dress_code),
+                "costs": [
+                    {
+                        "description": c.description,
+                        "amount": c.amount,
+                        "due_date": c.due_date,
+                        "source_text": c.source_text,
+                    }
+                    for c in extras.costs
+                ],
+                "notes": list(extras.notes),
+                "source_texts": list(extras.source_texts),
+            }
+
         # ドキュメント本体を更新
-        batch.update(
-            doc_ref,
-            {
-                "status": "completed",
-                "summary": analysis.summary,
-                "category": analysis.category.value,
-                "archive_filename": analysis.archive_filename,
-                "updated_at": firestore.SERVER_TIMESTAMP,
-            },
-        )
+        doc_update: dict = {
+            "status": "completed",
+            "summary": analysis.summary,
+            "category": analysis.category.value,
+            "archive_filename": analysis.archive_filename,
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        }
+        if extras_dict is not None:
+            doc_update["extras"] = extras_dict
+
+        batch.update(doc_ref, doc_update)
 
         # events サブコレクションに保存
         # family_id は collection_group クエリのフィルター用（必須）
@@ -349,6 +377,19 @@ class FirestoreDocumentRepository(DocumentRepository):
             for snap in snaps
             for d in (snap.to_dict() or {},)
         ]
+
+    def get_document_extras_raw(self, uid: str, document_id: str) -> dict | None:
+        """ドキュメントの extras フィールドをそのままの dict で返す。なければ None。"""
+        snap = (
+            self._db.collection(_FAMILIES)
+            .document(uid)
+            .collection(_DOCUMENTS)
+            .document(document_id)
+            .get()
+        )
+        if not snap.exists:
+            return None
+        return (snap.to_dict() or {}).get("extras")
 
     def list_tasks_by_document(
         self, uid: str, document_id: str
