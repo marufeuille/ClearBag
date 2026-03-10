@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime
 import logging
 
+import firebase_admin.auth as fb_auth
 from fastapi import APIRouter, Depends, HTTPException, status
 from google.cloud import firestore
 from pydantic import BaseModel
@@ -106,6 +107,15 @@ def register_with_code(
 
     transaction = db.transaction()
     _activate(transaction)
+
+    # Custom Claims を設定 — 次回 JWT 取得時にフロントエンドが API 呼び出し不要で
+    # is_activated を確認できるようにする（Cold Start 回避）
+    try:
+        fb_auth.set_custom_user_claims(auth_info.uid, {"is_activated": True})
+    except Exception:
+        logger.warning(
+            "Failed to set custom claims for uid=%s (non-fatal)", auth_info.uid
+        )
 
     logger.info(
         "register_with_code: activated uid=%s code=%s",
