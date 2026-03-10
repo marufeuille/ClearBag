@@ -411,7 +411,14 @@ class TestGetDocumentDetail:
         mock_doc_repo.get_document_extras_raw.return_value = {
             "items_to_bring": [{"item": "水筒", "event_index": -1, "source_text": ""}],
             "dress_code": ["体操服"],
-            "costs": [{"description": "遠足代", "amount": 500, "due_date": "2025-10-10", "source_text": ""}],
+            "costs": [
+                {
+                    "description": "遠足代",
+                    "amount": 500,
+                    "due_date": "2025-10-10",
+                    "source_text": "",
+                }
+            ],
             "notes": ["雨天中止"],
             "source_texts": [],
         }

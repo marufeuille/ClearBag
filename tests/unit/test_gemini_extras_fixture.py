@@ -38,8 +38,8 @@ _EXPECTATIONS_DIR = _FIXTURES_DIR / "expectations"
 # テスト対象のフィクスチャ名（gemini_responses/ と expectations/ の両方に同名ファイルがある）
 _FIXTURE_NAMES = [
     "excursion_notice",  # 遠足：持ち物・服装・費用・注意事項
-    "cost_notice",       # 集金：複数費用
-    "schedule_only",     # 行事予定のみ：extras なし
+    "cost_notice",  # 集金：複数費用
+    "schedule_only",  # 行事予定のみ：extras なし
 ]
 
 
@@ -74,10 +74,16 @@ def _assert_extras_meets_expectations(
         # extrasなしが期待される（空のDocumentExtrasも許容）
         if extras is not None:
             # 全フィールドが空ならOK（Geminiが空配列で返してくる場合）
-            assert not _item_names(extras), f"[{fixture_name}] extras.items_to_bring は空であるべき"
-            assert not _dress_code_str(extras), f"[{fixture_name}] extras.dress_code は空であるべき"
+            assert not _item_names(extras), (
+                f"[{fixture_name}] extras.items_to_bring は空であるべき"
+            )
+            assert not _dress_code_str(extras), (
+                f"[{fixture_name}] extras.dress_code は空であるべき"
+            )
             assert not extras.costs, f"[{fixture_name}] extras.costs は空であるべき"
-            assert not _note_str(extras), f"[{fixture_name}] extras.notes は空であるべき"
+            assert not _note_str(extras), (
+                f"[{fixture_name}] extras.notes は空であるべき"
+            )
         return
 
     actual_items = _item_names(extras)
@@ -148,8 +154,12 @@ class TestGeminiExtrasFixture:
         response_path = _RESPONSES_DIR / f"{fixture_name}.json"
         expectation_path = _EXPECTATIONS_DIR / f"{fixture_name}.json"
 
-        assert response_path.exists(), f"フィクスチャファイルが存在しない: {response_path}"
-        assert expectation_path.exists(), f"期待値ファイルが存在しない: {expectation_path}"
+        assert response_path.exists(), (
+            f"フィクスチャファイルが存在しない: {response_path}"
+        )
+        assert expectation_path.exists(), (
+            f"期待値ファイルが存在しない: {expectation_path}"
+        )
 
         raw_json = json.loads(response_path.read_text(encoding="utf-8"))
         expectation_json = json.loads(expectation_path.read_text(encoding="utf-8"))
@@ -209,7 +219,9 @@ class TestGeminiExtrasFixture:
             return
 
         for item in analysis.extras.items_to_bring:
-            assert item.item.strip(), f"[{fixture_name}] items_to_bring に空文字の item が含まれる"
+            assert item.item.strip(), (
+                f"[{fixture_name}] items_to_bring に空文字の item が含まれる"
+            )
 
         for d in analysis.extras.dress_code:
             assert d.strip(), f"[{fixture_name}] dress_code に空文字が含まれる"

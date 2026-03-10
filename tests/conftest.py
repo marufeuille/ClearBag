@@ -29,8 +29,16 @@ from v2.domain.ports import (
 
 def pytest_addoption(parser):
     """カスタム pytest オプションを追加"""
-    parser.addoption("--pdf-path", default=None, help="録画対象のPDFパス（TestRecordGeminiResponse用）")
-    parser.addoption("--fixture-name", default=None, help="保存するフィクスチャ名（TestRecordGeminiResponse用）")
+    parser.addoption(
+        "--pdf-path",
+        default=None,
+        help="録画対象のPDFパス（TestRecordGeminiResponse用）",
+    )
+    parser.addoption(
+        "--fixture-name",
+        default=None,
+        help="保存するフィクスチャ名（TestRecordGeminiResponse用）",
+    )
 
 
 # ========== サンプルデータ ==========

@@ -384,7 +384,9 @@ class GeminiDocumentAnalyzer(DocumentAnalyzer):
             )
 
         notes = [s for s in raw.get("notes", []) if isinstance(s, str) and s]
-        source_texts = [s for s in raw.get("source_texts", []) if isinstance(s, str) and s]
+        source_texts = [
+            s for s in raw.get("source_texts", []) if isinstance(s, str) and s
+        ]
 
         # すべて空の場合はNoneを返す（UI側での空チェックを省略できる）
         if not any([items_to_bring, dress_code, costs, notes, source_texts]):

@@ -167,7 +167,9 @@ class TestPrepItem:
 
     def test_create_prep_item_with_event_index(self):
         """event_indexを指定してPrepItemが生成される"""
-        item = PrepItem(item="体操服", event_index=0, source_text="体操服を着てきてください")
+        item = PrepItem(
+            item="体操服", event_index=0, source_text="体操服を着てきてください"
+        )
         assert item.event_index == 0
         assert item.source_text == "体操服を着てきてください"
 
@@ -217,7 +219,10 @@ class TestDocumentExtras:
     def test_create_extras_full(self):
         """全フィールド指定でDocumentExtrasが生成される"""
         extras = DocumentExtras(
-            items_to_bring=[PrepItem(item="水筒"), PrepItem(item="レジャーシート", event_index=0)],
+            items_to_bring=[
+                PrepItem(item="水筒"),
+                PrepItem(item="レジャーシート", event_index=0),
+            ],
             dress_code=["体操服", "白い靴下"],
             costs=[CostInfo(description="遠足代", amount=500, due_date="2026-04-20")],
             notes=["雨天中止"],

@@ -314,7 +314,9 @@ def get_document_detail(
                 for i in extras_raw.get("items_to_bring", [])
                 if isinstance(i, dict) and i.get("item")
             ],
-            dress_code=[s for s in extras_raw.get("dress_code", []) if isinstance(s, str)],
+            dress_code=[
+                s for s in extras_raw.get("dress_code", []) if isinstance(s, str)
+            ],
             costs=[
                 CostInfoResponse(
                     description=c.get("description", ""),
