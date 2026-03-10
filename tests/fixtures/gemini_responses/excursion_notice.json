@@ -1,0 +1,49 @@
+{
+  "summary": "4月25日（木）に動物園へ遠足があります。費用500円、体操服着用。雨天中止。",
+  "category": "EVENT",
+  "related_profile_ids": ["CHILD1"],
+  "events": [
+    {
+      "summary": "[長男] 遠足",
+      "start": "2026-04-25T08:30:00",
+      "end": "2026-04-25T15:00:00",
+      "location": "市立動物園",
+      "description": "バス移動。お弁当・水筒持参。",
+      "confidence": "HIGH"
+    }
+  ],
+  "tasks": [
+    {
+      "title": "遠足代の提出",
+      "due_date": "2026-04-20",
+      "assignee": "PARENT",
+      "note": "封筒に入れて担任に提出してください"
+    }
+  ],
+  "extras": {
+    "items_to_bring": [
+      {"item": "水筒", "event_index": 0, "source_text": "水筒をお持ちください"},
+      {"item": "お弁当", "event_index": 0, "source_text": "お弁当が必要です"},
+      {"item": "レジャーシート", "event_index": 0, "source_text": "レジャーシートをご持参ください"},
+      {"item": "雨合羽", "event_index": 0, "source_text": "念のため雨合羽をお持ちください"}
+    ],
+    "dress_code": ["体操服", "白い靴下", "運動靴"],
+    "costs": [
+      {
+        "description": "遠足代（バス代・入園料含む）",
+        "amount": 500,
+        "due_date": "2026-04-20",
+        "source_text": "遠足代として500円をご用意ください"
+      }
+    ],
+    "notes": [
+      "雨天の場合は中止となります",
+      "帽子を必ず着用してください",
+      "アレルギーのあるお子様は事前にご連絡ください"
+    ],
+    "source_texts": [
+      "水筒・お弁当・レジャーシートをお持ちください。体操服着用でお越しください。"
+    ]
+  },
+  "archive_filename": "20260425_遠足_長男.pdf"
+}

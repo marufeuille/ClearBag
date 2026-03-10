@@ -3,9 +3,12 @@
 import pytest
 from v2.domain.models import (
     Category,
+    CostInfo,
     DocumentAnalysis,
+    DocumentExtras,
     DocumentRecord,
     EventData,
+    PrepItem,
     TaskData,
     UserProfile,
 )
@@ -150,6 +153,111 @@ class TestDocumentRecord:
         )
         with pytest.raises(AttributeError):
             record.status = "completed"  # type: ignore
+
+
+class TestPrepItem:
+    """PrepItem dataclass のテスト"""
+
+    def test_create_prep_item_with_defaults(self):
+        """デフォルト値でPrepItemが生成される"""
+        item = PrepItem(item="水筒")
+        assert item.item == "水筒"
+        assert item.event_index == -1
+        assert item.source_text == ""
+
+    def test_create_prep_item_with_event_index(self):
+        """event_indexを指定してPrepItemが生成される"""
+        item = PrepItem(item="体操服", event_index=0, source_text="体操服を着てきてください")
+        assert item.event_index == 0
+        assert item.source_text == "体操服を着てきてください"
+
+    def test_prep_item_is_frozen(self):
+        """PrepItem は不変（frozen）である"""
+        item = PrepItem(item="水筒")
+        with pytest.raises(AttributeError):
+            item.item = "弁当"  # type: ignore
+
+
+class TestCostInfo:
+    """CostInfo dataclass のテスト"""
+
+    def test_create_cost_info_with_defaults(self):
+        """デフォルト値でCostInfoが生成される"""
+        cost = CostInfo(description="遠足代")
+        assert cost.description == "遠足代"
+        assert cost.amount is None
+        assert cost.due_date == ""
+        assert cost.source_text == ""
+
+    def test_create_cost_info_with_amount(self):
+        """金額付きCostInfoが生成される"""
+        cost = CostInfo(description="教材費", amount=1500, due_date="2026-04-20")
+        assert cost.amount == 1500
+        assert cost.due_date == "2026-04-20"
+
+    def test_cost_info_is_frozen(self):
+        """CostInfo は不変（frozen）である"""
+        cost = CostInfo(description="遠足代")
+        with pytest.raises(AttributeError):
+            cost.amount = 500  # type: ignore
+
+
+class TestDocumentExtras:
+    """DocumentExtras dataclass のテスト"""
+
+    def test_create_extras_with_defaults(self):
+        """デフォルト値でDocumentExtrasが生成される"""
+        extras = DocumentExtras()
+        assert extras.items_to_bring == []
+        assert extras.dress_code == []
+        assert extras.costs == []
+        assert extras.notes == []
+        assert extras.source_texts == []
+
+    def test_create_extras_full(self):
+        """全フィールド指定でDocumentExtrasが生成される"""
+        extras = DocumentExtras(
+            items_to_bring=[PrepItem(item="水筒"), PrepItem(item="レジャーシート", event_index=0)],
+            dress_code=["体操服", "白い靴下"],
+            costs=[CostInfo(description="遠足代", amount=500, due_date="2026-04-20")],
+            notes=["雨天中止"],
+            source_texts=["水筒をお持ちください"],
+        )
+        assert len(extras.items_to_bring) == 2
+        assert extras.items_to_bring[1].event_index == 0
+        assert extras.dress_code == ["体操服", "白い靴下"]
+        assert extras.costs[0].amount == 500
+        assert extras.notes == ["雨天中止"]
+
+    def test_extras_is_frozen(self):
+        """DocumentExtras は不変（frozen）である"""
+        extras = DocumentExtras()
+        with pytest.raises(AttributeError):
+            extras.notes = ["変更"]  # type: ignore
+
+
+class TestDocumentAnalysisWithExtras:
+    """DocumentAnalysis の extras フィールドのテスト"""
+
+    def test_analysis_extras_defaults_to_none(self):
+        """extrasのデフォルト値はNone（後方互換）"""
+        analysis = DocumentAnalysis(summary="テスト", category=Category.INFO)
+        assert analysis.extras is None
+
+    def test_analysis_with_extras(self):
+        """extrasを指定してDocumentAnalysisが生成される"""
+        extras = DocumentExtras(
+            items_to_bring=[PrepItem(item="水筒")],
+            notes=["雨天中止"],
+        )
+        analysis = DocumentAnalysis(
+            summary="遠足のお知らせ",
+            category=Category.EVENT,
+            extras=extras,
+        )
+        assert analysis.extras is not None
+        assert analysis.extras.items_to_bring[0].item == "水筒"
+        assert analysis.extras.notes == ["雨天中止"]
 
 
 class TestUserProfile:

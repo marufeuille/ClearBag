@@ -152,7 +152,98 @@ bash scripts/verify_worker_auth.sh [BASE_URL]
 
 ---
 
-## 7. prod リリース
+## 7. Gemini 抽出フィクスチャの録画（extras テスト用）
+
+`tests/fixtures/gemini_responses/` には、Gemini が返す JSON レスポンスのサンプルが保存されている。
+新しい PDF パターン（サマーフェスタのお知らせ・修学旅行など）を追加するときや、
+Gemini モデルのバージョンアップ後に抽出品質を確認したいときに録画を実施する。
+
+### 7-A. 新しいパターンを録画する
+
+```bash
+# 1. 実 Gemini API を呼び出してレスポンスを保存する
+PROJECT_ID=clearbag-dev \
+uv run pytest tests/unit/test_gemini_extras_fixture.py::TestRecordGeminiResponse \
+    -m manual -v -s \
+    --pdf-path=path/to/sample.pdf \
+    --fixture-name=my_new_fixture
+```
+
+実行後、`tests/fixtures/gemini_responses/my_new_fixture.json` が生成される。
+コンソール出力に抽出された items・costs・notes が表示されるので内容を確認する。
+
+```bash
+# 2. 期待値ファイルを手書きで作成する
+# tests/fixtures/expectations/my_new_fixture.json
+{
+  "description": "このフィクスチャの説明",
+  "extras": {
+    "must_contain_items": ["水筒", "お弁当"],        # 絶対含まれるべき持ち物
+    "must_contain_dress_code_keywords": ["体操服"],  # 部分一致で確認
+    "costs": [
+      {
+        "description_contains": "遠足",             # 費用名に含まれるキーワード
+        "amount_range": [400, 600],                 # 金額の許容範囲
+        "due_date_prefix": "2026-04"                # 期限の年月プレフィックス
+      }
+    ],
+    "must_contain_note_keywords": ["雨天"]           # 注意事項の部分一致
+  }
+}
+```
+
+期待値は「完全一致」ではなく「含んでいること」の宣言で書く。
+Gemini の出力の揺れ（"水筒（500ml以上）" など）に対してもテストが壊れないようにするため。
+
+```bash
+# 3. _FIXTURE_NAMES に追加して CI に組み込む
+# tests/unit/test_gemini_extras_fixture.py の先頭付近にあるリストに追記する
+_FIXTURE_NAMES = [
+    "excursion_notice",
+    "cost_notice",
+    "schedule_only",
+    "my_new_fixture",   # ← 追加
+]
+```
+
+### 7-B. モデルバージョンアップ後の再録画
+
+Gemini のモデルを変更したとき（例: `gemini-2.5-pro` → 新バージョン）は、
+既存フィクスチャを上書き録画して期待値との整合性を確認する。
+
+```bash
+# 既存フィクスチャを上書き（同じ --fixture-name を指定）
+PROJECT_ID=clearbag-dev \
+uv run pytest tests/unit/test_gemini_extras_fixture.py::TestRecordGeminiResponse \
+    -m manual -v -s \
+    --pdf-path=tests/fixtures/source_pdfs/excursion_notice.pdf \
+    --fixture-name=excursion_notice
+
+# 上書き後に通常テストが通ることを確認
+uv run pytest tests/unit/test_gemini_extras_fixture.py -m "not manual" -v
+```
+
+### 7-C. フィクスチャのファイル構成
+
+```
+tests/
+├── fixtures/
+│   ├── gemini_responses/       # 録画済み Gemini レスポンス JSON（git 管理）
+│   │   ├── excursion_notice.json   遠足（持ち物・服装・費用・注意）
+│   │   ├── cost_notice.json        集金（複数費用）
+│   │   └── schedule_only.json      行事予定のみ（extras なし）
+│   ├── expectations/           # 期待値宣言 JSON（git 管理）
+│   │   ├── excursion_notice.json
+│   │   ├── cost_notice.json
+│   │   └── schedule_only.json
+│   └── source_pdfs/            # 録画元 PDF（git 管理外・.gitignore 推奨）
+└── unit/
+    └── test_gemini_extras_fixture.py
+```
+
+---
+
+## 8. prod リリース
 
 ```bash
 git tag v1.x.x

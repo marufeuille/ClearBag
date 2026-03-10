@@ -50,9 +50,28 @@ export interface DocumentRecord {
   created_at: string | null;
 }
 
+export interface PrepItem {
+  item: string;
+  event_index: number;
+}
+
+export interface CostInfo {
+  description: string;
+  amount: number | null;
+  due_date: string;
+}
+
+export interface DocumentExtras {
+  items_to_bring: PrepItem[];
+  dress_code: string[];
+  costs: CostInfo[];
+  notes: string[];
+}
+
 export interface DocumentDetail {
   events: EventData[];
   tasks: TaskData[];
+  extras?: DocumentExtras | null;
 }
 
 export interface DocumentUrl {

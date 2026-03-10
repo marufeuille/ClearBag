@@ -70,6 +70,7 @@ def mock_doc_repo():
     repo.get.return_value = _DEFAULT_RECORD
     repo.list_events_by_document.return_value = []
     repo.list_tasks_by_document.return_value = []
+    repo.get_document_extras_raw.return_value = None  # extrasなし（デフォルト）
     return repo
 
 
@@ -404,6 +405,63 @@ class TestGetDocumentDetail:
         mock_doc_repo.get.return_value = None
         response = client.get("/api/documents/nonexistent/detail")
         assert response.status_code == 404
+
+    def test_detail_returns_extras_when_present(self, client, mock_doc_repo):
+        """extrasが存在する場合はレスポンスに含まれること"""
+        mock_doc_repo.get_document_extras_raw.return_value = {
+            "items_to_bring": [{"item": "水筒", "event_index": -1, "source_text": ""}],
+            "dress_code": ["体操服"],
+            "costs": [{"description": "遠足代", "amount": 500, "due_date": "2025-10-10", "source_text": ""}],
+            "notes": ["雨天中止"],
+            "source_texts": [],
+        }
+
+        response = client.get(f"/api/documents/{_DOC_ID}/detail")
+        assert response.status_code == 200
+        data = response.json()
+
+        extras = data["extras"]
+        assert extras is not None
+        assert extras["items_to_bring"][0]["item"] == "水筒"
+        assert extras["items_to_bring"][0]["event_index"] == -1
+        assert extras["dress_code"] == ["体操服"]
+        assert extras["costs"][0]["description"] == "遠足代"
+        assert extras["costs"][0]["amount"] == 500
+        assert extras["costs"][0]["due_date"] == "2025-10-10"
+        assert extras["notes"] == ["雨天中止"]
+
+    def test_detail_extras_none_when_not_present(self, client):
+        """extrasがない場合はレスポンスのextrasがNullになること"""
+        response = client.get(f"/api/documents/{_DOC_ID}/detail")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["extras"] is None
+
+    def test_detail_extras_filters_invalid_entries(self, client, mock_doc_repo):
+        """extras内の不正エントリ（item/descriptionなし）はフィルタされること"""
+        mock_doc_repo.get_document_extras_raw.return_value = {
+            "items_to_bring": [
+                {"item": "水筒", "event_index": 0},
+                {"event_index": 0},  # item欠損 → フィルタされる
+            ],
+            "dress_code": [],
+            "costs": [
+                {"description": "遠足代", "amount": None},
+                {},  # description欠損 → フィルタされる
+            ],
+            "notes": [],
+            "source_texts": [],
+        }
+
+        response = client.get(f"/api/documents/{_DOC_ID}/detail")
+        assert response.status_code == 200
+        data = response.json()
+
+        extras = data["extras"]
+        assert extras is not None
+        assert len(extras["items_to_bring"]) == 1
+        assert len(extras["costs"]) == 1
+        assert extras["costs"][0]["amount"] is None
 
 
 class TestGetDocumentUrl:

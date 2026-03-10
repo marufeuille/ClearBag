@@ -18,6 +18,9 @@ sample/
 # Manual test fixtures: 大容量ファイルはスクリプト実行時に生成するため除外
 tests/manual/fixtures/over_limit_*.bin
 
+# Gemini 録画用の元 PDF（個人情報を含む可能性があるため git 管理外）
+tests/fixtures/source_pdfs/
+
 # takt tool internals
 .takt/.runtime/
 .takt/runs/

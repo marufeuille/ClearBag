@@ -1,0 +1,32 @@
+{
+  "summary": "6月の行事予定表です。主な行事の日程をお知らせします。",
+  "category": "EVENT",
+  "related_profile_ids": ["CHILD1"],
+  "events": [
+    {
+      "summary": "[長男] 授業参観",
+      "start": "2026-06-10",
+      "end": "2026-06-10",
+      "location": "",
+      "description": "2・3時間目",
+      "confidence": "HIGH"
+    },
+    {
+      "summary": "[長男] 運動会",
+      "start": "2026-06-20",
+      "end": "2026-06-20",
+      "location": "校庭",
+      "description": "雨天順延",
+      "confidence": "HIGH"
+    }
+  ],
+  "tasks": [],
+  "extras": {
+    "items_to_bring": [],
+    "dress_code": [],
+    "costs": [],
+    "notes": [],
+    "source_texts": []
+  },
+  "archive_filename": "20260601_6月行事予定.pdf"
+}
