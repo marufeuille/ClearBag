@@ -148,12 +148,53 @@ class TestRegisterWithCode:
             patch(
                 "v2.entrypoints.api.routes.auth.firestore.transactional", lambda fn: fn
             ),
+            patch(
+                "v2.entrypoints.api.routes.auth.fb_auth.set_custom_user_claims"
+            ) as mock_claims,
         ):
             response = client.post("/api/auth/register", json={"code": _VALID_CODE})
 
         assert response.status_code == 200
         assert response.json()["activated"] is True
         assert response.json()["already_activated"] is False
+        # Custom Claims が正しいパラメータで呼ばれること（Cold Start 回避のため必須）
+        mock_claims.assert_called_once_with(_UID, {"is_activated": True})
+
+    def test_successful_activation_claims_failure_is_nonfatal(self, client: TestClient):
+        # Arrange: Custom Claims 設定が失敗しても 200 を返すこと
+        code_snap = _make_code_snap(
+            {"expires_at": _FUTURE, "used_count": 0, "max_uses": 10}
+        )
+        user_snap = _make_user_snap(is_activated=False)
+
+        mock_db = MagicMock()
+        mock_coll = MagicMock()
+        mock_db.collection.return_value = mock_coll
+        mock_coll.document.return_value.get.side_effect = [
+            code_snap,
+            user_snap,
+            code_snap,
+        ]
+        mock_db.transaction.return_value = MagicMock()
+
+        with (
+            patch(
+                "v2.entrypoints.api.routes.auth._get_firestore_client",
+                return_value=mock_db,
+            ),
+            patch(
+                "v2.entrypoints.api.routes.auth.firestore.transactional", lambda fn: fn
+            ),
+            patch(
+                "v2.entrypoints.api.routes.auth.fb_auth.set_custom_user_claims",
+                side_effect=Exception("Firebase Auth unavailable"),
+            ),
+        ):
+            response = client.post("/api/auth/register", json={"code": _VALID_CODE})
+
+        # Custom Claims 失敗は non-fatal — Firestore への is_activated 設定は完了済み
+        assert response.status_code == 200
+        assert response.json()["activated"] is True
 
     def test_unlimited_code_succeeds(self, client: TestClient):
         # Arrange: max_uses=None（無制限コード）
@@ -181,6 +222,7 @@ class TestRegisterWithCode:
             patch(
                 "v2.entrypoints.api.routes.auth.firestore.transactional", lambda fn: fn
             ),
+            patch("v2.entrypoints.api.routes.auth.fb_auth.set_custom_user_claims"),
         ):
             response = client.post("/api/auth/register", json={"code": _VALID_CODE})
 
