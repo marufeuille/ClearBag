@@ -23,7 +23,7 @@ dependencies = [
     # --- リトライ ---
     "tenacity>=9.0.0",
     # --- PDF 解析 ---
-    "pypdf>=6.7.5",
+    "pypdf>=6.10.1",
     # --- ユーティリティ ---
     "python-dotenv>=1.2.1",
 ]
